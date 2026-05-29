@@ -1,0 +1,161 @@
+name: God Channel Automation
+
+on:
+  schedule:
+    # Short A (multi-image): 7:00 AM IST = 01:30 UTC
+    - cron: '30 01 * * *'
+    # Short B (single-image): 7:00 PM IST = 13:30 UTC
+    - cron: '30 13 * * *'
+    # Long video: 12:00 PM IST = 06:30 UTC
+    - cron: '30 06 * * *'
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Video mode to generate'
+        required: true
+        default: 'multi_image'
+        type: choice
+        options:
+          - multi_image
+          - single_image
+          - long_video
+
+jobs:
+  upload_short_a:
+    name: Short A — Multi Image (7 AM IST)
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'multi_image' || github.event_name == 'schedule' && startsWith(github.event.schedule, '30 01')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg libass-dev
+
+      - name: Install Python dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Write credentials
+        run: |
+          echo '${{ secrets.TOKEN_JSON }}' > token.json
+
+      - name: Prepare assets
+        run: python prepare_assets.py
+
+      - name: Generate & upload Short A (multi_image)
+        env:
+          PYTHONUNBUFFERED: "1"
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python uploader.py --mode multi_image
+
+      - name: Commit manifest + archive
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git add manifest.json uploaded_archive/ || true
+          git commit -m "Auto: multi_image short [skip ci]" || echo "Nothing to commit"
+          git push origin main
+
+  upload_short_b:
+    name: Short B — Single Image (7 PM IST)
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'single_image' || github.event_name == 'schedule' && startsWith(github.event.schedule, '30 13')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg libass-dev
+
+      - name: Install Python dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Write credentials
+        run: |
+          echo '${{ secrets.TOKEN_JSON }}' > token.json
+
+      - name: Prepare assets
+        run: python prepare_assets.py
+
+      - name: Generate & upload Short B (single_image)
+        env:
+          PYTHONUNBUFFERED: "1"
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python uploader.py --mode single_image
+
+      - name: Commit manifest + archive
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git add manifest.json uploaded_archive/ || true
+          git commit -m "Auto: single_image short [skip ci]" || echo "Nothing to commit"
+          git push origin main
+
+  upload_long_video:
+    name: Long Video — Landscape (12 PM IST)
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'long_video' || github.event_name == 'schedule' && startsWith(github.event.schedule, '30 06')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg libass-dev
+
+      - name: Install Python dependencies
+        run: pip install --no-cache-dir -r requirements.txt
+
+      - name: Write credentials
+        run: |
+          echo '${{ secrets.TOKEN_JSON }}' > token.json
+
+      - name: Prepare assets
+        run: python prepare_assets.py
+
+      - name: Generate & upload Long Video
+        env:
+          PYTHONUNBUFFERED: "1"
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+        run: python uploader.py --mode long_video
+
+      - name: Commit manifest + archive
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git add manifest.json uploaded_archive/ || true
+          git commit -m "Auto: long_video [skip ci]" || echo "Nothing to commit"
+          git push origin main
