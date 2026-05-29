@@ -4,7 +4,7 @@ generate_short.py — God Channel Video Generator
 Generates one of three video types based on --mode argument:
 
   --mode multi_image   → Short Type A: multiple images from one randomly chosen
-                         god folder, each clip 2–4s, total under 60s. (vertical)
+                         god folder, each clip 2–4s, total 30–55s. (vertical)
 
   --mode single_image  → Short Type B: one single image from a randomly chosen
                          god folder, duration 30–55s, with Ken Burns + effects.
@@ -12,6 +12,8 @@ Generates one of three video types based on --mode argument:
 
   --mode long_video    → Long video: all images from one randomly chosen god folder,
                          landscape 1920x1080, under 4 minutes.
+
+No voiceover. No text overlays. Random duration between 30–55 seconds (Shorts modes).
 
 Output: prints a single JSON line on stdout with keys:
   video, title, description, tags, god_name, mode
@@ -21,19 +23,12 @@ import sys
 import json
 import random
 import subprocess
-import asyncio
 from pathlib import Path
 
 # ─────────────────────────────────────────────
 PROC_BASE  = Path("assets/gods_processed")
 OUTPUT     = Path("output")
 OUTPUT.mkdir(exist_ok=True)
-
-VOICE      = "en-IN-PrabhatNeural"   # warm Indian English voice for elderly audience
-FONT_PATH  = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-
-# Channel branding
-CHANNEL_TAG = "@GodsBlessings"       # ← update to your actual channel handle
 
 # Manifest to track which folder was used last (to rotate fairly)
 MANIFEST   = Path("manifest.json")
@@ -192,24 +187,19 @@ def get_duration(file: Path) -> float:
     return float(subprocess.check_output(cmd).decode().strip())
 
 
-# ── TTS ──────────────────────────────────────────────────────────────────────
+# ── Random target duration for Shorts ────────────────────────────────────────
 
-async def _tts(text: str, out_path: Path):
-    import edge_tts
-    comm = edge_tts.Communicate(text, VOICE)
-    await comm.save(str(out_path))
-
-
-def tts(text: str, out_path: Path):
-    asyncio.run(_tts(text, out_path))
+def random_short_duration() -> float:
+    """Pick a random duration between 30 and 55 seconds."""
+    return round(random.uniform(30.0, 55.0), 2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VIDEO TYPE A — Multi-image Short (vertical, <60s)
+# VIDEO TYPE A — Multi-image Short (vertical, 30–55s, no voice, no text)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_multi_image_short() -> dict:
-    """Pick one god folder, take multiple images as 2–4s clips, concat → Short."""
+    """Pick one god folder, take multiple images as clips, concat → Short."""
     god_dir = pick_god_folder("multi_image")
     vert_dir = god_dir / "vertical"
     clips = sorted(vert_dir.glob("*.mp4"))
@@ -220,17 +210,9 @@ def generate_multi_image_short() -> dict:
 
     meta = get_meta(god_dir.name)
     title = random.choice(meta["titles_multi"])
+    target_dur = random_short_duration()
 
-    # Greet and describe
-    vo_text = (
-        f"Jai {meta['display']}! "
-        
-    )
-    vo_path = OUTPUT / "vo_multi.mp3"
-    tts(vo_text, vo_path)
-    vo_duration = get_duration(vo_path)
-
-    # How many clips fit under 58 seconds?
+    # Select clips to fill target duration
     selected = []
     total_dur = 0.0
     shuffled = list(clips)
@@ -238,22 +220,28 @@ def generate_multi_image_short() -> dict:
 
     for clip in shuffled:
         d = get_duration(clip)
-        if total_dur + d > 58:
+        if total_dur + d > target_dur:
+            # Add a trimmed version of this clip to exactly hit target_dur
+            remaining = target_dur - total_dur
+            if remaining >= 1.0:
+                selected.append((clip, remaining))
+                total_dur += remaining
             break
         selected.append((clip, d))
         total_dur += d
-        if total_dur >= 50:
+        if total_dur >= target_dur:
             break
 
-    # Need at least 2 clips
-    if len(selected) < 2:
-        selected = [(c, get_duration(c)) for c in shuffled[:4]]
+    # Need at least 1 clip
+    if not selected:
+        clip = shuffled[0]
+        selected = [(clip, min(get_duration(clip), target_dur))]
+        total_dur = selected[0][1]
 
     print(f"🙏 God: {meta['display']} | {len(selected)} clips | {total_dur:.1f}s", file=sys.stderr)
 
-    # Build ffmpeg command
     out_file = OUTPUT / "short_multi.mp4"
-    _build_concat_vertical(selected, vo_path, vo_duration, title, out_file)
+    _build_concat_vertical(selected, target_dur, out_file)
 
     return {
         "video":       str(out_file),
@@ -265,54 +253,42 @@ def generate_multi_image_short() -> dict:
     }
 
 
-def _build_concat_vertical(selected: list, vo_path: Path, vo_duration: float,
-                            title: str, out_file: Path):
-    """Concat clips, overlay TTS audio and on-screen text, output vertical Short."""
+def _build_concat_vertical(selected: list, duration: float, out_file: Path):
+    """Concat clips, no audio, no text, output vertical Short."""
     n = len(selected)
 
     cmd = ["ffmpeg", "-y"]
-    for clip, _ in selected:
+
+    if n == 1:
+        # Single clip, just trim it
+        clip, dur = selected[0]
+        cmd += [
+            "-i", str(clip),
+            "-t", f"{dur:.2f}",
+            "-an",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
+            "-r", "30",
+            str(out_file)
+        ]
+        subprocess.run(cmd, check=True)
+        return
+
+    # Build filter for trim + concat
+    for clip, dur in selected:
         cmd += ["-i", str(clip)]
-    cmd += ["-i", str(vo_path)]
 
-    # Video filter: concat + text overlays
     fc = ""
-    for i in range(n):
-        fc += f"[{i}:v]setpts=PTS-STARTPTS[v{i}];"
+    for i, (clip, dur) in enumerate(selected):
+        fc += f"[{i}:v]trim=duration={dur:.2f},setpts=PTS-STARTPTS[v{i}];"
     fc += "".join(f"[v{i}]" for i in range(n))
-    fc += f"concat=n={n}:v=1:a=0[vraw];"
-
-    clean_title = title.replace("'", "").replace(":", "").replace("#", "").upper()
-    if len(clean_title) > 40:
-        clean_title = clean_title[:40]
-
-    sub_start = max(0, vo_duration - 4)
-
-    overlays = (
-        f"drawtext=fontfile='{FONT_PATH}':text='{clean_title}':fontsize=38:"
-        f"fontcolor=yellow:borderw=4:bordercolor=black:"
-        f"x=(w-text_w)/2:y=h*0.15:enable='between(t,0,3)',"
-        f"drawtext=fontfile='{FONT_PATH}':text='🙏 JAI {clean_title[:20]}':fontsize=34:"
-        f"fontcolor=white:borderw=3:bordercolor=black:"
-        f"x=(w-text_w)/2:y=h*0.75:enable='between(t,3,{sub_start:.1f})',"
-        f"drawtext=fontfile='{FONT_PATH}':text='SUBSCRIBE FOR DAILY BLESSINGS':fontsize=36:"
-        f"fontcolor=red:borderw=4:bordercolor=white:"
-        f"x=(w-text_w)/2:y=(h-text_h)/2:enable='gt(t,{sub_start:.1f})',"
-        f"drawtext=fontfile='{FONT_PATH}':text='{CHANNEL_TAG}':fontsize=22:"
-        f"fontcolor=white@0.5:x=w-tw-16:y=16"
-    )
-
-    fc += f"[vraw]{overlays}[vout];"
-
-    # Audio: voiceover only (music added manually)
-    fc += f"[{n}:a]volume=2.2[aout]"
+    fc += f"concat=n={n}:v=1:a=0[vout]"
 
     cmd += [
         "-filter_complex", fc,
-        "-map", "[vout]", "-map", "[aout]",
+        "-map", "[vout]",
+        "-an",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
-        "-c:a", "aac", "-b:a", "192k",
-        "-t", f"{vo_duration:.2f}",
+        "-t", f"{duration:.2f}",
         "-r", "30",
         str(out_file)
     ]
@@ -320,11 +296,11 @@ def _build_concat_vertical(selected: list, vo_path: Path, vo_duration: float,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VIDEO TYPE B — Single-image Short (vertical, 30–55s, with effects)
+# VIDEO TYPE B — Single-image Short (vertical, 30–55s, Ken Burns, no voice, no text)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_single_image_short() -> dict:
-    """Pick one god folder, pick one random image, make 30–55s Short with effects."""
+    """Pick one god folder, pick one random clip, make 30–55s Short with Ken Burns."""
     god_dir = pick_god_folder("single_image")
     vert_dir = god_dir / "vertical"
     clips = sorted(vert_dir.glob("*.mp4"))
@@ -336,26 +312,12 @@ def generate_single_image_short() -> dict:
     chosen_clip = random.choice(clips)
     meta = get_meta(god_dir.name)
     title = random.choice(meta["titles_single"])
-
-    # Longer, devotional voiceover for single-image format
-    vo_text = (
-        f"Jai {meta['display']}! "
-        "Please take a moment to look at this beautiful divine image and offer your prayers. "
-        "May the blessings of the Almighty always be with you, your family, and all your loved ones. "
-        "This sacred image brings peace, happiness, and good health to all who see it. "
-        "Please share this video with your parents, grandparents, and family members. "
-        "Subscribe to our channel for daily divine darshan and blessings. "
-        f"Jai {meta['display']}! God bless you all."
-    )
-    vo_path = OUTPUT / "vo_single.mp3"
-    tts(vo_text, vo_path)
-    vo_duration = get_duration(vo_path)
-    target_dur = max(30.0, min(vo_duration + 2, 54.0))
+    target_dur = random_short_duration()
 
     print(f"🙏 God: {meta['display']} | Single image | {target_dur:.1f}s", file=sys.stderr)
 
     out_file = OUTPUT / "short_single.mp4"
-    _build_single_image_vertical(chosen_clip, vo_path, target_dur, title, out_file, meta)
+    _build_single_image_vertical(chosen_clip, target_dur, out_file)
 
     return {
         "video":       str(out_file),
@@ -367,51 +329,25 @@ def generate_single_image_short() -> dict:
     }
 
 
-def _build_single_image_vertical(clip: Path, vo_path: Path, duration: float,
-                                  title: str, out_file: Path, meta: dict):
-    """Single image with Ken Burns zoom + fade in/out + golden glow border."""
-    sub_start = max(0, duration - 5)
-    clean_title = title.replace("'", "").replace(":", "").replace("#", "").upper()[:40]
-    god_display  = meta["display"].upper()
-
-    # Ken Burns: slow zoom from 1.05x to 1.15x over the full duration
+def _build_single_image_vertical(clip: Path, duration: float, out_file: Path):
+    """Single image with Ken Burns zoom + fade in/out. No audio, no text."""
+    # Ken Burns: slow zoom from 1.05x to 1.15x over full duration
     zoom_effect = (
         f"scale=8000:-1,zoompan="
         f"z='min(zoom+0.0003,1.15)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
-        f"d={int(duration*30)}:s=720x1280:fps=30"
+        f"d={int(duration * 30)}:s=720x1280:fps=30"
     )
     fade_in  = "fade=t=in:st=0:d=1.5"
-    fade_out = f"fade=t=out:st={duration-1.5:.2f}:d=1.5"
+    fade_out = f"fade=t=out:st={duration - 1.5:.2f}:d=1.5"
 
-    text_layers = (
-        # God name — bottom third, always visible
-        f"drawtext=fontfile='{FONT_PATH}':text='🙏 JAI {god_display}':fontsize=48:"
-        f"fontcolor=gold:borderw=5:bordercolor=black:"
-        f"x=(w-text_w)/2:y=h*0.78,"
-        # Subtitle line
-        f"drawtext=fontfile='{FONT_PATH}':text='DIVINE DARSHAN':fontsize=30:"
-        f"fontcolor=white@0.85:borderw=3:bordercolor=black:"
-        f"x=(w-text_w)/2:y=h*0.85,"
-        # Subscribe CTA
-        f"drawtext=fontfile='{FONT_PATH}':text='🔔 SUBSCRIBE FOR DAILY BLESSINGS':fontsize=32:"
-        f"fontcolor=red:borderw=4:bordercolor=white:"
-        f"x=(w-text_w)/2:y=(h-text_h)/2:enable='gt(t,{sub_start:.1f})',"
-        # Channel watermark
-        f"drawtext=fontfile='{FONT_PATH}':text='{CHANNEL_TAG}':fontsize=22:"
-        f"fontcolor=white@0.5:x=w-tw-16:y=16"
-    )
-
-    vf = f"{zoom_effect},{fade_in},{fade_out},{text_layers}"
+    vf = f"{zoom_effect},{fade_in},{fade_out}"
 
     cmd = [
         "ffmpeg", "-y",
         "-stream_loop", "-1", "-i", str(clip),
-        "-i", str(vo_path),
-        "-filter_complex",
-            f"[0:v]{vf}[vout];[1:a]volume=2.2[aout]",
-        "-map", "[vout]", "-map", "[aout]",
+        "-vf", vf,
+        "-an",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "20",
-        "-c:a", "aac", "-b:a", "192k",
         "-t", f"{duration:.2f}",
         "-r", "30",
         str(out_file)
@@ -420,7 +356,7 @@ def _build_single_image_vertical(clip: Path, vo_path: Path, duration: float,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VIDEO TYPE C — Long Landscape Video (<4 min, 1920x1080)
+# VIDEO TYPE C — Long Landscape Video (<4 min, 1920x1080, no voice, no text)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_long_video() -> dict:
@@ -436,7 +372,7 @@ def generate_long_video() -> dict:
     meta = get_meta(god_dir.name)
     title = random.choice(meta["titles_long"])
 
-    # Collect clips up to 3 min 40 sec (leaving room for VO and credits)
+    # Collect clips up to 3 min 40 sec
     selected = []
     total_dur = 0.0
     shuffled = list(clips)
@@ -450,29 +386,15 @@ def generate_long_video() -> dict:
         total_dur += d
 
     if not selected:
-        selected = [(shuffled[0], get_duration(shuffled[0]))]
+        clip = shuffled[0]
+        d = min(get_duration(clip), 218.0)
+        selected = [(clip, d)]
+        total_dur = d
 
-    # TTS: full devotional narration
-    vo_text = (
-        f"Jai {meta['display']}! Welcome to our channel. "
-        "We bring you this beautiful collection of divine images for your daily darshan. "
-        "May looking at these sacred images bring peace, health, and happiness to you and your entire family. "
-        "Our elders always taught us that starting the day with God's darshan brings good fortune. "
-        "Take a moment, close your eyes, and offer your prayers with a pure heart. "
-        f"May {meta['display']} always protect you and bless your family with long life and prosperity. "
-        "Please like this video, share it with your parents and grandparents, "
-        "and subscribe to our channel for daily devotional content. "
-        f"Jai {meta['display']}! God bless you all."
-    )
-    vo_path = OUTPUT / "vo_long.mp3"
-    tts(vo_text, vo_path)
-    vo_duration = get_duration(vo_path)
-    target_dur = max(total_dur, vo_duration + 2)
-
-    print(f"🙏 God: {meta['display']} | Long video | {len(selected)} clips | {target_dur:.1f}s", file=sys.stderr)
+    print(f"🙏 God: {meta['display']} | Long video | {len(selected)} clips | {total_dur:.1f}s", file=sys.stderr)
 
     out_file = OUTPUT / "long_video.mp4"
-    _build_long_landscape(selected, vo_path, target_dur, title, out_file, meta)
+    _build_long_landscape(selected, total_dur, out_file)
 
     return {
         "video":       str(out_file),
@@ -484,50 +406,40 @@ def generate_long_video() -> dict:
     }
 
 
-def _build_long_landscape(selected: list, vo_path: Path, duration: float,
-                           title: str, out_file: Path, meta: dict):
-    """Concat horizontal clips, TTS audio, elegant text overlays."""
+def _build_long_landscape(selected: list, duration: float, out_file: Path):
+    """Concat horizontal clips, fade in/out, no audio, no text."""
     n = len(selected)
-    sub_start = max(0, duration - 6)
-    god_display = meta["display"].upper()
 
     cmd = ["ffmpeg", "-y"]
     for clip, _ in selected:
         cmd += ["-i", str(clip)]
-    cmd += ["-i", str(vo_path)]
+
+    if n == 1:
+        clip, dur = selected[0]
+        vf = f"fade=t=in:st=0:d=2,fade=t=out:st={dur - 2:.1f}:d=2"
+        cmd += [
+            "-vf", vf,
+            "-an",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "20",
+            "-t", f"{dur:.2f}",
+            "-r", "30",
+            str(out_file)
+        ]
+        subprocess.run(cmd, check=True)
+        return
 
     fc = ""
-    for i in range(n):
-        fc += f"[{i}:v]setpts=PTS-STARTPTS[v{i}];"
+    for i, (clip, dur) in enumerate(selected):
+        fc += f"[{i}:v]trim=duration={dur:.2f},setpts=PTS-STARTPTS[v{i}];"
     fc += "".join(f"[v{i}]" for i in range(n))
     fc += f"concat=n={n}:v=1:a=0[vraw];"
-
-    # Landscape text overlays — title top, god name bottom-left, subscribe end
-    clean_title = title.replace("'", "").replace(":", "").replace("#", "")[:60]
-    overlays = (
-        f"drawtext=fontfile='{FONT_PATH}':text='{clean_title}':fontsize=50:"
-        f"fontcolor=gold:borderw=5:bordercolor=black:"
-        f"x=(w-text_w)/2:y=60:enable='between(t,0,5)',"
-        f"drawtext=fontfile='{FONT_PATH}':text='🙏 JAI {god_display}':fontsize=44:"
-        f"fontcolor=white:borderw=4:bordercolor=black:"
-        f"x=40:y=h-80,"
-        f"drawtext=fontfile='{FONT_PATH}':text='SUBSCRIBE FOR DAILY DARSHAN 🔔':fontsize=48:"
-        f"fontcolor=red:borderw=5:bordercolor=white:"
-        f"x=(w-text_w)/2:y=(h-text_h)/2:enable='gt(t,{sub_start:.1f})',"
-        f"drawtext=fontfile='{FONT_PATH}':text='{CHANNEL_TAG}':fontsize=26:"
-        f"fontcolor=white@0.45:x=w-tw-20:y=20,"
-        # Fade in/out
-        f"fade=t=in:st=0:d=2,fade=t=out:st={duration-2:.1f}:d=2"
-    )
-
-    fc += f"[vraw]{overlays}[vout];"
-    fc += f"[{n}:a]volume=2.2[aout]"
+    fc += f"[vraw]fade=t=in:st=0:d=2,fade=t=out:st={duration - 2:.1f}:d=2[vout]"
 
     cmd += [
         "-filter_complex", fc,
-        "-map", "[vout]", "-map", "[aout]",
+        "-map", "[vout]",
+        "-an",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "20",
-        "-c:a", "aac", "-b:a", "192k",
         "-t", f"{duration:.2f}",
         "-r", "30",
         str(out_file)
