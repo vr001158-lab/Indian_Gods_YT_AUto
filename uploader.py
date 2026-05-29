@@ -1,6 +1,6 @@
 """
-uploader.py — God Channel: Generate → Save to Google Drive Only
-----------------------------------------------------------------
+uploader.py — God Channel: Generate → Upload to YouTube → Save to Google Drive
+-------------------------------------------------------------------------------
 Usage:
   python uploader.py --mode multi_image    # Short Type A
   python uploader.py --mode single_image   # Short Type B
@@ -8,8 +8,8 @@ Usage:
 
 Each run:
   1. Runs generate_short.py with the given mode
-  2. Saves the video file to Google Drive
-  3. Creates a readable metadata text file alongside it
+  2. Uploads the video to YouTube
+  3. Saves a copy + metadata JSON to Google Drive folder
 """
 
 import json
@@ -24,9 +24,11 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
+from googleapiclient.errors import HttpError
 
 # ─────────────────────────────────────────────
 SCOPES = [
+    "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/drive.file",
 ]
 TOKEN_PATH = "token.json"
@@ -90,13 +92,59 @@ def run_generator(mode: str) -> dict:
         sys.exit(1)
 
 
+# ── YouTube Upload ────────────────────────────────────────────────────────────
+
+def upload_to_youtube(youtube, item: dict) -> str:
+    """Upload video to YouTube. Returns the video ID."""
+    video_path = item["video"]
+    title       = item["title"]
+    description = item["description"]
+    tags        = item["tags"]
+    mode        = item["mode"]
+
+    # Shorts: categoryId 22 (People & Blogs) works well; 24 is Entertainment
+    # Long videos: 22
+    category_id = "22"
+
+    # YouTube requires #Shorts in title/description for shorts detection
+    is_short = mode in ("multi_image", "single_image")
+    if is_short and "#Shorts" not in title and "#shorts" not in title:
+        title = title + " #Shorts"
+
+    print(f"📤 Uploading to YouTube: {title[:60]}")
+
+    request = youtube.videos().insert(
+        part="snippet,status",
+        body={
+            "snippet": {
+                "title":       title[:95],
+                "description": description,
+                "tags":        tags,
+                "categoryId":  category_id,
+            },
+            "status": {
+                "privacyStatus":          "public",
+                "selfDeclaredMadeForKids": False,
+            }
+        },
+        media_body=MediaFileUpload(video_path, chunksize=-1, resumable=True)
+    )
+
+    response = request.execute()
+    video_id = response["id"]
+    print(f"✅ YouTube upload SUCCESS! ID: {video_id}")
+    print(f"   🔗 https://www.youtube.com/shorts/{video_id}" if is_short
+          else f"   🔗 https://www.youtube.com/watch?v={video_id}")
+    return video_id
+
+
 # ── Google Drive Upload ───────────────────────────────────────────────────────
 
-def upload_to_drive(drive, item: dict):
-    """Upload video + metadata text file to Google Drive folder."""
+def upload_to_drive(drive, item: dict, youtube_id: str):
+    """Upload video + metadata JSON to Google Drive folder."""
     if not DRIVE_FOLDER_ID:
-        print("❌ DRIVE_FOLDER_ID not set. Set it in GitHub Actions secrets.")
-        sys.exit(1)
+        print("⚠️  DRIVE_FOLDER_ID not set. Skipping Drive upload.")
+        return
 
     timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
     god_name   = item.get("god_name", "unknown")
@@ -105,10 +153,9 @@ def upload_to_drive(drive, item: dict):
 
     drive_filename = f"{timestamp}_{god_name}_{mode}.mp4"
 
-    print(f"\n☁️  Uploading to Google Drive...")
-    print(f"   Video: {drive_filename}")
+    print(f"☁️  Uploading to Google Drive: {drive_filename}")
 
-    # ─── Upload video file ────────────────────────────────────────────────────
+    # Upload video file
     file_metadata = {
         "name":    drive_filename,
         "parents": [DRIVE_FOLDER_ID],
@@ -119,93 +166,38 @@ def upload_to_drive(drive, item: dict):
         media_body=media,
         fields="id, name"
     ).execute()
-    print(f"   ✅ Video uploaded: {uploaded['name']}")
+    print(f"✅ Drive video uploaded: {uploaded['name']} (id={uploaded['id']})")
 
-    # ─── Create readable metadata text file ────────────────────────────────────
-    meta_text = _build_metadata_text(item, timestamp)
-    meta_filename = f"{timestamp}_{god_name}_{mode}_info.txt"
+    # Upload metadata JSON alongside the video
+    meta_content = {
+        "youtube_id":   youtube_id,
+        "youtube_url":  (f"https://www.youtube.com/shorts/{youtube_id}"
+                         if mode in ("multi_image", "single_image")
+                         else f"https://www.youtube.com/watch?v={youtube_id}"),
+        "title":        item["title"],
+        "description":  item["description"],
+        "tags":         item["tags"],
+        "god_name":     god_name,
+        "mode":         mode,
+        "generated_at": timestamp,
+        "drive_file":   drive_filename,
+    }
+
+    meta_filename = f"{timestamp}_{god_name}_{mode}_metadata.json"
     meta_path = Path(f"/tmp/{meta_filename}")
-    meta_path.write_text(meta_text, encoding="utf-8")
+    meta_path.write_text(json.dumps(meta_content, indent=2, ensure_ascii=False))
 
     drive.files().create(
         body={"name": meta_filename, "parents": [DRIVE_FOLDER_ID]},
-        media_body=MediaFileUpload(str(meta_path), mimetype="text/plain"),
+        media_body=MediaFileUpload(str(meta_path), mimetype="application/json"),
         fields="id"
     ).execute()
-    print(f"   ✅ Metadata saved: {meta_filename}")
+    print(f"✅ Drive metadata uploaded: {meta_filename}")
 
-    # ─── Save locally for git commit ───────────────────────────────────────────
+    # Also save metadata locally for git commit
     local_meta = ARCHIVE_DIR / meta_filename
     shutil.copy(meta_path, local_meta)
-    print(f"   📁 Local archive: {local_meta}")
-
-
-def _build_metadata_text(item: dict, timestamp: str) -> str:
-    """
-    Build a human-readable metadata text file.
-    """
-    god_name = item.get("god_name", "unknown").replace("_", " ").title()
-    mode = item.get("mode", "unknown").replace("_", " ").title()
-    title = item.get("title", "No Title")
-    description = item.get("description", "No description")
-    tags = item.get("tags", [])
-
-    dt = datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
-    date_str = dt.strftime("%B %d, %Y")
-    time_str = dt.strftime("%I:%M %p")
-
-    # Build readable text
-    text = []
-    text.append("=" * 70)
-    text.append("GOD CHANNEL — VIDEO METADATA")
-    text.append("=" * 70)
-    text.append("")
-    text.append(f"Generated: {date_str} at {time_str}")
-    text.append("")
-    text.append("-" * 70)
-    text.append("VIDEO DETAILS")
-    text.append("-" * 70)
-    text.append("")
-    text.append(f"God Name:     {god_name}")
-    text.append(f"Video Type:   {mode}")
-    text.append(f"File Name:    {timestamp}_{item.get('god_name')}_{item.get('mode')}.mp4")
-    text.append("")
-    text.append("-" * 70)
-    text.append("YOUTUBE INFORMATION")
-    text.append("-" * 70)
-    text.append("")
-    text.append(f"Title:")
-    text.append(f"  {title}")
-    text.append("")
-    text.append("Description:")
-    for line in description.split("\n"):
-        text.append(f"  {line}")
-    text.append("")
-    text.append("Tags / Hashtags:")
-    text.append("")
-    for i, tag in enumerate(tags, 1):
-        if i % 3 == 0:
-            text.append(f"  #{tag}")
-        else:
-            text.append(f"  #{tag}  ", end="")
-    text.append("")
-    text.append("")
-    text.append("-" * 70)
-    text.append("NOTES FOR UPLOADING")
-    text.append("-" * 70)
-    text.append("")
-    text.append("• Video is ready to upload to YouTube")
-    text.append("• Add music/background music if desired")
-    text.append("• Copy the Title above into YouTube title field")
-    text.append("• Copy the Description above into YouTube description field")
-    text.append("• Copy the Tags into YouTube tags field")
-    if mode == "short type a" or mode == "short type b":
-        text.append("• Add #Shorts to the title for YouTube Shorts")
-    text.append("• Set to Public when uploading")
-    text.append("")
-    text.append("=" * 70)
-
-    return "\n".join(text)
+    print(f"📁 Local archive: {local_meta}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -226,15 +218,17 @@ def main():
     item = run_generator(mode)
 
     # 2. Auth
-    creds = refresh_credentials(TOKEN_PATH)
-    drive = build("drive", "v3", credentials=creds)
+    creds   = refresh_credentials(TOKEN_PATH)
+    youtube = build("youtube", "v3", credentials=creds)
+    drive   = build("drive",   "v3", credentials=creds)
 
-    # 3. Save to Google Drive (no YouTube upload)
-    upload_to_drive(drive, item)
+    # 3. Upload to YouTube
+    video_id = upload_to_youtube(youtube, item)
 
-    print(f"\n🎉 Done! Saved to Google Drive")
-    print(f"   Mode: {item.get('mode')}")
-    print(f"   God: {item.get('god_name')}")
+    # 4. Save to Google Drive
+    upload_to_drive(drive, item, video_id)
+
+    print(f"\n🎉 All done! Mode={mode}, God={item.get('god_name')}, YT={video_id}")
 
 
 if __name__ == "__main__":
