@@ -224,10 +224,7 @@ def generate_multi_image_short() -> dict:
     # Greet and describe
     vo_text = (
         f"Jai {meta['display']}! "
-        "Today we bring you the beautiful divine darshan. "
-        "May these blessings bring peace and happiness to you and your entire family. "
-        "Please share this video with your loved ones. "
-        "Subscribe for daily God blessings."
+        
     )
     vo_path = OUTPUT / "vo_multi.mp3"
     tts(vo_text, vo_path)
