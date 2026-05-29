@@ -27,7 +27,7 @@ from pathlib import Path
 
 # ── Config ───────────────────────────────────────────────────────────────────
 
-DRIVE_FOLDER_ID  = "YOUR_DRIVE_FOLDER_ID_HERE"   # ← paste your Drive folder ID here
+DRIVE_FOLDER_ID  = "1wV6atZCtcrTQk4QMlTg1DV1vI7nYr-Ki"   # ← paste your Drive folder ID here
 CREDENTIALS_FILE = Path("credentials.json")
 TOKEN_FILE       = Path("token.json")
 SCOPES           = ["https://www.googleapis.com/auth/drive.file"]
