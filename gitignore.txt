@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# Runtime output
+temp/
+output/
+
+# OS junk
+.DS_Store
+Thumbs.db
+manifest.json
