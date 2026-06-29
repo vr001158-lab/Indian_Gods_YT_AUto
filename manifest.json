@@ -6,14 +6,15 @@
     "lord_vishnu"
   ],
   "used_single_image": [
-    "ayyappa",
-    "lakshmi_devi",
-    "ram",
-    "lord_shiva",
-    "krishna",
     "hanuman",
+    "ram",
     "lakshmi",
-    "parvathi"
+    "ayyappa",
+    "lord_shiva",
+    "parvathi",
+    "lord_vishnu",
+    "krishna",
+    "lakshmi_devi"
   ],
   "used_long_video": [
     "ganesha",
