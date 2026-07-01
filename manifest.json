@@ -1,10 +1,11 @@
 {
   "used_multi_image": [
-    "ganesha",
     "krishna",
-    "lakshmi_devi",
+    "lakshmi",
     "lord_vishnu",
-    "ram"
+    "ram",
+    "lakshmi_devi",
+    "ganesha"
   ],
   "used_single_image": [
     "ram",
