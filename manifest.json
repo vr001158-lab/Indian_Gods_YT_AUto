@@ -1,14 +1,15 @@
 {
   "used_multi_image": [
-    "lakshmi",
-    "krishna",
-    "ram",
     "lord_shiva",
-    "subramanya",
     "ganesha",
-    "lakshmi_devi",
+    "lakshmi",
     "lord_vishnu",
-    "hanuman"
+    "krishna",
+    "lakshmi_devi",
+    "subramanya",
+    "ram",
+    "hanuman",
+    "ayyappa"
   ],
   "used_single_image": [
     "lord_vishnu",
