@@ -4,16 +4,17 @@ generate_short.py — God Channel Video Generator
 Generates one of three video types based on --mode argument:
 
   --mode multi_image   → Short Type A: multiple images from one randomly chosen
-                         god folder, each clip 2–4s, total 30–55s. (vertical)
+                         god folder, each clip 2–4s, total 35–55s. (vertical)
 
   --mode single_image  → Short Type B: one single image from a randomly chosen
-                         god folder, duration 30–55s, with Ken Burns + effects.
+                         god folder, duration 35–55s, with Ken Burns + effects.
                          (vertical)
 
-  --mode long_video    → Long video: all images from one randomly chosen god folder,
+  --mode long_video    → Long video: all images from one randomly chosen god folder
+                         (sourced from assets/long_video_source/<god_name>/),
                          landscape 1920x1080, under 4 minutes.
 
-No voiceover. No text overlays. Random duration between 30–55 seconds (Shorts modes).
+No voiceover. No text overlays. Random duration between 35–55 seconds (Shorts modes).
 
 Output: prints a single JSON line on stdout with keys:
   video, title, description, tags, god_name, mode
@@ -26,8 +27,9 @@ import subprocess
 from pathlib import Path
 
 # ─────────────────────────────────────────────
-PROC_BASE  = Path("assets/gods_processed")
-OUTPUT     = Path("output")
+PROC_BASE         = Path("assets/gods_processed")
+LONG_VIDEO_SOURCE = Path("assets/long_video_source")   # top-level folder for long-video clips
+OUTPUT            = Path("output")
 OUTPUT.mkdir(exist_ok=True)
 
 # Manifest to track which folder was used last (to rotate fairly)
@@ -190,12 +192,12 @@ def get_duration(file: Path) -> float:
 # ── Random target duration for Shorts ────────────────────────────────────────
 
 def random_short_duration() -> float:
-    """Pick a random duration between 30 and 55 seconds."""
-    return round(random.uniform(30.0, 55.0), 2)
+    """Pick a random duration between 35 and 55 seconds."""
+    return round(random.uniform(35.0, 55.0), 2)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VIDEO TYPE A — Multi-image Short (vertical, 30–55s, no voice, no text)
+# VIDEO TYPE A — Multi-image Short (vertical, 35–55s, no voice, no text)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_multi_image_short() -> dict:
@@ -296,11 +298,11 @@ def _build_concat_vertical(selected: list, duration: float, out_file: Path):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# VIDEO TYPE B — Single-image Short (vertical, 30–55s, Ken Burns, no voice, no text)
+# VIDEO TYPE B — Single-image Short (vertical, 35–55s, Ken Burns, no voice, no text)
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_single_image_short() -> dict:
-    """Pick one god folder, pick one random clip, make 30–55s Short with Ken Burns."""
+    """Pick one god folder, pick one random clip, make 35–55s Short with Ken Burns."""
     god_dir = pick_god_folder("single_image")
     vert_dir = god_dir / "vertical"
     clips = sorted(vert_dir.glob("*.mp4"))
@@ -357,16 +359,18 @@ def _build_single_image_vertical(clip: Path, duration: float, out_file: Path):
 
 # ─────────────────────────────────────────────────────────────────────────────
 # VIDEO TYPE C — Long Landscape Video (<4 min, 1920x1080, no voice, no text)
+# Sources its clips from assets/long_video_source/<god_name>/*.mp4
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_long_video() -> dict:
-    """All images from one god folder → landscape video <4 min."""
+    """All images from one god's long_video_source folder → landscape video <4 min."""
     god_dir = pick_god_folder("long_video")
-    horiz_dir = god_dir / "horizontal"
-    clips = sorted(horiz_dir.glob("*.mp4"))
+    long_dir = LONG_VIDEO_SOURCE / god_dir.name
+    clips = sorted(long_dir.glob("*.mp4"))
 
     if not clips:
-        print(f"❌ No horizontal clips in {horiz_dir}", file=sys.stderr)
+        print(f"❌ No long-video clips in {long_dir}. "
+              f"Add clips to assets/long_video_source/{god_dir.name}/", file=sys.stderr)
         sys.exit(1)
 
     meta = get_meta(god_dir.name)
