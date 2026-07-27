@@ -1,5 +1,5 @@
 """
-prepare_assets.py — God Channel Asset Preparation (v2)
+prepare_assets.py — God Channel Asset Preparation (v2, hang-fix)
 --------------------------------------------------------
 Converts RAW images *and* raw short video clips found in each god subfolder
 into normalized MP4 clips, ready to be mixed freely downstream:
@@ -10,8 +10,10 @@ into normalized MP4 clips, ready to be mixed freely downstream:
 Images  -> become a CLIP_MIN_S–CLIP_MAX_S second still clip (randomized).
 Videos  -> re-encoded to the same spec (30fps, yuv420p, no audio). If a
            source clip is shorter than VIDEO_MIN_S it is looped up to a
-           random target inside [VIDEO_MIN_S, VIDEO_MAX_S]; if longer than
-           VIDEO_MAX_S it is trimmed down to VIDEO_MAX_S.
+           random target inside [VIDEO_MIN_S, VIDEO_MAX_S] using a FINITE
+           calculated loop count (never -1/infinite, to avoid ffmpeg hangs
+           on clips with messy timestamps); if longer than VIDEO_MAX_S it
+           is trimmed down to VIDEO_MAX_S.
 
 Both outputs land in the SAME vertical/ and horizontal/ folders per god, so
 generate_short.py can pick from a single pool that mixes photos and clips.
@@ -25,6 +27,7 @@ at this stage (-an) to keep downstream concatenation/crossfade simple.
 
 import subprocess
 import random
+import math
 from pathlib import Path
 
 # ─────────────────────────────────────────────
@@ -58,13 +61,18 @@ CLIP_MAX_S   = 4   # image: maximum seconds per still clip
 VIDEO_MIN_S  = 2   # video: loop up to this if the source clip is shorter
 VIDEO_MAX_S  = 6   # video: trim down to this if the source clip is longer
 
+FFMPEG_TIMEOUT_S = 180   # hard safety cap per ffmpeg call — never hang forever again
+
 
 # ── ffmpeg / ffprobe helpers ──────────────────────────────────────────────
 
-def run_ffmpeg(cmd: list):
-    """Run an ffmpeg command, raise on failure."""
+def run_ffmpeg(cmd: list, timeout: int = FFMPEG_TIMEOUT_S):
+    """Run an ffmpeg command, raise on failure or if it hangs past `timeout` seconds."""
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        print(f"  ⏱️  FFmpeg timed out after {timeout}s — killing and skipping this file.")
+        raise
     except subprocess.CalledProcessError as e:
         print(f"  ❌ FFmpeg error:\n{e.stderr[-800:]}")
         raise
@@ -75,7 +83,7 @@ def get_duration(path: Path) -> float:
     cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration",
            "-of", "default=noprint_wrappers=1:nokey=1", str(path)]
     try:
-        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL).decode().strip()
+        out = subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=30).decode().strip()
         return float(out) if out else 0.0
     except Exception:
         return 0.0
@@ -86,7 +94,7 @@ def get_duration(path: Path) -> float:
 def make_vertical_image_clip(img: Path, out: Path, duration: int):
     """720x1280 vertical clip from a still image — fills frame, no letterbox."""
     cmd = [
-        "ffmpeg", "-y", "-loop", "1",
+        "ffmpeg", "-y", "-nostdin", "-loop", "1",
         "-i", str(img),
         "-t", str(duration),
         "-vf", (
@@ -105,7 +113,7 @@ def make_vertical_image_clip(img: Path, out: Path, duration: int):
 def make_horizontal_image_clip(img: Path, out: Path, duration: int):
     """1920x1080 horizontal clip from a still image — fills frame, no letterbox."""
     cmd = [
-        "ffmpeg", "-y", "-loop", "1",
+        "ffmpeg", "-y", "-nostdin", "-loop", "1",
         "-i", str(img),
         "-t", str(duration),
         "-vf", (
@@ -124,25 +132,36 @@ def make_horizontal_image_clip(img: Path, out: Path, duration: int):
 # ── Video → normalized clip ───────────────────────────────────────────────
 
 def _resolve_video_target(src: Path, min_s: int, max_s: int):
-    """Decide the output duration + whether looping is required."""
+    """
+    Decide the output duration + how many FINITE loops are needed.
+    Returns (target_duration_seconds, loop_count).
+    loop_count is 0 when no looping is required (stream_loop is omitted).
+    Never returns -1 / infinite — that's what caused ffmpeg to hang.
+    """
     src_dur = get_duration(src)
     if src_dur <= 0:
         # Unreadable duration — fall back to a safe fixed length, no loop.
-        return float(max_s), False
+        return float(max_s), 0
     if src_dur > max_s:
-        return float(max_s), False
+        return float(max_s), 0
     if src_dur < min_s:
-        return round(random.uniform(min_s, max_s), 2), True
-    return round(src_dur, 2), False
+        target = round(random.uniform(min_s, max_s), 2)
+        # stream_loop N plays the input N+1 times total.
+        # +1 extra loop of buffer so -t always has enough material to cut
+        # from, even with rounding — avoids relying on an infinite loop.
+        loops_needed = math.ceil(target / src_dur) - 1 + 1
+        return target, max(loops_needed, 1)
+    return round(src_dur, 2), 0
 
 
 def make_vertical_video_clip(vid: Path, out: Path, min_s: int = VIDEO_MIN_S, max_s: int = VIDEO_MAX_S):
     """720x1280 vertical clip from a short raw video clip."""
-    target, needs_loop = _resolve_video_target(vid, min_s, max_s)
-    cmd = ["ffmpeg", "-y"]
-    if needs_loop:
-        cmd += ["-stream_loop", "-1"]
+    target, loop_count = _resolve_video_target(vid, min_s, max_s)
+    cmd = ["ffmpeg", "-y", "-nostdin"]
+    if loop_count > 0:
+        cmd += ["-stream_loop", str(loop_count)]
     cmd += [
+        "-fflags", "+genpts",
         "-i", str(vid),
         "-t", f"{target:.2f}",
         "-vf", (
@@ -160,11 +179,12 @@ def make_vertical_video_clip(vid: Path, out: Path, min_s: int = VIDEO_MIN_S, max
 
 def make_horizontal_video_clip(vid: Path, out: Path, min_s: int = VIDEO_MIN_S, max_s: int = VIDEO_MAX_S):
     """1920x1080 horizontal clip from a short raw video clip."""
-    target, needs_loop = _resolve_video_target(vid, min_s, max_s)
-    cmd = ["ffmpeg", "-y"]
-    if needs_loop:
-        cmd += ["-stream_loop", "-1"]
+    target, loop_count = _resolve_video_target(vid, min_s, max_s)
+    cmd = ["ffmpeg", "-y", "-nostdin"]
+    if loop_count > 0:
+        cmd += ["-stream_loop", str(loop_count)]
     cmd += [
+        "-fflags", "+genpts",
         "-i", str(vid),
         "-t", f"{target:.2f}",
         "-vf", (
@@ -213,21 +233,26 @@ def process_god_folder(god_dir: Path):
             print(f"  ✅ {f.name} already processed.")
             continue
 
-        if is_video:
-            if not v_out.exists():
-                print(f"  🔨 Vertical (video)   {f.name}")
-                make_vertical_video_clip(f, v_out)
-            if not h_out.exists():
-                print(f"  🔨 Horizontal (video) {f.name}")
-                make_horizontal_video_clip(f, h_out)
-        else:
-            duration = random.randint(CLIP_MIN_S, CLIP_MAX_S)
-            if not v_out.exists():
-                print(f"  🔨 Vertical (image)   {f.name} → {duration}s")
-                make_vertical_image_clip(f, v_out, duration)
-            if not h_out.exists():
-                print(f"  🔨 Horizontal (image) {f.name} → {duration}s")
-                make_horizontal_image_clip(f, h_out, duration)
+        try:
+            if is_video:
+                if not v_out.exists():
+                    print(f"  🔨 Vertical (video)   {f.name}")
+                    make_vertical_video_clip(f, v_out)
+                if not h_out.exists():
+                    print(f"  🔨 Horizontal (video) {f.name}")
+                    make_horizontal_video_clip(f, h_out)
+            else:
+                duration = random.randint(CLIP_MIN_S, CLIP_MAX_S)
+                if not v_out.exists():
+                    print(f"  🔨 Vertical (image)   {f.name} → {duration}s")
+                    make_vertical_image_clip(f, v_out, duration)
+                if not h_out.exists():
+                    print(f"  🔨 Horizontal (image) {f.name} → {duration}s")
+                    make_horizontal_image_clip(f, h_out, duration)
+        except Exception as e:
+            # One bad file (corrupt clip, timeout, etc.) no longer kills the whole batch.
+            print(f"  ⏭️  Skipping {f.name} due to error: {e}")
+            continue
 
 
 def main():
