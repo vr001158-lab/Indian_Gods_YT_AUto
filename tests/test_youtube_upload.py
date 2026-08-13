@@ -33,15 +33,13 @@ def run_upload_test():
         print(f"❌ AUTH FAILURE: Failed to load Google credentials: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # 3. Generate one small test video using multi_image mode on a real god
+    # 3. Generate one small test video using multi_image mode
     print("🎬 Generating a small test video...")
     try:
-        god_dir = generate_short.pick_god_folder("multi_image")
-        print(f"   Selected deity: {god_dir.name}")
-        
-        result = generate_short.generate_multi_image_short(god_dir)
+        result = generate_short.generate_multi_image_short()
         video_path = Path(result["video"])
-        print(f"   Generated video: {video_path} ({video_path.stat().st_size / 1024 / 1024:.2f} MB)")
+        god_name = result.get("god_name", "unknown")
+        print(f"   Generated video: {video_path} for god {god_name} ({video_path.stat().st_size / 1024 / 1024:.2f} MB)")
     except Exception as e:
         print(f"❌ GENERATOR FAILURE: Failed to generate test video: {e}", file=sys.stderr)
         sys.exit(1)
@@ -70,16 +68,16 @@ def run_upload_test():
     archive_dir = Path("uploaded_archive")
     archive_dir.mkdir(exist_ok=True)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    archive_filename = f"{timestamp}_{god_dir.name}_youtube_test_metadata.json"
+    archive_filename = f"{timestamp}_{god_name}_youtube_test_metadata.json"
     archive_path = archive_dir / archive_filename
 
     metadata = {
         "pipeline_version": "v2.1-test",
         "timestamp": timestamp,
         "video_file_name": video_path.name,
-        "deity": god_dir.name,
+        "deity": god_name,
         "mode": "multi_image",
-        "duration": round(result.get("duration", 0), 2),
+        "duration": round(result.get("duration_s", 0), 2),
         "title": test_title,
         "description": test_desc,
         "tags": test_tags,
