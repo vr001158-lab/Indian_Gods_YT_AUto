@@ -23,6 +23,8 @@ assets/gods_processed/
 *.avi
 *.mkv
 
-# Research Engine — generated runtime artifacts (cache + results)
-data/research/api_cache.json
-data/research/research_results_*.json
+# Research Engine — generated runtime artifacts
+data/research/*
+
+# Decision Engine — generated runtime artifacts
+data/decision/*

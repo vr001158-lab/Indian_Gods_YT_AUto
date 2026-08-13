@@ -83,17 +83,69 @@ jobs:
 
           echo "✅ VALIDATION PASSED: All research results sourced from real YouTube API."
 
-      # ── 7. Upload research results as GitHub Actions artifact ──────────────
-      - name: Upload research results artifact
+      # ── 7. Run Topic Decision Engine ───────────────────────────────────────
+      - name: Run Topic Decision Engine (min-score=60)
+        run: |
+          RESULTS_FILE=$(find data/research -name "research_results_*.json" | sort | tail -n 1)
+          if [ -z "$RESULTS_FILE" ]; then
+            echo "❌ ERROR: No research results JSON file found."
+            exit 1
+          fi
+          echo "📄 Running decision engine on: $RESULTS_FILE"
+          python run_decision.py --input "$RESULTS_FILE" --min-score 60
+
+      # ── 8. Validate Topic Decision Output (production gates) ────────────────
+      - name: Validate Topic Decision Output (safety check)
+        run: |
+          DECISION_FILE=$(find data/decision -name "decision_*.json" | sort | tail -n 1)
+          if [ -z "$DECISION_FILE" ]; then
+            echo "❌ ERROR: No decision JSON file found in data/decision/"
+            exit 1
+          fi
+          echo "📄 Found decision file: $DECISION_FILE"
+          cat "$DECISION_FILE"
+
+          python3 -c "
+          import json, sys
+          data = json.loads(open('$DECISION_FILE', encoding='utf-8').read())
+          approved = data.get('approved_for_generation')
+          topic = data.get('selected_topic')
+          source = data.get('data_source')
+          confidence = data.get('confidence')
+
+          print(f'Approved:   {approved}')
+          print(f'Topic:      {topic}')
+          print(f'Source:     {source}')
+          print(f'Confidence: {confidence}')
+
+          if approved is not True:
+              print('❌ VALIDATION FAILED: approved_for_generation is not true')
+              sys.exit(1)
+          if not topic:
+              print('❌ VALIDATION FAILED: selected_topic is missing/empty')
+              sys.exit(1)
+          if source not in ('youtube_api', 'cached_youtube_api'):
+              print(f'❌ VALIDATION FAILED: data_source {source} is not production-safe')
+              sys.exit(1)
+          if confidence != 'high':
+              print(f'❌ VALIDATION FAILED: confidence {confidence} is not high')
+              sys.exit(1)
+          print('✅ VALIDATION PASSED: Topic decision is production-safe!')
+          "
+
+      # ── 9. Upload validation artifacts (both research and decision) ────────
+      - name: Upload validation results artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: research-results
-          path: data/research/research_results_*.json
+          name: validation-results
+          path: |
+            data/research/research_results_*.json
+            data/decision/decision_*.json
           if-no-files-found: warn
           retention-days: 7
 
-      # ── 8. Mandatory credential cleanup ───────────────────────────────────
+      # ── 10. Mandatory credential cleanup ──────────────────────────────────
       # if: always() guarantees deletion even on failure or cancellation.
       - name: Cleanup credentials (mandatory)
         if: always()
