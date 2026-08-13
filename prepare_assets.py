@@ -131,10 +131,22 @@ def validate_conformed_clip(clip_path: Path, expected_w: int, expected_h: int) -
 
 # ── FFmpeg Conforming ────────────────────────────────────────────────────────
 
-def run_ffmpeg(cmd: list):
-    """Run an ffmpeg command, raise on failure."""
+def run_ffmpeg(cmd: list, src: Path = None, out: Path = None):
+    """Run an ffmpeg command with -nostdin and a 60-second timeout."""
+    if cmd and cmd[0] == "ffmpeg" and "-nostdin" not in cmd:
+        cmd.insert(1, "-nostdin")
+
     try:
-        subprocess.run(cmd, check=True, capture_output=True, text=True)
+        subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired as e:
+        err_msg = f"❌ FFMPEG TIMEOUT: FFmpeg process timed out after 60 seconds."
+        if src:
+            err_msg += f"\n   Input file:  {src}"
+        if out:
+            err_msg += f"\n   Output file: {out}"
+        err_msg += f"\n   Command:     {' '.join(cmd)}"
+        print(err_msg, file=sys.stderr)
+        raise e
     except subprocess.CalledProcessError as e:
         print(f"  ❌ FFmpeg error:\n{e.stderr[-800:]}", file=sys.stderr)
         raise
@@ -170,7 +182,7 @@ def make_vertical_clip(src: Path, out: Path, duration: int, is_video: bool):
             "-r", "30", "-an",
             str(out)
         ]
-    run_ffmpeg(cmd)
+    run_ffmpeg(cmd, src=src, out=out)
 
 
 def make_horizontal_clip(src: Path, out: Path, duration: int, is_video: bool):
@@ -203,7 +215,7 @@ def make_horizontal_clip(src: Path, out: Path, duration: int, is_video: bool):
             "-r", "30", "-an",
             str(out)
         ]
-    run_ffmpeg(cmd)
+    run_ffmpeg(cmd, src=src, out=out)
 
 
 # ── Conforming Sourcing ──────────────────────────────────────────────────────

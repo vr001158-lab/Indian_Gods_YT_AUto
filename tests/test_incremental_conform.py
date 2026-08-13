@@ -123,8 +123,8 @@ def run_test():
     print("\n▶️ TEST 4: Changed source detection (modifying modification timestamp/size)")
     # Let's modify the source image size slightly by appending bytes
     test_img = TEST_GOD_SRC / "test_image.jpg"
-    with open(test_img, "ab") as f:
-        f.write(b"EXTRABYTES")
+    stat = test_img.stat()
+    os.utime(test_img, (stat.st_atime, stat.st_mtime + 60))
     
     t0 = time.time()
     out4 = capture_prepare()
