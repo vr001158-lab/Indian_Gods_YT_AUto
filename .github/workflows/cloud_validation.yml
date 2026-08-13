@@ -2,6 +2,12 @@ name: Cloud Validation
 
 on:
   workflow_dispatch:
+    inputs:
+      test_youtube_upload:
+        description: 'Set to true to run a controlled private YouTube upload test'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   validate:
@@ -89,3 +95,25 @@ jobs:
           echo "🔍 Running standalone ffprobe checks on $GEN_VIDEO..."
           ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,pix_fmt,duration -of json "$GEN_VIDEO"
           echo "✅ Output video verified successfully."
+
+      - name: Write YouTube Credentials (conditional)
+        if: github.event.inputs.test_youtube_upload == 'true'
+        run: |
+          echo '${{ secrets.TOKEN_JSON }}' > token.json
+          echo '${{ secrets.CLIENT_SECRET_JSON }}' > client_secret.json
+          echo "✅ Secret credentials written to workspace."
+
+      - name: Run Private YouTube Upload Test
+        if: github.event.inputs.test_youtube_upload == 'true'
+        env:
+          PYTHONUNBUFFERED: "1"
+          YOUTUBE_PUBLISH: "false"  # Safety fallback
+          ENABLE_GOOGLE_DRIVE: "false"
+        run: |
+          python -u tests/test_youtube_upload.py
+
+      - name: Cleanup Secrets
+        if: always()
+        run: |
+          rm -f token.json client_secret.json
+          echo "🧹 Temporary credentials cleaned up."
