@@ -1,10 +1,17 @@
 """
-Run this ONCE locally to generate a fresh token.json.
-Then copy the contents into GitHub Secrets as TOKEN_JSON.
+refresh_token.py — Local OAuth re-authorization tool.
+
+Run this ONCE locally whenever:
+  - You need to generate a new token.json for the first time
+  - You have added new OAuth scopes to google_auth_config.SCOPES
+  - The existing token.json is missing scopes (yields HTTP 403 from the API)
 
 Usage:
-    pip install google-auth-oauthlib google-auth
     python refresh_token.py
+
+The script opens a browser for Google consent and writes token.json locally.
+NEVER commit token.json to Git.
+After running, copy the token.json contents into the TOKEN_JSON GitHub Secret.
 """
 
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -55,14 +62,13 @@ def main():
         print("👉 Fix: Revoke app access and run again")
 
     print("\nNext steps:")
-    print("1. Copy the contents of token.json")
-    print("2. Go to your GitHub repo → Settings → Secrets and variables → Actions")
-    print("3. Create a secret named: TOKEN_JSON")
-    print("4. Paste the token.json contents as the value")
-    print("5. Add token.json to .gitignore and DELETE it locally")
-
-    print("\n📄 token.json contents:\n")
-    print(token_path.read_text())
+    print("1. Open token.json in a text editor (do NOT share it publicly).")
+    print("2. Copy its full contents.")
+    print("3. Go to: GitHub repo → Settings → Secrets and variables → Actions")
+    print("4. Update (or create) secret named: TOKEN_JSON")
+    print("5. Paste the token.json contents as the secret value.")
+    print("6. Ensure token.json is in .gitignore and DELETE it locally after updating the secret.")
+    print("\n⚠️  Do NOT print or share token.json contents in logs or chat.")
 
 
 if __name__ == "__main__":

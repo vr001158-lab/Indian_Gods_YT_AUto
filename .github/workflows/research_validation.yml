@@ -27,21 +27,25 @@ jobs:
         run: |
           pip install --no-cache-dir -r requirements.txt
 
-      # ── 4. Write credentials (ephemeral — never printed) ──────────────────
-      - name: Write credentials from GitHub Secrets
+      # ── 4. Write OAuth credentials for potential future upload steps ───────
+      # Research itself does NOT use OAuth — it uses YOUTUBE_API_KEY.
+      # token.json / client_secret.json are written here only for completeness
+      # and to keep the cleanup step consistent with the upload workflow.
+      - name: Write OAuth credentials from GitHub Secrets
         run: |
           echo '${{ secrets.TOKEN_JSON }}' > token.json
           echo '${{ secrets.CLIENT_SECRET_JSON }}' > client_secret.json
-          echo "✅ Credentials written to workspace (not printed)."
+          echo "✅ OAuth credentials written to workspace (not printed)."
 
-      # ── 5. Run live research engine ───────────────────────────────────────
-      - name: Run Research Engine (Live YouTube API, limit=3)
+      # ── 5. Run live research engine (API key mode) ─────────────────────────
+      - name: Run Research Engine (Live YouTube API key, limit=3)
         env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           PYTHONUNBUFFERED: "1"
         run: |
           python run_research.py --limit 3
 
-      # ── 6. Validate that results use real API data (not mock/offline) ─────
+      # ── 6. Validate data_source is youtube_api (not mock or offline) ───────
       - name: Validate data_source is youtube_api (not mock or offline)
         run: |
           RESULTS_FILE=$(find data/research -name "research_results_*.json" | sort | tail -n 1)
@@ -53,13 +57,12 @@ jobs:
 
           echo "📄 Found results file: $RESULTS_FILE"
 
-          # Count candidates using real API (youtube_api or cached_youtube_api)
           REAL_COUNT=$(python3 -c "
           import json, sys
           data = json.loads(open('$RESULTS_FILE', encoding='utf-8').read())
           real = [c for c in data if c.get('data_source') in ('youtube_api', 'cached_youtube_api')]
           mock = [c for c in data if c.get('data_source') in ('mock', 'offline')]
-          print(f'Real API results:  {len(real)}')
+          print(f'Real API results:     {len(real)}')
           print(f'Mock/offline results: {len(mock)}')
           if mock:
               print('MOCK_DETECTED')
@@ -71,13 +74,16 @@ jobs:
 
           if echo "$REAL_COUNT" | grep -q "MOCK_DETECTED"; then
             echo "❌ VALIDATION FAILED: Research results contain mock or offline data."
-            echo "   This means credentials were invalid or quota was exhausted."
+            echo "   Possible causes:"
+            echo "   1. YOUTUBE_API_KEY secret is missing or invalid."
+            echo "   2. YouTube API quota was exhausted for today."
+            echo "   3. API key restrictions block this runner's IP."
             exit 1
           fi
 
           echo "✅ VALIDATION PASSED: All research results sourced from real YouTube API."
 
-      # ── 7. Upload research results as GitHub Actions artifact ─────────────
+      # ── 7. Upload research results as GitHub Actions artifact ──────────────
       - name: Upload research results artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -88,13 +94,12 @@ jobs:
           retention-days: 7
 
       # ── 8. Mandatory credential cleanup ───────────────────────────────────
-      # Uses if: always() to guarantee deletion even on failure or cancellation.
+      # if: always() guarantees deletion even on failure or cancellation.
       - name: Cleanup credentials (mandatory)
         if: always()
         run: |
           rm -f token.json client_secret.json
-          echo "🧹 Credentials deleted from runner workspace."
-          # Confirm deletion
+          echo "🧹 OAuth credentials deleted from runner workspace."
           if [ -f token.json ] || [ -f client_secret.json ]; then
             echo "❌ WARNING: Credential files still exist after cleanup!"
             exit 1

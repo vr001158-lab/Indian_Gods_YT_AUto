@@ -1,6 +1,6 @@
 """
 tests/test_research.py
-Hardened v0.2 — 9 test scenarios for the research engine.
+Hardened v0.2 â€” 9 test scenarios for the research engine.
 All tests run without any network or YouTube API access.
 """
 
@@ -30,9 +30,9 @@ from src.research.scorer    import TopicScorer
 from src.research.dedup     import deduplicate_topics
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # Helpers
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def _make_video(views=100_000, age_days=200):
     pub = (datetime.date.today() - datetime.timedelta(days=age_days)).isoformat() + "T00:00:00Z"
@@ -48,17 +48,17 @@ def _mock_festival(verified=True, days=30):
         "source": "test",
     }
 
-def _make_collector(tmp_path, creds=None, max_calls=10, ttl=24):
-    c = collector_mod.ResearchCollector(creds=creds, max_search_calls=max_calls, cache_ttl_hours=ttl)
+def _make_collector(tmp_path, api_key=None, max_calls=10, ttl=24):
+    c = collector_mod.ResearchCollector(api_key=api_key, max_search_calls=max_calls, cache_ttl_hours=ttl)
     # Redirect cache file to temp dir
-    c._cache_raw = {"_version": CACHE_VERSION}
+    c._cache_raw = {"_version": collector_mod.CACHE_VERSION}
     collector_mod.CACHE_FILE = tmp_path / "api_cache.json"
     return c
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestQuotaBudgeting(unittest.TestCase):
-    """TEST 1 — Quota budget is enforced; engine never exceeds max_search_calls."""
+    """TEST 1 â€” Quota budget is enforced; engine never exceeds max_search_calls."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -70,7 +70,7 @@ class TestQuotaBudgeting(unittest.TestCase):
 
     def test_quota_exhausted_returns_offline(self):
         # Budget = 0 from the start; every call must return offline immediately
-        c = ResearchCollector(creds=None, max_search_calls=0)
+        c = ResearchCollector(api_key=None, max_search_calls=0)
         c._cache_raw = {"_version": CACHE_VERSION}
         result = c.search_youtube_videos("Why Ganesha has broken tusk")
         self.assertEqual(result["data_source"], "offline",
@@ -79,17 +79,17 @@ class TestQuotaBudgeting(unittest.TestCase):
         self.assertEqual(c._search_calls_used, 0, "No API calls should have been made")
 
     def test_quota_counter_increments_on_mock_api(self):
-        """search_calls_used should NOT increment for mock/no-creds path."""
-        c = ResearchCollector(creds=None, max_search_calls=5)
+        """search_calls_used should NOT increment for no-API-key (offline) path."""
+        c = ResearchCollector(api_key=None, max_search_calls=5)
         c._cache_raw = {"_version": CACHE_VERSION}
         c.search_youtube_videos("test topic")
         self.assertEqual(c._search_calls_used, 0,
                          "Mock/offline path must not consume quota units")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestCacheTTL(unittest.TestCase):
-    """TEST 2 — Cache TTL: fresh entries are reused; stale entries are flagged."""
+    """TEST 2 â€” Cache TTL: fresh entries are reused; stale entries are flagged."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -101,21 +101,21 @@ class TestCacheTTL(unittest.TestCase):
         collector_mod.CACHE_FILE = self.orig
 
     def test_fresh_cache_hit(self):
-        c = ResearchCollector(creds=None, max_search_calls=10, cache_ttl_hours=24)
+        c = ResearchCollector(api_key=None, max_search_calls=10, cache_ttl_hours=24)
         c._cache_raw = {"_version": CACHE_VERSION}
         query = "Shiva snake neck"
         r1 = c.search_youtube_videos(query)
         self.assertTrue((self.tmp / "cache.json").exists(), "Cache file must be written")
 
-        # Second instance — should return from cache, not re-run mock generation
-        c2 = ResearchCollector(creds=None, max_search_calls=10, cache_ttl_hours=24)
+        # Second instance â€” should return from cache, not re-run mock generation
+        c2 = ResearchCollector(api_key=None, max_search_calls=10, cache_ttl_hours=24)
         r2 = c2.search_youtube_videos(query)
         self.assertIn(r2["data_source"], ("mock", "cached_youtube_api"),
                       "Cached result should be returned for same query within TTL")
         self.assertEqual(r1["videos"], r2["videos"], "Cached content must match original")
 
     def test_stale_cache_is_flagged(self):
-        c = ResearchCollector(creds=None, max_search_calls=10, cache_ttl_hours=24)
+        c = ResearchCollector(api_key=None, max_search_calls=10, cache_ttl_hours=24)
         c._cache_raw = {"_version": CACHE_VERSION}
         query = "Hanuman sindoor"
         # Manually insert an expired entry (timestamp 48h ago)
@@ -135,9 +135,9 @@ class TestCacheTTL(unittest.TestCase):
         self.assertTrue(entry.get("stale"), "Expired entry must be marked stale=True")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestMockVsRealLabeling(unittest.TestCase):
-    """TEST 3 — data_source field correctly distinguishes mock from real data."""
+    """TEST 3 â€” data_source field correctly distinguishes mock from real data."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -148,15 +148,15 @@ class TestMockVsRealLabeling(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
         collector_mod.CACHE_FILE = self.orig
 
-    def test_no_creds_gives_mock_label(self):
-        c = ResearchCollector(creds=None)
+    def test_no_api_key_gives_mock_label(self):
+        c = ResearchCollector(api_key=None)
         c._cache_raw = {"_version": CACHE_VERSION}
         r = c.search_youtube_videos("Lakshmi Samudra Manthan")
         self.assertIn(r["data_source"], ("mock", "offline"))
         self.assertTrue(r["is_mock"])
 
     def test_mock_urls_are_not_real_youtube(self):
-        c = ResearchCollector(creds=None)
+        c = ResearchCollector(api_key=None)
         c._cache_raw = {"_version": CACHE_VERSION}
         r = c.search_youtube_videos("Narasimha avatar mystery")
         for v in r["videos"]:
@@ -176,9 +176,9 @@ class TestMockVsRealLabeling(unittest.TestCase):
                          "Mock data must yield low confidence regardless of video count")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestUnverifiedFestivalDate(unittest.TestCase):
-    """TEST 4 — Unverified festival date halves the relevance contribution."""
+    """TEST 4 â€” Unverified festival date halves the relevance contribution."""
 
     def test_unverified_halves_relevance(self):
         videos = [_make_video(views=200_000)]
@@ -199,16 +199,16 @@ class TestUnverifiedFestivalDate(unittest.TestCase):
         self.assertEqual(score_verified["relevance_score"],   90)
 
     def test_unverified_flag_propagates_to_candidate(self):
-        candidates = report_mod.run_research_pipeline(creds=None, limit=1)
+        candidates = report_mod.run_research_pipeline(api_key=None, limit=1)
         c = candidates[0]
         # All built-in festivals have verified=False
         self.assertFalse(c["festival_verified"],
                          "Default festivals must carry verified=False")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestDuplicateTopicGrouping(unittest.TestCase):
-    """TEST 5 — Near-duplicate topics are collapsed to a single entry."""
+    """TEST 5 â€” Near-duplicate topics are collapsed to a single entry."""
 
     def test_snake_topic_variants_are_deduplicated(self):
         topics = [
@@ -231,9 +231,9 @@ class TestDuplicateTopicGrouping(unittest.TestCase):
                          "Three distinct topics must all be preserved")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestContentGapLanguage(unittest.TestCase):
-    """TEST 6 — Content gap claims are cautious; no unsupported 'high growth potential' language."""
+    """TEST 6 â€” Content gap claims are cautious; no unsupported 'high growth potential' language."""
 
     FORBIDDEN_PHRASES = [
         "high growth potential",
@@ -279,9 +279,9 @@ class TestContentGapLanguage(unittest.TestCase):
         self.assertIn("insufficient evidence", gap.lower())
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestDeterministicScoring(unittest.TestCase):
-    """TEST 7 — Identical inputs produce identical scores across multiple calls."""
+    """TEST 7 â€” Identical inputs produce identical scores across multiple calls."""
 
     def test_score_is_deterministic(self):
         videos = [_make_video(views=250_000, age_days=400)]
@@ -306,9 +306,9 @@ class TestDeterministicScoring(unittest.TestCase):
             self.assertIn(key, s, f"Score output missing required key: {key}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestConfidenceScoring(unittest.TestCase):
-    """TEST 8 — Confidence reflects evidence quality, not expected views."""
+    """TEST 8 â€” Confidence reflects evidence quality, not expected views."""
 
     def test_mock_source_is_low_confidence(self):
         s = TopicScorer.calculate_score(
@@ -340,9 +340,9 @@ class TestConfidenceScoring(unittest.TestCase):
         self.assertEqual(s["confidence"], "medium")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class TestCandidateSchemaAndPipeline(unittest.TestCase):
-    """TEST 9 — Candidate model contains all required fields; pipeline runs offline."""
+    """TEST 9 â€” Candidate model contains all required fields; pipeline runs offline."""
 
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
@@ -357,7 +357,7 @@ class TestCandidateSchemaAndPipeline(unittest.TestCase):
         report_mod.OUTPUT_DIR    = self.orig_output
 
     def test_full_pipeline_offline(self):
-        candidates = report_mod.run_research_pipeline(creds=None, limit=2)
+        candidates = report_mod.run_research_pipeline(api_key=None, limit=2)
         self.assertGreater(len(candidates), 0)
 
         required = [
@@ -374,13 +374,13 @@ class TestCandidateSchemaAndPipeline(unittest.TestCase):
             self.assertIn(key, candidates[0], f"Candidate missing required field: {key}")
 
     def test_pipeline_sorted_descending(self):
-        candidates = report_mod.run_research_pipeline(creds=None, limit=3)
+        candidates = report_mod.run_research_pipeline(api_key=None, limit=3)
         scores = [c["overall_score"] for c in candidates]
         self.assertEqual(scores, sorted(scores, reverse=True),
                          "Candidates must be sorted by overall_score descending")
 
     def test_pipeline_output_file_created(self):
-        report_mod.run_research_pipeline(creds=None, limit=1)
+        report_mod.run_research_pipeline(api_key=None, limit=1)
         files = list(self.tmp.glob("research_results_*.json"))
         self.assertTrue(len(files) >= 1, "Pipeline must write a results JSON file")
 

@@ -1,8 +1,15 @@
 # src/research/collector.py
-# Collector module — YouTube Data API v3 + Hindu festival calendar.
-# Hardened v0.2: quota budgeting, TTL-aware cache, real/mock labeling, verified festival dates.
+# Collector module — YouTube Data API v3 public-data + Hindu festival calendar.
+# Hardened v0.3: API-key-based research (no OAuth), quota budgeting,
+#                TTL-aware cache, real/mock labeling, verified festival dates.
+#
+# Architecture note:
+#   Research reads (search.list, videos.list) use a PUBLIC-DATA API key
+#   from the YOUTUBE_API_KEY environment variable. No OAuth token is needed.
+#   OAuth (token.json) is used exclusively by youtube_uploader.py for upload.
 
 import json
+import os
 import sys
 import datetime
 from pathlib import Path
@@ -10,21 +17,24 @@ from pathlib import Path
 # ── Configurable quota budget ─────────────────────────────────────────────────
 # YouTube Data API v3 unit costs (as of 2024):
 #   search.list  = 100 units per call
-#   videos.list  = 1 unit per call
+#   videos.list  = 1 unit per call  (batch of up to 50 IDs)
 # Default project quota: 10,000 units/day
-# Safe default: allow at most 10 search calls per research run (= 1,000 units)
+# Safe per-run default: 10 search calls = 1,000 units
 RESEARCH_MAX_SEARCH_CALLS_PER_RUN: int = 10
-SEARCH_CALL_COST: int = 100          # quota units per search.list call
-VIDEOS_LIST_CALL_COST: int = 1       # quota units per videos.list call
-DAILY_QUOTA_LIMIT: int = 10_000      # total project daily limit
+SEARCH_CALL_COST: int = 100       # quota units per search.list call
+VIDEOS_LIST_CALL_COST: int = 1    # quota units per videos.list batch
+DAILY_QUOTA_LIMIT: int = 10_000   # total project daily limit
 
 # ── Cache settings ────────────────────────────────────────────────────────────
-CACHE_VERSION: str = "2"
-CACHE_TTL_HOURS: int = 24            # cached entries older than this are considered stale
+CACHE_VERSION: str = "3"          # bump version when cache schema changes
+CACHE_TTL_HOURS: int = 24
 
 # ── File paths ────────────────────────────────────────────────────────────────
 CACHE_FILE = Path("data/research/api_cache.json")
 FESTIVAL_FILE = Path("data/research/festivals.json")
+
+# ── Environment variable name for the API key ─────────────────────────────────
+YOUTUBE_API_KEY_ENV: str = "YOUTUBE_API_KEY"
 
 # ── Deity keyword map ─────────────────────────────────────────────────────────
 DEITY_KEYWORDS: dict = {
@@ -97,34 +107,62 @@ DEFAULT_FESTIVALS: list = [
 
 class ResearchCollector:
     """
-    Collects YouTube competitor signals and Hindu festival proximity data.
+    Collects YouTube competitor signals using a public-data API key.
+
+    Authentication:
+        No OAuth is used. The YOUTUBE_API_KEY environment variable provides
+        a simple API key sufficient for search.list and videos.list on public data.
 
     Quota management:
         A run is allocated at most RESEARCH_MAX_SEARCH_CALLS_PER_RUN search.list
-        calls. Each call costs SEARCH_CALL_COST quota units. The run aborts
-        gracefully (falls through to cached/mock data) once the budget is exhausted.
+        calls (100 units each). The run falls back to cached/mock data once
+        the budget is exhausted.
+
+    Modes (in priority order):
+        1. Fresh cache hit              → data_source = "cached_youtube_api"
+        2. Quota budget available + key → data_source = "youtube_api"
+        3. Budget exhausted             → data_source = "offline"
+        4. No API key                   → data_source = "mock"
+        5. API error                    → data_source = "offline"
     """
 
     def __init__(
         self,
-        creds=None,
+        api_key: str = None,
         max_search_calls: int = RESEARCH_MAX_SEARCH_CALLS_PER_RUN,
         cache_ttl_hours: int = CACHE_TTL_HOURS,
     ):
-        self.creds = creds
+        """
+        Parameters
+        ----------
+        api_key          : YouTube Data API v3 key. If None, reads from
+                           YOUTUBE_API_KEY environment variable.
+                           If still absent, falls back to mock mode.
+        max_search_calls : maximum search.list calls this run
+        cache_ttl_hours  : cache entry freshness window
+        """
+        # Resolve API key from argument → env var → None (offline)
+        self.api_key: str = api_key or os.environ.get(YOUTUBE_API_KEY_ENV) or None
         self.youtube = None
         self.max_search_calls = max_search_calls
         self.cache_ttl_hours = cache_ttl_hours
-        self._search_calls_used = 0            # track quota this run
+        self._search_calls_used = 0
         self._cache_raw: dict = self._load_cache_raw()
         self.festivals: list = self._load_festivals()
 
-        if self.creds:
+        if self.api_key:
             try:
                 from googleapiclient.discovery import build
-                self.youtube = build("youtube", "v3", credentials=self.creds)
+                self.youtube = build("youtube", "v3", developerKey=self.api_key)
+                print("🔑 YouTube API key loaded — research operating in live mode.", file=sys.stderr)
             except Exception as e:
                 print(f"⚠️  Warning: Failed to build YouTube API client: {e}", file=sys.stderr)
+                self.youtube = None
+        else:
+            print(
+                "ℹ️  YOUTUBE_API_KEY not set — research operating in offline/mock mode.",
+                file=sys.stderr
+            )
 
     # ── Cache helpers ─────────────────────────────────────────────────────────
 
@@ -132,7 +170,6 @@ class ResearchCollector:
         if CACHE_FILE.exists():
             try:
                 data = json.loads(CACHE_FILE.read_text(encoding="utf-8"))
-                # Accept only matching cache version
                 if isinstance(data, dict) and data.get("_version") == CACHE_VERSION:
                     return data
             except Exception:
@@ -162,7 +199,6 @@ class ResearchCollector:
             age_hours = (datetime.datetime.utcnow() - cached_at).total_seconds() / 3600
             if age_hours <= self.cache_ttl_hours:
                 return entry
-            # Stale — mark explicitly but still return so caller can decide
             entry["stale"] = True
             return entry
         except Exception:
@@ -171,14 +207,14 @@ class ResearchCollector:
     def _cache_put(self, key: str, results: list, data_source: str, api_method: str):
         """Store a cache entry with full metadata."""
         self._cache_raw[key] = {
-            "query": key,
-            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "query":         key,
+            "timestamp":     datetime.datetime.utcnow().isoformat(),
             "cache_version": CACHE_VERSION,
-            "source": data_source,
-            "api_method": api_method,
-            "is_mock": data_source in ("mock", "offline"),
-            "stale": False,
-            "result": results,
+            "source":        data_source,
+            "api_method":    api_method,
+            "is_mock":       data_source in ("mock", "offline"),
+            "stale":         False,
+            "result":        results,
         }
         self._save_cache()
 
@@ -196,9 +232,9 @@ class ResearchCollector:
 
     def get_festival_info(self, deity: str) -> dict:
         """
-        Returns a dict with:
-          festival_name, days_remaining, verified
-        If no festival found returns a safe fallback with verified=False.
+        Returns next upcoming festival for the deity:
+          { festival_name, days_remaining, verified, calendar_basis, source }
+        Falls back to a safe generic record when no match found.
         """
         today = datetime.date.today()
         upcoming = []
@@ -219,9 +255,9 @@ class ResearchCollector:
             upcoming.append({
                 "festival_name": f.get("festival_name", f.get("name", "Unknown")),
                 "days_remaining": days,
-                "verified": f.get("verified", False),
+                "verified":       f.get("verified", False),
                 "calendar_basis": f.get("calendar_basis", "unknown"),
-                "source": f.get("source", "built-in default"),
+                "source":         f.get("source", "built-in default"),
             })
 
         if upcoming:
@@ -229,11 +265,11 @@ class ResearchCollector:
             return upcoming[0]
 
         return {
-            "festival_name": "Generic Devotional",
+            "festival_name":  "Generic Devotional",
             "days_remaining": 365,
-            "verified": False,
+            "verified":       False,
             "calendar_basis": "n/a",
-            "source": "fallback",
+            "source":         "fallback",
         }
 
     # ── YouTube data collection ───────────────────────────────────────────────
@@ -244,31 +280,30 @@ class ResearchCollector:
 
     def search_youtube_videos(self, query: str) -> dict:
         """
-        Returns a dict:
-          {
-            "videos": [...],
-            "data_source": "youtube_api" | "cached_youtube_api" | "mock" | "offline" | "stale_offline",
-            "is_mock": bool,
-            "stale": bool,
-          }
-        Never raises; always returns a usable result with explicit data_source.
-        """
-        # 1. Check cache (fresh or stale)
-        cached = self._cache_get(query)
-        if cached:
-            is_stale = cached.get("stale", False)
-            if not is_stale:
-                src = "cached_youtube_api" if not cached.get("is_mock") else "mock"
-                return {
-                    "videos": cached["result"],
-                    "data_source": src,
-                    "is_mock": cached.get("is_mock", False),
-                    "stale": False,
-                }
-            # Stale — attempt refresh if we have budget
-            # (fall through to live fetch below)
+        Search YouTube for *query* and return video statistics.
 
-        # 2. Check quota budget
+        Returns
+        -------
+        {
+          "videos":      list of video dicts,
+          "data_source": "youtube_api" | "cached_youtube_api" | "mock" | "offline",
+          "is_mock":     bool,
+          "stale":       bool,
+        }
+        Never raises. Always returns a usable result with explicit data_source.
+        """
+        # 1. Fresh cache hit
+        cached = self._cache_get(query)
+        if cached and not cached.get("stale", False):
+            src = "cached_youtube_api" if not cached.get("is_mock") else "mock"
+            return {
+                "videos":      cached["result"],
+                "data_source": src,
+                "is_mock":     cached.get("is_mock", False),
+                "stale":       False,
+            }
+
+        # 2. Quota budget exhausted
         if self._search_calls_used >= self.max_search_calls:
             print(
                 f"⚠️  Research quota exhausted ({self.max_search_calls} search calls used). "
@@ -279,13 +314,13 @@ class ResearchCollector:
             self._cache_put(query, videos, "offline", "none")
             return {"videos": videos, "data_source": "offline", "is_mock": True, "stale": False}
 
-        # 3. No YouTube client — offline/mock mode
+        # 3. No API key → offline/mock mode
         if not self.youtube:
             videos = self._generate_mock_results(query)
             self._cache_put(query, videos, "mock", "none")
             return {"videos": videos, "data_source": "mock", "is_mock": True, "stale": False}
 
-        # 4. Live YouTube API call
+        # 4. Live API call using API key (public data — no OAuth required)
         try:
             self._search_calls_used += 1
             search_res = self.youtube.search().list(
@@ -304,7 +339,7 @@ class ResearchCollector:
 
             videos = []
             if video_ids:
-                # Batch videos.list — costs only 1 unit for the batch
+                # Batch videos.list — costs 1 quota unit for the whole batch
                 vid_res = self.youtube.videos().list(
                     id=",".join(video_ids),
                     part="statistics,snippet",
@@ -334,7 +369,7 @@ class ResearchCollector:
 
         except Exception as e:
             print(
-                f"⚠️  YouTube API error for {query!r}: {e}. Falling back to mock.",
+                f"⚠️  YouTube API error for {query!r}: {e}. Falling back to offline.",
                 file=sys.stderr
             )
             videos = self._generate_mock_results(query)
@@ -345,8 +380,9 @@ class ResearchCollector:
 
     def _generate_mock_results(self, query: str) -> list:
         """
-        Generates deterministic mock video records seeded from the query string.
-        These are explicitly labelled as mock — never presented as real YouTube data.
+        Deterministic mock video records seeded from the query string.
+        Explicitly labelled as mock — never presented as real YouTube data.
+        URLs use mock.example.invalid — never youtube.com.
         """
         import random
         seed = sum(ord(c) for c in query)
@@ -363,7 +399,7 @@ class ResearchCollector:
             pub_date = (
                 datetime.date.today() - datetime.timedelta(days=age_days)
             ).isoformat() + "T00:00:00Z"
-            vid_id   = f"mock_vid_{seed + i}"
+            vid_id = f"mock_vid_{seed + i}"
             results.append({
                 "video_id":     vid_id,
                 "title":        f"[MOCK] Story of {query} — Part {i + 1}",

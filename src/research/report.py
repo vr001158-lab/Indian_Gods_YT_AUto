@@ -137,7 +137,7 @@ def analyze_content_gap(scores: dict, data_source: str) -> str:
 # ── Pipeline ──────────────────────────────────────────────────────────────────
 
 def run_research_pipeline(
-    creds=None,
+    api_key: str = None,
     limit: int = None,
     max_search_calls: int = 10,
     cache_ttl_hours: int = 24,
@@ -147,7 +147,7 @@ def run_research_pipeline(
 
     Parameters
     ----------
-    creds             : Google OAuth credentials (None = offline/mock mode)
+    api_key           : YouTube Data API v3 key (None = offline/mock mode)
     limit             : cap number of topics scanned (None = all)
     max_search_calls  : quota budget for YouTube search.list this run
     cache_ttl_hours   : cache entry freshness window
@@ -157,7 +157,7 @@ def run_research_pipeline(
     Sorted list of candidate dicts, best score first.
     """
     collector = ResearchCollector(
-        creds=creds,
+        api_key=api_key,
         max_search_calls=max_search_calls,
         cache_ttl_hours=cache_ttl_hours,
     )

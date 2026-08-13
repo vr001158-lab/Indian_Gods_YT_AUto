@@ -1,6 +1,11 @@
 """
-run_research.py — Devotional Research Engine Runner (v2.1)
+run_research.py — Devotional Research Engine Runner (v2.2)
 Coordinates collection and scoring to report evidence-backed video topic candidates.
+
+Architecture:
+  Research uses a YouTube Data API v3 PUBLIC-DATA API key.
+  No OAuth token is required for search.list or videos.list on public data.
+  Set YOUTUBE_API_KEY in the environment (or GitHub Secrets) to enable live mode.
 """
 
 import sys
@@ -14,13 +19,12 @@ if sys.stdout.encoding != 'utf-8':
 if sys.stderr.encoding != 'utf-8':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-# Ensure imports can find src/
 sys.path.insert(0, os.getcwd())
-import google_auth_config
 from src.research import report
 
+
 def main():
-    limit = None
+    limit      = None
     force_mock = False
 
     # CLI parsing
@@ -35,31 +39,32 @@ def main():
     if "--no-api" in sys.argv:
         force_mock = True
 
-    print("==================================================")
+    print("=" * 50)
     print("🌅 Research Engine — Divine Dharshanam Daily")
-    print("==================================================")
+    print("=" * 50)
 
-    # Resolve OAuth credentials (optional; skips API and falls back to mocks if missing)
-    creds = None
-    if not force_mock:
-        token_path = Path("token.json")
-        secret_path = Path("client_secret.json")
-        if token_path.exists() and secret_path.exists():
-            try:
-                creds = google_auth_config.get_google_credentials()
-                print("🔑 YouTube API Credentials loaded successfully.")
-            except Exception as e:
-                print(f"⚠️ Warning: Failed to load Google credentials: {e}. Falling back to offline/mock mode.", file=sys.stderr)
-        else:
-            print("ℹ️ token.json or client_secret.json not found on disk. Operating in offline/mock mode.")
+    # Resolve API key from environment
+    api_key = None
+    if force_mock:
+        print("ℹ️  Offline mode forced via --no-api. Bypassing YouTube API.")
     else:
-        print("ℹ️ Offline mode forced via --no-api. Bypassing YouTube API.")
+        api_key = os.environ.get("YOUTUBE_API_KEY")
+        if api_key:
+            # Confirm key is loaded without printing its value
+            print(f"🔑 YOUTUBE_API_KEY found in environment ({len(api_key)} chars). Live mode.")
+        else:
+            print(
+                "ℹ️  YOUTUBE_API_KEY not found in environment. "
+                "Operating in offline/mock mode.",
+                file=sys.stderr
+            )
 
     # Execute pipeline
-    candidates = report.run_research_pipeline(creds=creds, limit=limit)
+    candidates = report.run_research_pipeline(api_key=api_key, limit=limit)
 
     # Print report
     report.print_report(candidates)
+
 
 if __name__ == "__main__":
     main()
