@@ -1,5 +1,9 @@
 name: God Channel Automation
 
+env:
+  YOUTUBE_PUBLISH: "false"
+  ENABLE_GOOGLE_DRIVE: "true"
+
 on:
   schedule:
     # Short A (multi-image): 7:00 AM IST = 01:30 UTC
@@ -46,6 +50,16 @@ jobs:
       - name: Install Python dependencies
         run: pip install --no-cache-dir -r requirements.txt
 
+      - name: Cache conformed assets
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets/gods_processed/
+            assets/asset_manifest.json
+          key: ${{ runner.os }}-conformed-assets-v2.1-${{ hashFiles('assets/gods/**') }}
+          restore-keys: |
+            ${{ runner.os }}-conformed-assets-v2.1-
+
       - name: Write credentials
         run: |
           echo '${{ secrets.TOKEN_JSON }}' > token.json
@@ -56,8 +70,14 @@ jobs:
       - name: Generate & upload Short A (multi_image)
         env:
           PYTHONUNBUFFERED: "1"
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-        run: python uploader.py --mode multi_image
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          ENABLE_GOOGLE_DRIVE: ${{ env.ENABLE_GOOGLE_DRIVE }}
+        run: |
+          PRIVACY="private"
+          if [ "${{ env.YOUTUBE_PUBLISH }}" = "true" ]; then
+            PRIVACY="public"
+          fi
+          python uploader.py --mode multi_image --privacy $PRIVACY
 
       - name: Commit manifest + archive
         run: |
@@ -92,6 +112,16 @@ jobs:
       - name: Install Python dependencies
         run: pip install --no-cache-dir -r requirements.txt
 
+      - name: Cache conformed assets
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets/gods_processed/
+            assets/asset_manifest.json
+          key: ${{ runner.os }}-conformed-assets-v2.1-${{ hashFiles('assets/gods/**') }}
+          restore-keys: |
+            ${{ runner.os }}-conformed-assets-v2.1-
+
       - name: Write credentials
         run: |
           echo '${{ secrets.TOKEN_JSON }}' > token.json
@@ -102,8 +132,14 @@ jobs:
       - name: Generate & upload Short B (single_image)
         env:
           PYTHONUNBUFFERED: "1"
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-        run: python uploader.py --mode single_image
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          ENABLE_GOOGLE_DRIVE: ${{ env.ENABLE_GOOGLE_DRIVE }}
+        run: |
+          PRIVACY="private"
+          if [ "${{ env.YOUTUBE_PUBLISH }}" = "true" ]; then
+            PRIVACY="public"
+          fi
+          python uploader.py --mode single_image --privacy $PRIVACY
 
       - name: Commit manifest + archive
         run: |
@@ -138,6 +174,16 @@ jobs:
       - name: Install Python dependencies
         run: pip install --no-cache-dir -r requirements.txt
 
+      - name: Cache conformed assets
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets/gods_processed/
+            assets/asset_manifest.json
+          key: ${{ runner.os }}-conformed-assets-v2.1-${{ hashFiles('assets/gods/**') }}
+          restore-keys: |
+            ${{ runner.os }}-conformed-assets-v2.1-
+
       - name: Write credentials
         run: |
           echo '${{ secrets.TOKEN_JSON }}' > token.json
@@ -148,8 +194,14 @@ jobs:
       - name: Generate & upload Long Video
         env:
           PYTHONUNBUFFERED: "1"
-          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-        run: python uploader.py --mode long_video
+          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          ENABLE_GOOGLE_DRIVE: ${{ env.ENABLE_GOOGLE_DRIVE }}
+        run: |
+          PRIVACY="private"
+          if [ "${{ env.YOUTUBE_PUBLISH }}" = "true" ]; then
+            PRIVACY="public"
+          fi
+          python uploader.py --mode long_video --privacy $PRIVACY
 
       - name: Commit manifest + archive
         run: |

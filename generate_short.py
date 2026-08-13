@@ -44,12 +44,19 @@ line is still the same JSON for backward compatibility.
 """
 
 import sys
+import io
 import json
 import random
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+# Force stdout/stderr to use UTF-8 to prevent console encoding crashes on Windows
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # ─────────────────────────────────────────────
 PROC_BASE         = Path("assets/gods_processed")
@@ -199,29 +206,34 @@ def save_manifest(data: dict):
 
 def pick_god_folder(mode: str) -> Path:
     """
-    Picks a god folder, rotating so no folder repeats until all have been used.
-    Each mode tracks its own rotation.
+    Picks a god folder from assets/gods, rotating so no folder repeats
+    until all have been used. Runs conformed asset preparation on-demand.
     """
-    available = [d for d in PROC_BASE.iterdir() if d.is_dir()]
-    if not available:
-        print("❌ No processed god folders found. Run prepare_assets.py first.", file=sys.stderr)
+    available_gods = [d for d in Path("assets/gods").iterdir() if d.is_dir()]
+    if not available_gods:
+        print("❌ CONFIGURATION FAILURE: No god folders found in assets/gods.", file=sys.stderr)
         sys.exit(1)
 
     manifest = load_manifest()
     key = f"used_{mode}"
     used = set(manifest.get(key, []))
 
-    remaining = [d for d in available if d.name not in used]
-    if not remaining:
+    available_names = [d.name for d in available_gods]
+    remaining_names = [name for name in available_names if name not in used]
+    if not remaining_names:
         used = set()
-        remaining = available
+        remaining_names = available_names
 
-    chosen = random.choice(remaining)
-    used.add(chosen.name)
+    chosen_name = random.choice(remaining_names)
+    used.add(chosen_name)
     manifest[key] = list(used)
     save_manifest(manifest)
 
-    return chosen
+    # Run on-demand asset conforming for this selected god only
+    import prepare_assets
+    prepare_assets.prepare_deity_assets(chosen_name)
+
+    return Path("assets/gods_processed") / chosen_name
 
 
 # ── ffprobe / ffmpeg helpers ─────────────────────────────────────────────────
@@ -502,11 +514,20 @@ def generate_single_video_short() -> dict:
 def generate_long_video() -> dict:
     god_dir = pick_god_folder("long_video")
     long_dir = LONG_VIDEO_SOURCE / god_dir.name
-    clips = sorted(long_dir.glob("*.mp4"))
+    clips = []
+    
+    if long_dir.exists():
+        clips = sorted(long_dir.glob("*.mp4"))
+
+    fallback_dir = PROC_BASE / god_dir.name / "horizontal"
+    if not clips:
+        # Fall back to processed horizontal clips
+        if fallback_dir.exists():
+            clips = sorted(fallback_dir.glob("*.mp4"))
 
     if not clips:
-        print(f"❌ No long-video clips in {long_dir}. "
-              f"Add clips to assets/long_video_source/{god_dir.name}/", file=sys.stderr)
+        print(f"❌ No long-video clips found in {long_dir} or fallback {fallback_dir}.", file=sys.stderr)
+        print("   Please run prepare_assets.py first or add source clips.", file=sys.stderr)
         sys.exit(1)
 
     meta = get_meta(god_dir.name)
@@ -555,7 +576,7 @@ def rename_with_ist_timestamp(result: dict) -> dict:
     result["generated_at_ist"] = ist_now.isoformat()
 
     sidecar = dest.with_suffix(".json")
-    sidecar.write_text(json.dumps(result, indent=2, ensure_ascii=False))
+    sidecar.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     result["metadata_file"] = str(sidecar)
     return result
 

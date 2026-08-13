@@ -1,37 +1,31 @@
 {
   "used_multi_image": [
-    "lakshmi_devi",
-    "subramanya",
-    "ganesha",
-    "parvathi",
-    "lord_vishnu",
-    "ram",
-    "krishna",
-    "hanuman",
-    "narasimha",
     "ayyappa",
-    "lord_shiva"
+    "7Kondala_Swami",
+    "hanuman"
   ],
   "used_single_image": [
-    "parvathi",
-    "subramanya",
-    "ayyappa",
-    "lakshmi_devi",
-    "hanuman",
-    "narasimha",
-    "lord_vishnu",
-    "lord_shiva",
     "krishna",
-    "7Kondala_Swami"
-  ],
-  "used_long_video": [
-    "ayyappa",
+    "parvathi",
+    "hanuman",
     "lakshmi_devi",
-    "subramanya",
+    "ayyappa",
+    "narasimha",
     "ganesha",
     "lord_shiva",
+    "7Kondala_Swami",
+    "subramanya",
+    "lord_vishnu"
+  ],
+  "used_long_video": [
     "lakshmi",
     "lord_vishnu",
-    "krishna"
+    "ganesha",
+    "subramanya",
+    "ayyappa",
+    "hanuman",
+    "lakshmi_devi",
+    "krishna",
+    "lord_shiva"
   ]
 }

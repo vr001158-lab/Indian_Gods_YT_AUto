@@ -10,13 +10,25 @@ Usage:
 from google_auth_oauthlib.flow import InstalledAppFlow
 from pathlib import Path
 import json
+import sys
 
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+import google_auth_config
 
 def main():
+    # Support both client_secret.json and credentials.json
+    secret_path = Path("client_secret.json")
+    if not secret_path.exists():
+        secret_path = Path("credentials.json")
+
+    if not secret_path.exists():
+        print("❌ ERROR: Neither client_secret.json nor credentials.json was found in the current directory.")
+        print("   Please download client secrets from Google Cloud Console and save as credentials.json.")
+        sys.exit(1)
+
+    print(f"🔑 Using client secrets from: {secret_path}")
     flow = InstalledAppFlow.from_client_secrets_file(
-        "client_secret.json",
-        SCOPES
+        str(secret_path),
+        google_auth_config.SCOPES
     )
 
     # 🔥 IMPORTANT: force refresh token generation

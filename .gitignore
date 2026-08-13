@@ -1,0 +1,24 @@
+# Credentials & Tokens
+credentials.json
+client_secret.json
+token.json
+*.json.token
+.env
+.env.*
+
+# Python Cache
+__pycache__/
+*.pyc
+
+# Render Output & Temporary directories
+output/
+temp/
+tmp/
+uploaded_archive/
+assets/gods_processed/
+
+# Ignore video formats to prevent raw outputs from being tracked
+*.mp4
+*.mov
+*.avi
+*.mkv
