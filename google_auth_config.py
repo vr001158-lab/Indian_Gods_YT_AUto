@@ -8,12 +8,10 @@ Architecture:
 
 Scope rationale:
   youtube.upload — videos.insert (upload to YouTube channel)
-  drive.file     — optional Google Drive backup
 
-NOTE: youtube.readonly is intentionally excluded.
+NOTE: drive.file and youtube.readonly are intentionally excluded.
   Research uses a public-data API key (YOUTUBE_API_KEY env var), not OAuth.
-  Google rejects combined youtube.upload + youtube.readonly OAuth requests
-  in this project's consent configuration.
+  Google Drive backup is disabled from the core production path.
 """
 
 from pathlib import Path
@@ -24,12 +22,12 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 
 # ── Centralized OAuth scope set ───────────────────────────────────────────────
-# All callers (upload + research) MUST use this exact list.
+# All callers (upload) MUST use this exact list.
 # Changing this list requires re-running refresh_token.py and updating TOKEN_JSON.
 SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",  # upload: videos.insert
-    "https://www.googleapis.com/auth/drive.file",      # optional: Google Drive backup
 ]
+
 
 CREDENTIALS_FILE = Path("credentials.json")
 TOKEN_FILE = Path("token.json")

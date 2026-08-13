@@ -18,6 +18,7 @@ import google_auth_config
 from google_auth_config import SCOPES, get_google_credentials
 import src.research.collector as collector_mod
 from src.research.collector import ResearchCollector, YOUTUBE_API_KEY_ENV
+import youtube_uploader
 
 
 # ── Expected scope constants ──────────────────────────────────────────────────
@@ -38,12 +39,12 @@ class TestScopeDefinition(unittest.TestCase):
         """youtube.readonly must be ABSENT — research uses API key, not OAuth."""
         self.assertNotIn(SCOPE_READONLY, SCOPES,
                          "youtube.readonly must NOT be in SCOPES — "
-                         "research uses YOUTUBE_API_KEY, not OAuth. "
-                         "Google rejects combined upload+readonly OAuth in this project.")
+                         "research uses YOUTUBE_API_KEY, not OAuth.")
 
-    def test_drive_scope_present(self):
-        self.assertIn(SCOPE_DRIVE, SCOPES,
-                      "drive.file scope must be in google_auth_config.SCOPES")
+    def test_drive_scope_NOT_present(self):
+        """drive.file must be ABSENT — Google Drive integration is disabled/removed."""
+        self.assertNotIn(SCOPE_DRIVE, SCOPES,
+                         "drive.file must NOT be in SCOPES — Drive backup is disabled.")
 
     def test_scopes_is_a_list(self):
         self.assertIsInstance(SCOPES, list, "SCOPES must be a plain list")
@@ -58,8 +59,8 @@ class TestScopeDefinition(unittest.TestCase):
                                   f"Every scope must be a string, got: {type(s)}")
 
     def test_scope_count(self):
-        self.assertEqual(len(SCOPES), 2,
-                         "SCOPES must have exactly 2 entries: upload + drive.file")
+        self.assertEqual(len(SCOPES), 1,
+                         "SCOPES must have exactly 1 entry: youtube.upload only")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -167,7 +168,7 @@ class TestInsufficientScopeDetection(unittest.TestCase):
                           "Scope error must reference 'python refresh_token.py'")
 
     def test_complete_upload_token_passes_scope_check(self):
-        """A token with youtube.upload + drive.file must pass scope check."""
+        """A token with youtube.upload must pass scope check."""
         with tempfile.TemporaryDirectory() as tmp:
             token_file = self._make_token_file(SCOPES, Path(tmp))
             try:
@@ -180,7 +181,7 @@ class TestInsufficientScopeDetection(unittest.TestCase):
                 pass  # Network/refresh failures are acceptable in offline test
 
     def test_token_with_readonly_still_passes_if_upload_present(self):
-        """Old tokens that happen to have readonly should still pass if upload is there."""
+        """Old tokens that happen to have readonly/drive should still pass if upload is there."""
         with tempfile.TemporaryDirectory() as tmp:
             token_file = self._make_token_file(
                 [SCOPE_UPLOAD, SCOPE_READONLY, SCOPE_DRIVE],
@@ -194,6 +195,74 @@ class TestInsufficientScopeDetection(unittest.TestCase):
                                  "Extra scopes in token must not cause scope rejection")
             except Exception:
                 pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+class TestOAuthCredentialHandling(unittest.TestCase):
+    """Verify uploader OAuth credentials check, refresh, and clear failures."""
+
+    @patch("youtube_uploader.build")
+    def test_uploader_receives_oauth_credentials(self, mock_build):
+        """Existing YouTube uploader still receives credentials."""
+        mock_creds = MagicMock()
+        mock_video_path = Path("dummy.mp4")
+        # Mock the YouTube API insert and resumable upload chunk loop
+        mock_request = MagicMock()
+        mock_request.next_chunk.return_value = (None, {"id": "dummy_video_id"})
+        mock_build.return_value.videos.return_value.insert.return_value = mock_request
+
+        with patch("youtube_uploader.Path.exists", return_value=True), \
+             patch("youtube_uploader.Path.stat") as mock_stat:
+            mock_stat.return_value.st_size = 10 * 1024 * 1024
+            with patch("youtube_uploader.MediaFileUpload") as mock_media:
+                youtube_uploader.upload_to_youtube(
+                    creds=mock_creds,
+                    video_path=mock_video_path,
+                    title="Test",
+                    description="Desc",
+                    tags=[]
+                )
+                # Verify oauth build was called with the passed credentials
+                mock_build.assert_called_once_with("youtube", "v3", credentials=mock_creds)
+
+    @patch("google_auth_config.Credentials")
+    def test_expired_access_token_refreshed(self, mock_creds_class):
+        """Expired access tokens are refreshed using the refresh token."""
+        mock_creds = MagicMock()
+        mock_creds.expired = True
+        mock_creds.refresh_token = "valid_refresh_token"
+        mock_creds.scopes = SCOPES
+        mock_creds.to_json.return_value = "{}"
+        mock_creds_class.from_authorized_user_file.return_value = mock_creds
+
+        with tempfile.TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token.json"
+            # Write a valid dummy JSON that satisfies _read_raw_scopes_from_file
+            token_file.write_text(json.dumps({"scopes": SCOPES}), encoding="utf-8")
+
+            with patch("google_auth_config.Request") as mock_request:
+                get_google_credentials(token_file=token_file)
+                # Ensure refresh was called
+                mock_creds.refresh.assert_called_once()
+
+    @patch("google_auth_config.Credentials")
+    def test_refresh_failure_raises_clear_auth_error(self, mock_creds_class):
+        """Refresh failure produces a clear authentication failure."""
+        mock_creds = MagicMock()
+        mock_creds.expired = True
+        mock_creds.refresh_token = "valid_refresh_token"
+        mock_creds.scopes = SCOPES
+        mock_creds.refresh.side_effect = Exception("Auth Server Connection Error")
+        mock_creds_class.from_authorized_user_file.return_value = mock_creds
+
+        with tempfile.TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token.json"
+            token_file.write_text(json.dumps({"scopes": SCOPES}), encoding="utf-8")
+
+            with patch("google_auth_config.Request"):
+                with self.assertRaises(ValueError) as ctx:
+                    get_google_credentials(token_file=token_file)
+                self.assertIn("Failed to refresh expired token", str(ctx.exception))
 
 
 # ─────────────────────────────────────────────────────────────────────────────

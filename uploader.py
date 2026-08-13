@@ -252,12 +252,12 @@ def main():
     print("==================================================")
 
     # 1. Config Validation
-    enable_drive = os.environ.get("ENABLE_GOOGLE_DRIVE", "").lower() == "true"
-    drive_folder_id = os.environ.get("GOOGLE_DRIVE_FOLDER_ID", "")
+    # Google Drive integration is disabled/removed from the core production path.
+    # This keeps OAuth scope minimal (youtube.upload only) and satisfies the ₹0 constraint.
+    enable_drive = False
+    if os.environ.get("ENABLE_GOOGLE_DRIVE", "").lower() == "true":
+        print("ℹ️  Note: Google Drive backup is disabled/removed from the core production path. Skipping backup.", file=sys.stderr)
 
-    if enable_drive and not drive_folder_id:
-        print("❌ CONFIGURATION FAILURE: ENABLE_GOOGLE_DRIVE is true but GOOGLE_DRIVE_FOLDER_ID is missing.", file=sys.stderr)
-        sys.exit(1)
 
     # 2. Check Credentials (unless dry-run)
     creds = None
