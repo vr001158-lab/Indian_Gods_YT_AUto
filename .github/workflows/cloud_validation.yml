@@ -1,0 +1,91 @@
+name: Cloud Validation
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg libass-dev
+
+      - name: Install Python dependencies
+        run: |
+          pip install --no-cache-dir -r requirements.txt
+
+      - name: Cache conformed assets
+        uses: actions/cache@v4
+        with:
+          path: |
+            assets/gods_processed/
+            assets/asset_manifest.json
+          key: ${{ runner.os }}-conformed-assets-validation-${{ hashFiles('assets/gods/**') }}
+          restore-keys: |
+            ${{ runner.os }}-conformed-assets-validation-
+
+      - name: Validate Python imports
+        run: |
+          python -c "import prepare_assets; import uploader; import generate_short; import youtube_uploader; import google_auth_config"
+          echo "✅ Python imports validated successfully."
+
+      - name: Validate required project directories
+        run: |
+          mkdir -p assets/gods
+          mkdir -p assets/gods_processed
+          mkdir -p output
+          echo "✅ Project directories verified."
+
+      - name: Run incremental conforming tests
+        run: |
+          python -u tests/test_incremental_conform.py
+
+      - name: Run pipeline dry-run (video generation & quality check validation)
+        env:
+          PYTHONUNBUFFERED: "1"
+          YOUTUBE_PUBLISH: "false"
+          ENABLE_GOOGLE_DRIVE: "false"
+        run: |
+          python -u uploader.py --mode multi_image --dry-run
+
+      - name: Verify output files structure
+        run: |
+          echo "📂 Listing output/ directory:"
+          ls -la output/ || echo "output/ is empty"
+          echo "📂 Listing uploaded_archive/ directory:"
+          ls -la uploaded_archive/ || echo "uploaded_archive/ is empty"
+          
+          # Find the generated video
+          GEN_VIDEO=$(find output/ -maxdepth 1 -name "*.mp4" | head -n 1)
+          if [ -z "$GEN_VIDEO" ]; then
+            echo "❌ Error: No generated MP4 video found in output/!"
+            exit 1
+          fi
+          echo "🎬 Found generated video: $GEN_VIDEO"
+          
+          # Verify file size is > 0
+          FILESIZE=$(stat -c%s "$GEN_VIDEO")
+          echo "📏 Video size: $FILESIZE bytes"
+          if [ "$FILESIZE" -le 0 ]; then
+            echo "❌ Error: Video file size is 0!"
+            exit 1
+          fi
+          
+          # Run standalone ffprobe check on the output video
+          echo "🔍 Running standalone ffprobe checks on $GEN_VIDEO..."
+          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,pix_fmt,duration -of json "$GEN_VIDEO"
+          echo "✅ Output video verified successfully."
