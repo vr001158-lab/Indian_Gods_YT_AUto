@@ -28,3 +28,24 @@ data/research/*
 
 # Decision Engine — generated runtime artifacts
 data/decision/*
+
+# Content Brief Engine — generated runtime artifacts
+data/content_briefs/*
+
+# Script Engine — generated runtime artifacts
+data/scripts/*
+
+# Voice Engine — generated runtime artifacts
+data/audio/*
+
+# Visual Engine — generated runtime artifacts
+data/visuals/*
+
+# Video Engine — generated runtime artifacts
+data/videos/*
+
+# Thumbnail Engine — generated runtime artifacts
+data/thumbnails/*
+
+# Pipeline Engine — generated runtime artifacts
+data/pipeline/*

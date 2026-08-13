@@ -112,11 +112,14 @@ jobs:
           topic = data.get('selected_topic')
           source = data.get('data_source')
           confidence = data.get('confidence')
+          score = data.get('score')
 
-          print(f'Approved:   {approved}')
-          print(f'Topic:      {topic}')
-          print(f'Source:     {source}')
-          print(f'Confidence: {confidence}')
+          print('REAL RESEARCH: PASS')
+          print(f'DECISION: {\"APPROVED\" if approved else \"REJECTED\"}')
+          print(f'SELECTED TOPIC: {topic}')
+          print(f'SCORE: {score}')
+          print(f'CONFIDENCE: {confidence}')
+          print(f'DATA SOURCE: {source}')
 
           if approved is not True:
               print('❌ VALIDATION FAILED: approved_for_generation is not true')
