@@ -4,7 +4,7 @@
 # Wraps the existing youtube_uploader.upload_to_youtube() and adds:
 #   - Thumbnail upload (videos.setThumbnail)
 #   - Publishing manifest written to data/publishing/
-#   - PRIVATE-only enforcement
+#   - Default publishing privacy (configurable via REQUIRED_PRIVACY)
 #   - No credential logging at any point
 #
 # IMPORTANT: This module NEVER stores, prints, or logs OAuth credentials,
@@ -26,18 +26,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# PRIVATE is the ONLY permitted initial privacy status.
-# This value is hard-coded and cannot be overridden by callers.
-REQUIRED_PRIVACY = "private"
+# Default publishing privacy status. Change to 'private' if you want private uploads.
+# This value is hard-coded here but can be modified before deployment.
+REQUIRED_PRIVACY = "public"
 
 
 class PublishError(RuntimeError):
     """Raised when a YouTube upload or thumbnail set operation fails."""
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────��[...]
 # Thumbnail upload
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────��[...]
 
 def upload_thumbnail(creds: Any, video_id: str, thumbnail_file: str | Path) -> bool:
     """
@@ -76,9 +76,9 @@ def upload_thumbnail(creds: Any, video_id: str, thumbnail_file: str | Path) -> b
         raise PublishError(f"Thumbnail upload failed: {exc}") from exc
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────��[...]
 # Main publisher
-# ─────────────────────────────────────────────────────────────────────────────
+# ────────────────────────────────────────────────────────────────��[...]
 
 def publish_video(
     creds: Any,
@@ -92,7 +92,7 @@ def publish_video(
     output_dir: str | Path = "data/publishing",
 ) -> dict:
     """
-    Upload the video to YouTube (always PRIVATE), optionally set the thumbnail,
+    Upload the video to YouTube (default privacy is set by REQUIRED_PRIVACY), optionally set the thumbnail,
     and write a publishing manifest.
 
     Parameters
@@ -128,8 +128,8 @@ def publish_video(
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
     # ── Step 1: Upload video ────────────────────────────────────────────────
-    # Privacy is ALWAYS "private" — non-negotiable.
-    print(f"  Uploading to YouTube [PRIVATE]...")
+    # Privacy is set by REQUIRED_PRIVACY.
+    print(f"  Uploading to YouTube [{REQUIRED_PRIVACY.upper()}]...")
     print(f"  File:  {vp.name} ({vp.stat().st_size / 1024 / 1024:.2f} MB)")
     print(f"  Title: {title[:80]}")
 
