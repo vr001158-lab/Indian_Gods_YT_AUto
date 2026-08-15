@@ -10,72 +10,75 @@ from PIL import Image
 CANONICAL_ASSET_PLAN_SHA256 = "f6ca03a2dfec5add5b9bce5ce699124bfdffacf42f009b2a9d4b1c02a5f87b33"
 CANONICAL_MUSIC_SHA256 = "dc529b821c5d236ec450c5462dba7810c6dddb4032e6f288a59b62dba0b04e7b"
 
-# Exact byte string of canonical data/visuals/asset_plan_20260814_071510.json
-CANONICAL_ASSET_PLAN_JSON = """{
-  "topic": "Secrets of Shiva's Snake: The Mastery Over Ego and Poison",
-  "deity": "lord_shiva",
-  "created_at": "2026-08-14T07:15:10.915458+00:00",
-  "approval_metadata": {
-    "approved_for_generation": true,
-    "selected_topic": "Why Lord Shiva Wears a Snake Around His Neck",
-    "score": 66,
-    "confidence": "high",
-    "data_source": "youtube_api",
-    "category": "Stories of deities"
-  },
-  "scenes": [
-    {
-      "scene": 1,
-      "asset_type": "image",
-      "asset": "assets/gods/lord_shiva/#shiva #shivratri #shivling #shivshankar #mahadev.jpg",
-      "asset_id": "#shiva #shivratri #shivling #shivshankar #mahadev",
-      "deity": "lord_shiva",
-      "source": "repository",
-      "reason_for_selection": "Semantic match (score=2) in repository deity assets for 'lord_shiva'",
-      "validation_result": "OK"
-    },
-    {
-      "scene": 2,
-      "asset_type": "image",
-      "asset": "assets/gods/lord_shiva/Divine Trident of Cosmic Power\\u26a1\\ufe0f\\ud83d\\udd31 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy.jpg",
-      "asset_id": "Divine Trident of Cosmic Power\\u26a1\\ufe0f\\ud83d\\udd31 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy",
-      "deity": "lord_shiva",
-      "source": "repository",
-      "reason_for_selection": "Semantic match (score=1) in repository deity assets for 'lord_shiva'",
-      "validation_result": "OK"
-    },
-    {
-      "scene": 3,
-      "asset_type": "image",
-      "asset": "assets/gods/lord_shiva/Divine Trident of Cosmic Power\\u26a1\\ufe0f\\ud83d\\udd31 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy.jpg",
-      "asset_id": "Divine Trident of Cosmic Power\\u26a1\\ufe0f\\ud83d\\udd31 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy",
-      "deity": "lord_shiva",
-      "source": "repository",
-      "reason_for_selection": "Semantic match (score=3) in repository deity assets for 'lord_shiva'",
-      "validation_result": "OK"
-    },
-    {
-      "scene": 4,
-      "asset_type": "image",
-      "asset": "assets/gods/lord_shiva/#shiva #shivratri #shivling #shivshankar #mahadev.jpg",
-      "asset_id": "#shiva #shivratri #shivling #shivshankar #mahadev",
-      "deity": "lord_shiva",
-      "source": "repository",
-      "reason_for_selection": "Semantic match (score=2) in repository deity assets for 'lord_shiva'",
-      "validation_result": "OK"
-    },
-    {
-      "scene": 5,
-      "asset_type": "image",
-      "asset": "assets/gods/lord_shiva/181199585004244858.jpg",
-      "asset_id": "181199585004244858",
-      "deity": "lord_shiva",
-      "source": "repository",
-      "reason_for_selection": "Deity repository asset fallback for 'lord_shiva' (scene #5)",
-      "validation_result": "OK"
-    }
-  ]
-}""".encode("utf-8")
+# Exact canonical byte content of data/visuals/asset_plan_20260814_071510.json
+# SHA256: f6ca03a2dfec5add5b9bce5ce699124bfdffacf42f009b2a9d4b1c02a5f87b33
+CANONICAL_ASSET_PLAN_BYTES = (
+    b'{\n'
+    b'  "topic": "Secrets of Shiva\'s Snake: The Mastery Over Ego and Poison",\n'
+    b'  "deity": "lord_shiva",\n'
+    b'  "created_at": "2026-08-14T07:15:10.915458+00:00",\n'
+    b'  "approval_metadata": {\n'
+    b'    "approved_for_generation": true,\n'
+    b'    "selected_topic": "Why Lord Shiva Wears a Snake Around His Neck",\n'
+    b'    "score": 66,\n'
+    b'    "confidence": "high",\n'
+    b'    "data_source": "youtube_api",\n'
+    b'    "category": "Stories of deities"\n'
+    b'  },\n'
+    b'  "scenes": [\n'
+    b'    {\n'
+    b'      "scene": 1,\n'
+    b'      "asset_type": "image",\n'
+    b'      "asset": "assets/gods/lord_shiva/#shiva #shivratri #shivling #shivshankar #mahadev.jpg",\n'
+    b'      "asset_id": "#shiva #shivratri #shivling #shivshankar #mahadev",\n'
+    b'      "deity": "lord_shiva",\n'
+    b'      "source": "repository",\n'
+    b'      "reason_for_selection": "Semantic match (score=2) in repository deity assets for \'lord_shiva\'",\n'
+    b'      "validation_result": "OK"\n'
+    b'    },\n'
+    b'    {\n'
+    b'      "scene": 2,\n'
+    b'      "asset_type": "image",\n'
+    b'      "asset": "assets/gods/lord_shiva/Divine Trident of Cosmic Power\xe2\x9a\xa1\xef\xb8\x8f\xf0\x9f\x94\x91 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy.jpg",\n'
+    b'      "asset_id": "Divine Trident of Cosmic Power\xe2\x9a\xa1\xef\xb8\x8f\xf0\x9f\x94\x91 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy",\n'
+    b'      "deity": "lord_shiva",\n'
+    b'      "source": "repository",\n'
+    b'      "reason_for_selection": "Semantic match (score=1) in repository deity assets for \'lord_shiva\'",\n'
+    b'      "validation_result": "OK"\n'
+    b'    },\n'
+    b'    {\n'
+    b'      "scene": 3,\n'
+    b'      "asset_type": "image",\n'
+    b'      "asset": "assets/gods/lord_shiva/Divine Trident of Cosmic Power\xe2\x9a\xa1\xef\xb8\x8f\xf0\x9f\x94\x91 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy.jpg",\n'
+    b'      "asset_id": "Divine Trident of Cosmic Power\xe2\x9a\xa1\xef\xb8\x8f\xf0\x9f\x94\x91 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy",\n'
+    b'      "deity": "lord_shiva",\n'
+    b'      "source": "repository",\n'
+    b'      "reason_for_selection": "Semantic match (score=3) in repository deity assets for \'lord_shiva\'",\n'
+    b'      "validation_result": "OK"\n'
+    b'    },\n'
+    b'    {\n'
+    b'      "scene": 4,\n'
+    b'      "asset_type": "image",\n'
+    b'      "asset": "assets/gods/lord_shiva/#shiva #shivratri #shivling #shivshankar #mahadev.jpg",\n'
+    b'      "asset_id": "#shiva #shivratri #shivling #shivshankar #mahadev",\n'
+    b'      "deity": "lord_shiva",\n'
+    b'      "source": "repository",\n'
+    b'      "reason_for_selection": "Semantic match (score=2) in repository deity assets for \'lord_shiva\'",\n'
+    b'      "validation_result": "OK"\n'
+    b'    },\n'
+    b'    {\n'
+    b'      "scene": 5,\n'
+    b'      "asset_type": "image",\n'
+    b'      "asset": "assets/gods/lord_shiva/181199585004244858.jpg",\n'
+    b'      "asset_id": "181199585004244858",\n'
+    b'      "deity": "lord_shiva",\n'
+    b'      "source": "repository",\n'
+    b'      "reason_for_selection": "Deity repository asset fallback for \'lord_shiva\' (scene #5)",\n'
+    b'      "validation_result": "OK"\n'
+    b'    }\n'
+    b'  ]\n'
+    b'}'
+)
 
 
 def generate_canonical_shiva_music(out_path: Path):
@@ -243,11 +246,14 @@ def bootstrap():
     visuals_dir.mkdir(parents=True, exist_ok=True)
     asset_plan_file = visuals_dir / "asset_plan_20260814_071510.json"
 
-    if not asset_plan_file.exists() or hashlib.sha256(asset_plan_file.read_bytes()).hexdigest() != CANONICAL_ASSET_PLAN_SHA256:
-        asset_plan_file.write_bytes(CANONICAL_ASSET_PLAN_JSON)
-        print(f"[CI BOOTSTRAP] Asset plan created/verified: {asset_plan_file}")
+    if asset_plan_file.exists() and hashlib.sha256(asset_plan_file.read_bytes()).hexdigest() == CANONICAL_ASSET_PLAN_SHA256:
+        print("Canonical asset plan exists, skipping creation")
+    else:
+        asset_plan_file.write_bytes(CANONICAL_ASSET_PLAN_BYTES)
+        print(f"[CI BOOTSTRAP] Asset plan created: {asset_plan_file}")
 
     # 3. Deterministic WAV music fixture (assets/music/devotional/ & data/music/)
+    # NOTE: Does NOT mutate production assets/music/music_manifest.json
     music_paths = [
         Path("assets/music/devotional/shiva_devotional_shivaranjani_flute.wav"),
         Path("data/music/shiva_devotional_shivaranjani_flute.wav"),
