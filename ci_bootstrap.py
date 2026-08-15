@@ -10,76 +10,6 @@ from PIL import Image
 CANONICAL_ASSET_PLAN_SHA256 = "f6ca03a2dfec5add5b9bce5ce699124bfdffacf42f009b2a9d4b1c02a5f87b33"
 CANONICAL_MUSIC_SHA256 = "dc529b821c5d236ec450c5462dba7810c6dddb4032e6f288a59b62dba0b04e7b"
 
-# Exact canonical byte content of data/visuals/asset_plan_20260814_071510.json
-# SHA256: f6ca03a2dfec5add5b9bce5ce699124bfdffacf42f009b2a9d4b1c02a5f87b33
-CANONICAL_ASSET_PLAN_BYTES = (
-    b'{\n'
-    b'  "topic": "Secrets of Shiva\'s Snake: The Mastery Over Ego and Poison",\n'
-    b'  "deity": "lord_shiva",\n'
-    b'  "created_at": "2026-08-14T07:15:10.915458+00:00",\n'
-    b'  "approval_metadata": {\n'
-    b'    "approved_for_generation": true,\n'
-    b'    "selected_topic": "Why Lord Shiva Wears a Snake Around His Neck",\n'
-    b'    "score": 66,\n'
-    b'    "confidence": "high",\n'
-    b'    "data_source": "youtube_api",\n'
-    b'    "category": "Stories of deities"\n'
-    b'  },\n'
-    b'  "scenes": [\n'
-    b'    {\n'
-    b'      "scene": 1,\n'
-    b'      "asset_type": "image",\n'
-    b'      "asset": "assets/gods/lord_shiva/#shiva #shivratri #shivling #shivshankar #mahadev.jpg",\n'
-    b'      "asset_id": "#shiva #shivratri #shivling #shivshankar #mahadev",\n'
-    b'      "deity": "lord_shiva",\n'
-    b'      "source": "repository",\n'
-    b'      "reason_for_selection": "Semantic match (score=2) in repository deity assets for \'lord_shiva\'",\n'
-    b'      "validation_result": "OK"\n'
-    b'    },\n'
-    b'    {\n'
-    b'      "scene": 2,\n'
-    b'      "asset_type": "image",\n'
-    b'      "asset": "assets/gods/lord_shiva/Divine Trident of Cosmic Power\xe2\x9a\xa1\xef\xb8\x8f\xf0\x9f\x94\x91 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy.jpg",\n'
-    b'      "asset_id": "Divine Trident of Cosmic Power\xe2\x9a\xa1\xef\xb8\x8f\xf0\x9f\x94\x91 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy",\n'
-    b'      "deity": "lord_shiva",\n'
-    b'      "source": "repository",\n'
-    b'      "reason_for_selection": "Semantic match (score=1) in repository deity assets for \'lord_shiva\'",\n'
-    b'      "validation_result": "OK"\n'
-    b'    },\n'
-    b'    {\n'
-    b'      "scene": 3,\n'
-    b'      "asset_type": "image",\n'
-    b'      "asset": "assets/gods/lord_shiva/Divine Trident of Cosmic Power\xe2\x9a\xa1\xef\xb8\x8f\xf0\x9f\x94\x91 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy.jpg",\n'
-    b'      "asset_id": "Divine Trident of Cosmic Power\xe2\x9a\xa1\xef\xb8\x8f\xf0\x9f\x94\x91 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy",\n'
-    b'      "deity": "lord_shiva",\n'
-    b'      "source": "repository",\n'
-    b'      "reason_for_selection": "Semantic match (score=3) in repository deity assets for \'lord_shiva\'",\n'
-    b'      "validation_result": "OK"\n'
-    b'    },\n'
-    b'    {\n'
-    b'      "scene": 4,\n'
-    b'      "asset_type": "image",\n'
-    b'      "asset": "assets/gods/lord_shiva/#shiva #shivratri #shivling #shivshankar #mahadev.jpg",\n'
-    b'      "asset_id": "#shiva #shivratri #shivling #shivshankar #mahadev",\n'
-    b'      "deity": "lord_shiva",\n'
-    b'      "source": "repository",\n'
-    b'      "reason_for_selection": "Semantic match (score=2) in repository deity assets for \'lord_shiva\'",\n'
-    b'      "validation_result": "OK"\n'
-    b'    },\n'
-    b'    {\n'
-    b'      "scene": 5,\n'
-    b'      "asset_type": "image",\n'
-    b'      "asset": "assets/gods/lord_shiva/181199585004244858.jpg",\n'
-    b'      "asset_id": "181199585004244858",\n'
-    b'      "deity": "lord_shiva",\n'
-    b'      "source": "repository",\n'
-    b'      "reason_for_selection": "Deity repository asset fallback for \'lord_shiva\' (scene #5)",\n'
-    b'      "validation_result": "OK"\n'
-    b'    }\n'
-    b'  ]\n'
-    b'}'
-)
-
 
 def generate_canonical_shiva_music(out_path: Path):
     """
@@ -241,16 +171,24 @@ def bootstrap():
         thumb_meta.write_text(json.dumps(meta_data, indent=2), encoding="utf-8")
         print(f"[CI BOOTSTRAP] Thumbnail metadata created: {thumb_meta}")
 
-    # 2. Canonical visual asset plan fixture (data/visuals/asset_plan_20260814_071510.json)
+    # 2. Verify tracked visual asset plan fixture (data/visuals/asset_plan_20260814_071510.json)
+    # Read-only verification: MUST NEVER write or mutate the asset plan.
     visuals_dir = Path("data/visuals")
-    visuals_dir.mkdir(parents=True, exist_ok=True)
     asset_plan_file = visuals_dir / "asset_plan_20260814_071510.json"
 
-    if asset_plan_file.exists() and hashlib.sha256(asset_plan_file.read_bytes()).hexdigest() == CANONICAL_ASSET_PLAN_SHA256:
-        print("Canonical asset plan exists, skipping creation")
-    else:
-        asset_plan_file.write_bytes(CANONICAL_ASSET_PLAN_BYTES)
-        print(f"[CI BOOTSTRAP] Asset plan created: {asset_plan_file}")
+    if not asset_plan_file.exists():
+        raise FileNotFoundError(
+            f"Canonical asset plan missing: {asset_plan_file}. "
+            "It must be tracked in Git and present on clean checkouts."
+        )
+
+    actual_plan_sha = hashlib.sha256(asset_plan_file.read_bytes()).hexdigest()
+    if actual_plan_sha != CANONICAL_ASSET_PLAN_SHA256:
+        raise ValueError(
+            f"Canonical asset plan SHA256 mismatch for {asset_plan_file.name}: "
+            f"expected {CANONICAL_ASSET_PLAN_SHA256}, got {actual_plan_sha}"
+        )
+    print(f"[CI BOOTSTRAP] Canonical asset plan verified: {asset_plan_file} (SHA256: {actual_plan_sha[:16]}...)")
 
     # 3. Deterministic WAV music fixture (assets/music/devotional/ & data/music/)
     # NOTE: Does NOT mutate production assets/music/music_manifest.json

@@ -97,6 +97,10 @@ jobs:
         run: |
           python -m unittest discover -s tests -p "test_*.py"
 
+      - name: Verify Asset Plan SHA256 Integrity
+        run: |
+          python -c "import hashlib, pathlib; p = pathlib.Path('data/visuals/asset_plan_20260814_071510.json'); expected = 'f6ca03a2dfec5add5b9bce5ce699124bfdffacf42f009b2a9d4b1c02a5f87b33'; actual = hashlib.sha256(p.read_bytes()).hexdigest(); assert actual == expected, f'Asset plan SHA256 mismatch! Expected {expected}, got {actual}'; print('✅ Asset plan SHA256 integrity verified!')"
+
       - name: Execute Canonical Production Pipeline
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
@@ -116,6 +120,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -- data/visuals/asset_plan_20260814_071510.json || true
           git add data/publishing_history.json
           git diff-index --quiet HEAD || git commit -m "auto(publishing): update publishing_history.json [skip ci]"
           git push || true
