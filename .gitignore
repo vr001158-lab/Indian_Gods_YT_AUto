@@ -39,6 +39,7 @@ data/videos/*
 data/thumbnails/*
 data/pipeline/*
 data/publishing/*
+data/qa/*
 
 # Keep gitkeep and persistent history file
 !data/publishing_history.json
