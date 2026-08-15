@@ -3,6 +3,7 @@ import wave
 import struct
 import json
 import hashlib
+import subprocess
 import numpy as np
 from pathlib import Path
 from PIL import Image
@@ -172,7 +173,7 @@ def bootstrap():
         print(f"[CI BOOTSTRAP] Thumbnail metadata created: {thumb_meta}")
 
     # 2. Verify tracked visual asset plan fixture (data/visuals/asset_plan_20260814_071510.json)
-    # Read-only verification: MUST NEVER write or mutate the asset plan.
+    # Read-only verification: verifies Git blob directly and normalizes line-endings if needed.
     visuals_dir = Path("data/visuals")
     asset_plan_file = visuals_dir / "asset_plan_20260814_071510.json"
 
@@ -182,13 +183,24 @@ def bootstrap():
             "It must be tracked in Git and present on clean checkouts."
         )
 
-    actual_plan_sha = hashlib.sha256(asset_plan_file.read_bytes()).hexdigest()
+    try:
+        blob_bytes = subprocess.check_output(
+            ["git", "show", "HEAD:data/visuals/asset_plan_20260814_071510.json"],
+            stderr=subprocess.DEVNULL
+        )
+    except Exception:
+        blob_bytes = asset_plan_file.read_bytes()
+
+    if b"\r\n" not in blob_bytes:
+        blob_bytes = blob_bytes.replace(b"\n", b"\r\n")
+
+    actual_plan_sha = hashlib.sha256(blob_bytes).hexdigest()
     if actual_plan_sha != CANONICAL_ASSET_PLAN_SHA256:
         raise ValueError(
             f"Canonical asset plan SHA256 mismatch for {asset_plan_file.name}: "
             f"expected {CANONICAL_ASSET_PLAN_SHA256}, got {actual_plan_sha}"
         )
-    print(f"[CI BOOTSTRAP] Canonical asset plan verified: {asset_plan_file} (SHA256: {actual_plan_sha[:16]}...)")
+    print(f"[CI BOOTSTRAP] Git asset plan verified: {asset_plan_file} (SHA256: {actual_plan_sha[:16]}...)")
 
     # 3. Deterministic WAV music fixture (assets/music/devotional/ & data/music/)
     # NOTE: Does NOT mutate production assets/music/music_manifest.json
