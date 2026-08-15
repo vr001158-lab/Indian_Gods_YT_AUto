@@ -99,7 +99,17 @@ jobs:
 
       - name: Verify Asset Plan SHA256 Integrity
         run: |
-          python -c "import hashlib, pathlib; p = pathlib.Path('data/visuals/asset_plan_20260814_071510.json'); expected = 'f6ca03a2dfec5add5b9bce5ce699124bfdffacf42f009b2a9d4b1c02a5f87b33'; actual = hashlib.sha256(p.read_bytes()).hexdigest(); assert actual == expected, f'Asset plan SHA256 mismatch! Expected {expected}, got {actual}'; print('✅ Asset plan SHA256 integrity verified!')"
+          python -c "
+          import hashlib, pathlib
+          p = pathlib.Path('data/visuals/asset_plan_20260814_071510.json')
+          expected = 'f6ca03a2dfec5add5b9bce5ce699124bfdffacf42f009b2a9d4b1c02a5f87b33'
+          raw = p.read_bytes()
+          # Normalize to canonical CRLF form (matches committed Windows-origin fixture)
+          canonical = raw.replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
+          actual = hashlib.sha256(canonical).hexdigest()
+          assert actual == expected, f'Asset plan SHA256 mismatch! Expected {expected}, got {actual}'
+          print('✅ Asset plan SHA256 integrity verified!')
+          "
 
       - name: Execute Canonical Production Pipeline
         env:
@@ -121,6 +131,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -- data/visuals/asset_plan_20260814_071510.json || true
+          git checkout -- assets/music/music_manifest.json || true
           git add data/publishing_history.json
           git diff-index --quiet HEAD || git commit -m "auto(publishing): update publishing_history.json [skip ci]"
           git push || true
