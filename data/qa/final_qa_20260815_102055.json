@@ -1,0 +1,31 @@
+{
+  "approved_for_publishing": false,
+  "selected_topic": "",
+  "score": null,
+  "confidence": "",
+  "data_source": "",
+  "content_type": "short",
+  "aspect_ratio": "",
+  "resolution": "",
+  "artifacts": {
+    "decision": "",
+    "content_brief": "",
+    "script": "",
+    "audio": "",
+    "visual": "",
+    "video": "",
+    "thumbnail": ""
+  },
+  "checks": {
+    "artifact_discovery": false
+  },
+  "details": {
+    "artifact_discovery": "Required artifact not found: None"
+  },
+  "errors": [
+    "artifact_discovery: Required artifact not found: None"
+  ],
+  "video_validation": {},
+  "approval_metadata": {},
+  "approved_at": "2026-08-15T10:20:55.464250+00:00"
+}

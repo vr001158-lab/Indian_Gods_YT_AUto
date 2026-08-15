@@ -116,11 +116,14 @@ def publish_video(
     """
     import youtube_uploader as _yt_uploader
 
+    from .safety import verify_video_with_ffprobe, PublisherSafetyError
+
     vp = Path(video_file)
-    if not vp.exists():
-        raise PublishError(f"Video file not found: {vp}")
-    if vp.stat().st_size == 0:
-        raise PublishError(f"Video file is zero bytes: {vp}")
+    ct = qa.get("content_type", "short")
+    try:
+        verify_video_with_ffprobe(vp, content_type=ct)
+    except PublisherSafetyError as exc:
+        raise PublishError(f"Pre-upload ffprobe validation failed for {vp.name}: {exc}") from exc
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
@@ -164,6 +167,7 @@ def publish_video(
     # ── Step 3: Build manifest ──────────────────────────────────────────────
     # IMPORTANT: NO credential values are included in the manifest.
     arts = qa.get("artifacts", {})
+    ct = qa.get("content_type", "short")
     manifest = {
         "video_id":           video_id,
         "youtube_url":        youtube_url,
@@ -174,6 +178,11 @@ def publish_video(
         "thumbnail_error":    thumbnail_error,
         "success":            True,
         "approval_metadata":  qa.get("approval_metadata", {}),
+        # ── Content format metadata ────────────────────────────────────────────
+        "content_type":       ct,
+        "aspect_ratio":       qa.get("aspect_ratio", ""),
+        "resolution":         qa.get("resolution", ""),
+        "duration_seconds":   qa.get("video_validation", {}).get("duration_seconds"),
         "source_artifacts": {
             "decision":       arts.get("decision",       ""),
             "content_brief":  arts.get("content_brief",  ""),
@@ -200,6 +209,34 @@ def publish_video(
         encoding="utf-8",
     )
     print(f"  Manifest : {manifest_path}")
+
+    # ── Step 5: Append to persistent history file (production runs only) ───
+    is_temp_run = "tmp" in str(out_dir).lower() or "temp" in str(out_dir).lower() or "tmp" in str(vp).lower() or "temp" in str(vp).lower()
+    if not is_temp_run:
+        history_file = Path("data/publishing_history.json")
+        history_file.parent.mkdir(parents=True, exist_ok=True)
+        history_records = []
+        if history_file.exists():
+            try:
+                history_records = json.loads(history_file.read_text(encoding="utf-8"))
+                if not isinstance(history_records, list):
+                    history_records = []
+            except Exception:
+                history_records = []
+
+        history_entry = {
+            "youtube_video_id": video_id,
+            "topic":            qa.get("selected_topic", ""),
+            "title":            title,
+            "content_type":     ct,
+            "aspect_ratio":     qa.get("aspect_ratio", ""),
+            "resolution":       qa.get("resolution", ""),
+            "duration_seconds": qa.get("video_validation", {}).get("duration_seconds"),
+            "published_at":     ts,
+            "video_file_name":  vp.name,
+        }
+        history_records.append(history_entry)
+        history_file.write_text(json.dumps(history_records, indent=2, ensure_ascii=False), encoding="utf-8")
 
     manifest["_manifest_path"] = str(manifest_path)
     return manifest

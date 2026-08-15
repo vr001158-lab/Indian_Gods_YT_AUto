@@ -2,6 +2,8 @@
 credentials.json
 client_secret.json
 token.json
+token_backup.json
+token*.json
 *.json.token
 .env
 .env.*
@@ -9,6 +11,7 @@ token.json
 # Python Cache
 __pycache__/
 *.pyc
+.pytest_cache/
 
 # Render Output & Temporary directories
 output/
@@ -17,35 +20,26 @@ tmp/
 uploaded_archive/
 assets/gods_processed/
 
-# Ignore video formats to prevent raw outputs from being tracked
+# Ignore large media formats
 *.mp4
 *.mov
 *.avi
 *.mkv
+*.wav
+*.mp3
 
-# Research Engine — generated runtime artifacts
+# Runtime artifacts
 data/research/*
-
-# Decision Engine — generated runtime artifacts
 data/decision/*
-
-# Content Brief Engine — generated runtime artifacts
 data/content_briefs/*
-
-# Script Engine — generated runtime artifacts
 data/scripts/*
-
-# Voice Engine — generated runtime artifacts
 data/audio/*
-
-# Visual Engine — generated runtime artifacts
 data/visuals/*
-
-# Video Engine — generated runtime artifacts
 data/videos/*
-
-# Thumbnail Engine — generated runtime artifacts
 data/thumbnails/*
-
-# Pipeline Engine — generated runtime artifacts
 data/pipeline/*
+data/publishing/*
+
+# Keep gitkeep and persistent history file
+!data/publishing_history.json
+!.gitkeep

@@ -31,13 +31,14 @@ def build_video_metadata(qa: dict) -> dict:
     Derive YouTube upload metadata from a passed QA result.
 
     Returns a dict with keys:
-        title, description, tags, category_id, video_file, thumbnail_file
+        title, description, tags, category_id, video_file, thumbnail_file, content_type
     """
-    arts     = qa.get("artifacts", {})
-    topic    = qa.get("selected_topic", "")
-    score    = qa.get("score", 0)
-    src      = qa.get("data_source", "")
-    conf     = qa.get("confidence", "")
+    arts         = qa.get("artifacts", {})
+    topic        = qa.get("selected_topic", "")
+    score        = qa.get("score", 0)
+    src          = qa.get("data_source", "")
+    conf         = qa.get("confidence", "")
+    content_type = qa.get("content_type", "short")
 
     # ── Script metadata ──────────────────────────────────────────────────────
     script_file = arts.get("script", "")
@@ -68,8 +69,10 @@ def build_video_metadata(qa: dict) -> dict:
     hook_block = f"{hook}\n\n" if hook else ""
     narration_excerpt = narration[:800] + "..." if len(narration) > 800 else narration
     narration_block = f"{narration_excerpt}\n\n" if narration_excerpt else ""
+
+    hashtag_shorts = " #Shorts" if content_type == "short" else ""
     disclaimer = (
-        "#IndianMythology #HinduDharma #DivineStories #Shorts\n\n"
+        f"#IndianMythology #HinduDharma #DivineStories{hashtag_shorts}\n\n"
         "This video is created for educational and devotional purposes."
     )
     description = (
@@ -86,9 +89,11 @@ def build_video_metadata(qa: dict) -> dict:
         "spirituality",
         "Hinduism",
         "mythology explained",
-        "Shorts",
-        "Divine Dharshanam Daily",
     ]
+    if content_type == "short":
+        base_tags.append("Shorts")
+    base_tags.append("Divine Dharshanam Daily")
+
     # Derive deity/topic-specific tags from content brief
     keywords = brief.get("seo_keywords", [])
     topic_words = [w.strip() for w in topic.replace(".", " ").split() if len(w.strip()) > 3]
@@ -130,4 +135,5 @@ def build_video_metadata(qa: dict) -> dict:
         "category_id":    CATEGORY_ID_EDUCATION,
         "video_file":     video_file,
         "thumbnail_file": thumbnail_file,
+        "content_type":   content_type,
     }

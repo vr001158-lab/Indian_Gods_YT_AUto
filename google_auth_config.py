@@ -25,7 +25,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 # All callers (upload) MUST use this exact list.
 # Changing this list requires re-running refresh_token.py and updating TOKEN_JSON.
 SCOPES = [
-    "https://www.googleapis.com/auth/youtube.upload",  # upload: videos.insert
+    "https://www.googleapis.com/auth/youtube.upload",
 ]
 
 

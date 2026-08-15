@@ -1,0 +1,117 @@
+name: Divine Dharshanam Daily — Production Automated Pipeline
+
+on:
+  schedule:
+    # Trigger daily at 04:00 UTC (09:30 AM IST)
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      content_type:
+        description: 'Content Format (short: 1080x1920 9:16 | long: 1920x1080 16:9)'
+        required: true
+        default: 'short'
+        type: choice
+        options:
+          - short
+          - long
+      language_code:
+        description: 'Target Language (hi-IN | te-IN | ta-IN)'
+        required: true
+        default: 'hi-IN'
+        type: choice
+        options:
+          - hi-IN
+          - te-IN
+          - ta-IN
+      dry_run:
+        description: 'Dry Run Mode (stop before YouTube upload)'
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: divine-dharshanam-production
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  production-pipeline:
+    name: Execute Automated Production Pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install system dependencies & FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-indic fonts-noto-core fonts-deva fonts-telu fonts-taml
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Reconstruct OAuth Credentials & Tokens (Securely)
+        env:
+          TOKEN_JSON: ${{ secrets.TOKEN_JSON }}
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+        run: |
+          if [ -n "$TOKEN_JSON" ]; then
+            echo "$TOKEN_JSON" > token.json
+            chmod 600 token.json
+            echo "✅ token.json reconstructed from GitHub Secret."
+          else
+            echo "⚠️ TOKEN_JSON secret is empty or missing."
+          fi
+
+          if [ -n "$CREDENTIALS_JSON" ]; then
+            echo "$CREDENTIALS_JSON" > credentials.json
+            chmod 600 credentials.json
+            echo "✅ credentials.json reconstructed from GitHub Secret."
+          else
+            echo "⚠️ CREDENTIALS_JSON secret is empty or missing."
+          fi
+
+      - name: Run Complete Test Suite
+        run: |
+          python -m unittest discover -s tests -p "test_*.py"
+
+      - name: Execute Canonical Production Pipeline
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          CONTENT_TYPE_INPUT: ${{ inputs.content_type }}
+          DRY_RUN_INPUT: ${{ inputs.dry_run }}
+        run: |
+          CT="${CONTENT_TYPE_INPUT:-short}"
+          DRY=""
+          if [ "$DRY_RUN_INPUT" = "true" ]; then
+            DRY="--dry-run"
+          fi
+          echo "🚀 Executing pipeline with content-type=$CT $DRY"
+          python run_pipeline.py --content-type "$CT" $DRY
+
+      - name: Persist Lightweight Publishing History State
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/publishing_history.json
+          git diff-index --quiet HEAD || git commit -m "auto(publishing): update publishing_history.json [skip ci]"
+          git push || true

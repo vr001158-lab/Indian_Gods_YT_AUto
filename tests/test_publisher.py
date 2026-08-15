@@ -142,6 +142,7 @@ def _make_qa(
         "score": 66,
         "confidence": confidence,
         "data_source": data_source,
+        "content_type": "short",
         "artifacts": {
             "decision":      str(tmp / "decision.json"),
             "content_brief": str(cb_file),
@@ -250,6 +251,18 @@ class TestPublisherSafetyGate(unittest.TestCase):
             with self.assertRaises(PublisherSafetyError) as ctx:
                 validate_qa_for_publishing(qa)
             self.assertIn("zero bytes", str(ctx.exception))
+
+    # ── Test 7b: Corrupted / mock text video rejected ─────────────────────
+    def test_07b_corrupted_video_stub_rejected(self):
+        """Mock text files or corrupt stubs (e.g. video_20260813_194729.mp4) must be rejected."""
+        from publisher.safety import verify_video_with_ffprobe
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            corrupt_file = tmp / "video_20260813_194729.mp4"
+            corrupt_file.write_text("MOCK_MP4_VIDEO: resolution=720x1280, format=yuv420p", encoding="utf-8")
+            with self.assertRaises(PublisherSafetyError) as ctx:
+                verify_video_with_ffprobe(corrupt_file)
+            self.assertIn("Mock video text file is not valid", str(ctx.exception))
 
     # ── Test 8: PRIVATE privacy enforced ─────────────────────────────────
     def test_08_private_privacy_enforced(self):

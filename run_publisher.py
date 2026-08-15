@@ -72,7 +72,7 @@ def main() -> int:
     print(f"QA file  : {args.qa}")
     try:
         qa = load_qa_result(args.qa)
-        validate_qa_for_publishing(qa)
+        validate_qa_for_publishing(qa, allow_mock=args.dry_run)
     except PublisherSafetyError as exc:
         print(f"\n[BLOCKED] Publisher safety gate rejected QA result:")
         print(f"  {exc}")
@@ -81,6 +81,7 @@ def main() -> int:
         return 1
 
     print(f"Topic    : {qa.get('selected_topic', '')}")
+    print(f"Type     : {qa.get('content_type', 'short').upper()}")
     print(f"Source   : {qa.get('data_source', '')}")
     print(f"Score    : {qa.get('score', '')}")
     print(f"Conf     : {qa.get('confidence', '')}")
