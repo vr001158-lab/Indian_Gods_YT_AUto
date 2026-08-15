@@ -89,6 +89,10 @@ jobs:
             echo "⚠️ CREDENTIALS_JSON secret is empty or missing."
           fi
 
+      - name: Bootstrap CI Minimal Test Assets
+        run: |
+          python ci_bootstrap.py
+
       - name: Run Complete Test Suite
         run: |
           python -m unittest discover -s tests -p "test_*.py"
