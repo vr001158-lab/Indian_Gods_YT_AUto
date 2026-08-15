@@ -1,0 +1,65 @@
+{
+  "topic": "Secrets of Shiva's Snake: The Mastery Over Ego and Poison",
+  "deity": "lord_shiva",
+  "created_at": "2026-08-14T07:15:10.915458+00:00",
+  "approval_metadata": {
+    "approved_for_generation": true,
+    "selected_topic": "Why Lord Shiva Wears a Snake Around His Neck",
+    "score": 66,
+    "confidence": "high",
+    "data_source": "youtube_api",
+    "category": "Stories of deities"
+  },
+  "scenes": [
+    {
+      "scene": 1,
+      "asset_type": "image",
+      "asset": "assets/gods/lord_shiva/#shiva #shivratri #shivling #shivshankar #mahadev.jpg",
+      "asset_id": "#shiva #shivratri #shivling #shivshankar #mahadev",
+      "deity": "lord_shiva",
+      "source": "repository",
+      "reason_for_selection": "Semantic match (score=2) in repository deity assets for 'lord_shiva'",
+      "validation_result": "OK"
+    },
+    {
+      "scene": 2,
+      "asset_type": "image",
+      "asset": "assets/gods/lord_shiva/Divine Trident of Cosmic Power⚡️🔱 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy.jpg",
+      "asset_id": "Divine Trident of Cosmic Power⚡️🔱 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy",
+      "deity": "lord_shiva",
+      "source": "repository",
+      "reason_for_selection": "Semantic match (score=1) in repository deity assets for 'lord_shiva'",
+      "validation_result": "OK"
+    },
+    {
+      "scene": 3,
+      "asset_type": "image",
+      "asset": "assets/gods/lord_shiva/Divine Trident of Cosmic Power⚡️🔱 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy.jpg",
+      "asset_id": "Divine Trident of Cosmic Power⚡️🔱 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy",
+      "deity": "lord_shiva",
+      "source": "repository",
+      "reason_for_selection": "Semantic match (score=3) in repository deity assets for 'lord_shiva'",
+      "validation_result": "OK"
+    },
+    {
+      "scene": 4,
+      "asset_type": "image",
+      "asset": "assets/gods/lord_shiva/#shiva #shivratri #shivling #shivshankar #mahadev.jpg",
+      "asset_id": "#shiva #shivratri #shivling #shivshankar #mahadev",
+      "deity": "lord_shiva",
+      "source": "repository",
+      "reason_for_selection": "Semantic match (score=2) in repository deity assets for 'lord_shiva'",
+      "validation_result": "OK"
+    },
+    {
+      "scene": 5,
+      "asset_type": "image",
+      "asset": "assets/gods/lord_shiva/181199585004244858.jpg",
+      "asset_id": "181199585004244858",
+      "deity": "lord_shiva",
+      "source": "repository",
+      "reason_for_selection": "Deity repository asset fallback for 'lord_shiva' (scene #5)",
+      "validation_result": "OK"
+    }
+  ]
+}

@@ -41,6 +41,7 @@ data/pipeline/*
 data/publishing/*
 data/qa/*
 
-# Keep gitkeep and persistent history file
+# Keep gitkeep, persistent history file, and canonical test asset plan fixture
 !data/publishing_history.json
 !.gitkeep
+!data/visuals/asset_plan_20260814_071510.json
