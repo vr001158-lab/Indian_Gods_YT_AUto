@@ -38,12 +38,14 @@ jobs:
           echo "✅ OAuth credentials written to workspace (not printed)."
 
       # ── 5. Run live research engine (API key mode) ─────────────────────────
-      - name: Run Research Engine (Live YouTube API key, limit=3)
+      - name: Run Research Engine (Live YouTube API key, limit=10)
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          RESEARCH_LIMIT: "10"
           PYTHONUNBUFFERED: "1"
         run: |
-          python run_research.py --limit 3
+          LIMIT="${RESEARCH_LIMIT:-10}"
+          python run_research.py --limit "$LIMIT"
 
       # ── 6. Validate data_source is youtube_api (not mock or offline) ───────
       - name: Validate data_source is youtube_api (not mock or offline)

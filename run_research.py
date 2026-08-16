@@ -27,12 +27,16 @@ def main():
     limit      = None
     force_mock = False
 
-    # CLI parsing
     if "--limit" in sys.argv:
         try:
             idx = sys.argv.index("--limit")
             if idx + 1 < len(sys.argv):
                 limit = int(sys.argv[idx + 1])
+        except ValueError:
+            pass
+    elif "RESEARCH_LIMIT" in os.environ:
+        try:
+            limit = int(os.environ["RESEARCH_LIMIT"])
         except ValueError:
             pass
 

@@ -62,7 +62,8 @@ class PipelineRunner:
         self.state.update_stage(stage, "IN_PROGRESS")
         self.state.save()
 
-        cmd = [sys.executable, "run_research.py", "--limit", "3"]
+        research_limit = os.environ.get("RESEARCH_LIMIT", "10")
+        cmd = [sys.executable, "run_research.py", "--limit", str(research_limit)]
         self._execute_cmd(cmd, stage)
 
         # Auto-discover output path

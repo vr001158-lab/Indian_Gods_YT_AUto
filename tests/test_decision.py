@@ -335,6 +335,43 @@ class TestDecisionCLI(unittest.TestCase):
                 run_decision.main()
                 mock_exit.assert_called_once_with(2)
 
+    def test_decision_succeeds_when_valid_candidate_beyond_first_3(self):
+        """Verify decision engine evaluates beyond candidate 3 and selects valid candidate 4."""
+        c1 = _make_candidate("Published Topic 1", overall_score=85)
+        c2 = _make_candidate("Mock Topic 2", overall_score=80, data_source="mock")
+        c3 = _make_candidate("Low Score Topic 3", overall_score=50)
+        c4 = _make_candidate("Valid Deep Candidate 4", overall_score=72)
+        c5 = _make_candidate("Valid Deep Candidate 5", overall_score=68)
+
+        # Mock publishing history to simulate c1 already published
+        published_set = {"published topic 1"}
+        with patch("src.decision.validator._load_published_topics", return_value=published_set):
+            valid, rejected = validate_candidates([c1, c2, c3, c4, c5], min_score=60)
+            self.assertEqual(len(valid), 2)
+            self.assertEqual([v["topic"] for v in valid], ["Valid Deep Candidate 4", "Valid Deep Candidate 5"])
+
+            decision = run_decision_pipeline([c1, c2, c3, c4, c5], min_score=60, save=False)
+            self.assertTrue(decision["approved_for_generation"])
+            self.assertEqual(decision["selected_topic"], "Valid Deep Candidate 4")
+
+    def test_published_topic_rejection(self):
+        """Verify published topics are strictly rejected by safety gate."""
+        c_pub = _make_candidate("Already Published Topic", overall_score=90)
+        published_set = {"already published topic"}
+        ok, reasons = validate_candidate(c_pub, published_topics=published_set)
+        self.assertFalse(ok)
+        self.assertTrue(any("already published" in r for r in reasons))
+
+    def test_production_safety_gates_uncompromised(self):
+        """Verify mock data, low confidence, and score < 60 remain strictly rejected."""
+        c_mock = _make_candidate("Mock Data", data_source="mock")
+        c_low_conf = _make_candidate("Low Confidence", confidence="low")
+        c_low_score = _make_candidate("Low Score", overall_score=55)
+
+        self.assertFalse(validate_candidate(c_mock)[0])
+        self.assertFalse(validate_candidate(c_low_conf)[0])
+        self.assertFalse(validate_candidate(c_low_score)[0])
+
 
 if __name__ == "__main__":
     unittest.main()
