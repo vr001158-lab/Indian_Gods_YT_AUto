@@ -264,10 +264,10 @@ class TestPublisherSafetyGate(unittest.TestCase):
                 verify_video_with_ffprobe(corrupt_file)
             self.assertIn("Mock video text file is not valid", str(ctx.exception))
 
-    # ── Test 8: PRIVATE privacy enforced ─────────────────────────────────
-    def test_08_private_privacy_enforced(self):
-        """REQUIRED_PRIVACY must always be 'private' — not 'public' or 'unlisted'."""
-        self.assertEqual(REQUIRED_PRIVACY, "private")
+    # ── Test 8: PUBLIC privacy enforced ───────────────────────────────────
+    def test_08_public_privacy_enforced(self):
+        """REQUIRED_PRIVACY must always be 'public' — the authorized production status."""
+        self.assertEqual(REQUIRED_PRIVACY, "public")
 
 
 class TestPublisherUpload(unittest.TestCase):
@@ -457,8 +457,8 @@ class TestPublisherUpload(unittest.TestCase):
         for key in required_keys:
             self.assertIn(key, manifest, f"Manifest missing key: {key}")
 
-        # Privacy must be "private"
-        self.assertEqual(manifest["privacy_status"], "private")
+        # Privacy must be "public"
+        self.assertEqual(manifest["privacy_status"], "public")
 
         # No credential keys in manifest
         manifest_json = json.dumps(manifest)

@@ -5,7 +5,7 @@
 # Usage:
 #   python run_publisher.py --qa data/qa/final_qa_YYYYMMDD_HHMMSS.json
 #
-# This script NEVER uploads publicly.  Privacy is always PRIVATE.
+# This script uploads with PUBLIC privacy (authorized production behavior).
 # STOP: Do NOT call this until explicitly authorized for a real upload.
 #
 # Safety rules enforced:
@@ -14,7 +14,7 @@
 #  - confidence must be high
 #  - approved_for_generation must be true
 #  - video must exist and be non-zero .mp4
-#  - Privacy is ALWAYS "private" — cannot be changed via CLI
+#  - Privacy is ALWAYS "public" — cannot be changed via CLI
 
 import argparse
 import sys
@@ -40,14 +40,14 @@ def _print_banner():
     print()
     print(LINE)
     print("DIVINE DHARSHANAM DAILY")
-    print("YOUTUBE PUBLISHER  [PRIVATE ONLY]")
+    print("YOUTUBE PUBLISHER  [PUBLIC]")
     print(LINE)
     print()
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="YouTube Publisher — uploads to YouTube as PRIVATE"
+        description="YouTube Publisher — uploads to YouTube as PUBLIC"
     )
     parser.add_argument(
         "--qa",

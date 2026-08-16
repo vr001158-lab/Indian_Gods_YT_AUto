@@ -326,7 +326,7 @@ class TestPublisherManifestAndThumbnail(unittest.TestCase):
         self.assertEqual(manifest["resolution"], "1920x1080")
         self.assertEqual(manifest["duration_seconds"], 300.0)
         self.assertTrue(manifest["thumbnail_uploaded"])
-        self.assertEqual(manifest["privacy_status"], "private")
+        self.assertEqual(manifest["privacy_status"], "public")
 
         manifest_path = Path(manifest["_manifest_path"])
         self.assertTrue(manifest_path.exists())

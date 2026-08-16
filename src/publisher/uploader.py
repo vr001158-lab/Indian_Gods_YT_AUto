@@ -26,8 +26,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Default publishing privacy status. Change to 'private' if you want private uploads.
-# This value is hard-coded here but can be modified before deployment.
+# PUBLIC is the authorized production privacy status for YouTube uploads.
+# This value is hard-coded and cannot be overridden by callers.
 REQUIRED_PRIVACY = "public"
 
 

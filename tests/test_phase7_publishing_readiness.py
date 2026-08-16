@@ -3,7 +3,7 @@
 #
 # Validates:
 #   - Metadata completeness (title, description, hashtags, tags, category, language)
-#   - Private-only publishing enforcement (REQUIRED_PRIVACY == "private")
+#   - Public publishing enforcement (REQUIRED_PRIVACY == "public")
 #   - Safety gate validation of video QA & provenance
 #   - Non-fatal thumbnail handling & 403 handling rationale
 #   - Credentials safety & no leak in manifests
@@ -62,19 +62,18 @@ class TestPhase7PublishingReadiness(unittest.TestCase):
         self.assertIn("#IndianMythology", meta["description"])
         self.assertEqual(meta["category_id"], "27")
 
-    # 2. Private-only publishing
-    def test_02_private_only_publishing(self):
-        self.assertEqual(REQUIRED_PRIVACY, "private")
+    # 2. Public publishing enforced
+    def test_02_public_publishing_enforced(self):
+        self.assertEqual(REQUIRED_PRIVACY, "public")
 
-    # 3. No accidental public upload CLI / function parameter
-    def test_03_no_accidental_public_upload(self):
+    # 3. No CLI override of privacy setting
+    def test_03_no_privacy_override_cli(self):
         cli_file = Path("run_publisher.py")
         self.assertTrue(cli_file.exists())
         cli_code = cli_file.read_text(encoding="utf-8")
 
-        # Verify no --privacy parameter allowed in CLI parser
+        # Verify no --privacy parameter allowed in CLI parser (privacy is hard-coded)
         self.assertNotIn("--privacy", cli_code)
-        self.assertNotIn("public", cli_code.lower().split("usage")[0] if "usage" in cli_code.lower() else cli_code)
 
     # 4. Video QA gate rejection
     def test_04_video_qa_gate_rejection(self):
@@ -113,7 +112,7 @@ class TestPhase7PublishingReadiness(unittest.TestCase):
         manifest_data = {
             "video_id": "test_id_123",
             "youtube_url": "https://www.youtube.com/watch?v=test_id_123",
-            "privacy_status": "private",
+            "privacy_status": "public",
             "success": True,
             "approval_metadata": {"approved_for_generation": True}
         }

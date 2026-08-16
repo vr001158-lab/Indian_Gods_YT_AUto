@@ -49,7 +49,7 @@ def run_upload_test():
     test_desc = "Private validation upload for the Divine Dharshanam Daily automated production pipeline."
     test_tags = ["test", "divine dharshanam daily", "automation"]
     
-    # 5. Run YouTube upload (explicitly private!)
+    # 5. Run YouTube upload (public — authorized production behavior)
     video_id = None
     try:
         video_id = youtube_uploader.upload_to_youtube(
@@ -58,7 +58,7 @@ def run_upload_test():
             title=test_title,
             description=test_desc,
             tags=test_tags,
-            privacy_status="private"
+            privacy_status="public"
         )
     except Exception as e:
         print(f"❌ YOUTUBE FAILURE: YouTube upload failed: {e}", file=sys.stderr)
@@ -84,7 +84,7 @@ def run_upload_test():
         "youtube_id": video_id,
         "youtube_url": f"https://www.youtube.com/watch?v={video_id}",
         "youtube_upload_status": "success",
-        "privacy_status": "private",
+        "privacy_status": "public",
         "drive_backup_status": "disabled"
     }
 
@@ -94,9 +94,9 @@ def run_upload_test():
     except Exception as e:
         print(f"⚠️ Warning: Failed to write local archive log: {e}", file=sys.stderr)
 
-    print("\n🎉 Controlled Private YouTube Upload Test completed successfully!")
+    print("\n🎉 Controlled Public YouTube Upload Test completed successfully!")
     print(f"   YouTube Video ID: {video_id}")
-    print("   Privacy Status:   PRIVATE")
+    print("   Privacy Status:   PUBLIC")
 
 if __name__ == "__main__":
     run_upload_test()

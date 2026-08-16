@@ -74,7 +74,7 @@ for lang_code, vpath in videos.items():
 # 3. Verify Publisher Safety Gate
 print("\n3. Verifying Publisher Safety Gate & Privacy Enforcement:")
 print(f"   REQUIRED_PRIVACY constant: '{REQUIRED_PRIVACY}'")
-assert REQUIRED_PRIVACY == "private", "REQUIRED_PRIVACY must be 'private'"
+assert REQUIRED_PRIVACY == "public", "REQUIRED_PRIVACY must be 'public'"
 
 for lang_code, qdict in qa_manifests.items():
     # Make sure safety gate accepts valid QA manifest

@@ -208,7 +208,7 @@ def upload_to_drive(creds, video_path: Path, filename: str, folder_id: str) -> s
 def main():
     # Simple manual argument parsing to match expected custom error formats
     mode = None
-    privacy = "private"
+    privacy = "public"
     dry_run = False
 
     if "--mode" in sys.argv:
