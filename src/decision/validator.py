@@ -37,10 +37,33 @@ REQUIRED_FIELDS = (
 )
 
 # ── Accepted real-data sources ────────────────────────────────────────────────
+import json
+from pathlib import Path
+
 REAL_DATA_SOURCES = frozenset({"youtube_api", "cached_youtube_api"})
 
 
-def validate_candidate(candidate: dict, min_score: int = 60) -> tuple:
+def _load_published_topics(history_file: str | Path = "data/publishing_history.json") -> set[str]:
+    p = Path(history_file)
+    published = set()
+    if p.exists():
+        try:
+            records = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(records, list):
+                for rec in records:
+                    top = (rec.get("topic") or "").strip().lower()
+                    if top:
+                        published.add(top)
+        except Exception:
+            pass
+    return published
+
+
+def validate_candidate(
+    candidate: dict,
+    min_score: int = 60,
+    published_topics: set[str] | None = None,
+) -> tuple:
     """
     Validates a single research candidate against all production-safety gates.
 
@@ -48,6 +71,7 @@ def validate_candidate(candidate: dict, min_score: int = 60) -> tuple:
     ----------
     candidate : dict   — one item from a research_results_*.json list
     min_score : int    — minimum overall_score required (default 60)
+    published_topics : set — set of lowercase topic strings already published
 
     Returns
     -------
@@ -97,12 +121,22 @@ def validate_candidate(candidate: dict, min_score: int = 60) -> tuple:
             f"overall_score {overall_score} is below minimum threshold {min_score}"
         )
 
+    # Gate 5: topic must not already be in publishing_history
+    if published_topics and candidate.get("topic"):
+        t_norm = candidate["topic"].strip().lower()
+        if t_norm in published_topics:
+            reasons.append(f"Topic '{candidate['topic']}' was already published in publishing_history.json")
+
     if reasons:
         return False, reasons
     return True, []
 
 
-def validate_candidates(candidates: list, min_score: int = 60) -> tuple:
+def validate_candidates(
+    candidates: list,
+    min_score: int = 60,
+    history_file: str | Path = "data/publishing_history.json",
+) -> tuple:
     """
     Validates a list of research candidates.
 
@@ -116,11 +150,12 @@ def validate_candidates(candidates: list, min_score: int = 60) -> tuple:
     if not isinstance(candidates, list):
         return [], [{"topic": "<invalid input>", "reasons": ["Input is not a list"], "original": candidates}]
 
+    published_topics = _load_published_topics(history_file)
     valid = []
     rejected = []
 
     for i, c in enumerate(candidates):
-        ok, reasons = validate_candidate(c, min_score=min_score)
+        ok, reasons = validate_candidate(c, min_score=min_score, published_topics=published_topics)
         if ok:
             valid.append(c)
         else:

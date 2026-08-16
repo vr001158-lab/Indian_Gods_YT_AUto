@@ -32,10 +32,16 @@ class PipelineRunner:
             )
             return result.stdout
         except subprocess.CalledProcessError as e:
-            PipelineLogger.error(f"Command failed in stage {stage_name}: {e.stderr}")
+            err_output = []
+            if e.stdout and e.stdout.strip():
+                err_output.append(f"STDOUT:\n{e.stdout.strip()}")
+            if e.stderr and e.stderr.strip():
+                err_output.append(f"STDERR:\n{e.stderr.strip()}")
+            combined = "\n".join(err_output) if err_output else str(e)
+            PipelineLogger.error(f"Command failed in stage {stage_name}:\n{combined}")
             self.state.update_stage(stage_name, "FAILED")
             self.state.save()
-            raise RuntimeError(f"Stage {stage_name} execution failed: {e.stderr}")
+            raise RuntimeError(f"Stage {stage_name} execution failed:\n{combined}")
         except Exception as e:
             PipelineLogger.error(f"Unexpected error in stage {stage_name}: {e}")
             self.state.update_stage(stage_name, "FAILED")

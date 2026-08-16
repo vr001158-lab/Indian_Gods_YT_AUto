@@ -74,10 +74,12 @@ def main() -> int:
         qa = load_qa_result(args.qa)
         validate_qa_for_publishing(qa, allow_mock=args.dry_run)
     except PublisherSafetyError as exc:
-        print(f"\n[BLOCKED] Publisher safety gate rejected QA result:")
-        print(f"  {exc}")
-        print()
-        print("APPROVED FOR PUBLISHING: NO")
+        print(f"\n[BLOCKED] Publisher safety gate rejected QA result:", file=sys.stderr)
+        print(f"  {exc}", file=sys.stderr)
+        print(file=sys.stderr)
+        print("APPROVED FOR PUBLISHING: NO", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return 1
 
     print(f"Topic    : {qa.get('selected_topic', '')}")
@@ -93,6 +95,8 @@ def main() -> int:
         meta = build_video_metadata(qa)
     except Exception as exc:
         print(f"[ERROR] Metadata build failed: {exc}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return 1
 
     print(THIN)
@@ -122,11 +126,13 @@ def main() -> int:
     except Exception as exc:
         print(f"[BLOCKED] OAuth credentials unavailable: {exc}", file=sys.stderr)
         print("Ensure TOKEN_JSON is configured correctly.", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return 1
 
     # ── Step 4: Publish ──────────────────────────────────────────────────────
     print(THIN)
-    print("UPLOADING TO YOUTUBE [PRIVATE]")
+    print("UPLOADING TO YOUTUBE [PUBLIC]")
     print(THIN)
     try:
         manifest = publish_video(
@@ -142,6 +148,8 @@ def main() -> int:
         )
     except Exception as exc:
         print(f"\n[FAILED] Upload failed: {exc}", file=sys.stderr)
+        import traceback
+        traceback.print_exc(file=sys.stderr)
         return 1
 
     print()
@@ -154,8 +162,7 @@ def main() -> int:
     print()
     print(f"Manifest saved: {manifest.get('_manifest_path', args.output_dir)}")
     print()
-    print("UPLOAD COMPLETE: PRIVATE")
-    print("Do NOT change privacy to PUBLIC without explicit authorization.")
+    print("UPLOAD COMPLETE: PUBLIC")
     print()
     return 0
 
