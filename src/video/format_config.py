@@ -41,6 +41,24 @@ FORMAT_CONFIGS: dict[str, dict[str, Any]] = {
     },
 }
 
+OLD_FORMAT_CONFIG: dict[str, Any] = {
+    "format":                 "old",
+    "content_type":           "short",
+    "aspect_ratio":           "9:16",
+    "resolution":             "1080x1920",
+    "width":                  1080,
+    "height":                 1920,
+    "min_duration_seconds":   24,
+    "max_duration_seconds":   45,
+    "preferred_target_min":   28,
+    "preferred_target_max":   40,
+    "audio_narration_required": False,
+    "publish_classification": "short",
+    "audio_sample_rate":      48000,
+    "audio_channels":         2,
+    "audio_codec":            "aac",
+}
+
 VALID_CONTENT_TYPES: frozenset[str] = frozenset(FORMAT_CONFIGS.keys())
 DEFAULT_CONTENT_TYPE: str = "short"
 

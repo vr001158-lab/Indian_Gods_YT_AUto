@@ -2,8 +2,10 @@ name: Divine Dharshanam Daily — Production Automated Pipeline
 
 on:
   schedule:
-    # Trigger daily at 04:00 UTC (09:30 AM IST)
+    # Morning Short (narrated): 04:00 UTC (09:30 AM IST)
     - cron: '0 4 * * *'
+    # Evening Short (old format devotional): 13:30 UTC (07:00 PM IST / 19:00 IST)
+    - cron: '30 13 * * *'
   workflow_dispatch:
     inputs:
       content_type:
@@ -14,6 +16,14 @@ on:
         options:
           - short
           - long
+      format:
+        description: 'Production Format (narrated: 09:30 AM narrated | old: 19:00 PM devotional visual)'
+        required: true
+        default: 'narrated'
+        type: choice
+        options:
+          - narrated
+          - old
       language_code:
         description: 'Target Language (hi-IN | te-IN | ta-IN)'
         required: true
@@ -115,15 +125,25 @@ jobs:
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           CONTENT_TYPE_INPUT: ${{ inputs.content_type }}
+          FORMAT_INPUT: ${{ inputs.format }}
           DRY_RUN_INPUT: ${{ inputs.dry_run }}
+          SCHEDULE_CRON: ${{ github.event.schedule }}
         run: |
           CT="${CONTENT_TYPE_INPUT:-short}"
+          FMT="${FORMAT_INPUT:-narrated}"
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "$SCHEDULE_CRON" = "30 13 * * *" ]; then
+              FMT="old"
+            else
+              FMT="narrated"
+            fi
+          fi
           DRY=""
           if [ "$DRY_RUN_INPUT" = "true" ]; then
             DRY="--dry-run"
           fi
-          echo "🚀 Executing pipeline with content-type=$CT $DRY"
-          python run_pipeline.py --content-type "$CT" $DRY
+          echo "🚀 Executing pipeline with content-type=$CT format=$FMT $DRY"
+          python run_pipeline.py --content-type "$CT" --format "$FMT" $DRY
 
       - name: Persist Lightweight Publishing History State
         if: always()

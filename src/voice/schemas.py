@@ -115,10 +115,11 @@ def validate_audio_output(audio: dict) -> tuple:
 
     if audio.get("mode") == "production":
         provider = audio["provider"]
-        if provider not in PRODUCTION_PROVIDERS:
+        allowed_prod_providers = PRODUCTION_PROVIDERS | {"devotional_music"} if (audio.get("format") == "old" or audio.get("audio_type") == "music_only") else PRODUCTION_PROVIDERS
+        if provider not in allowed_prod_providers:
             return False, (
                 f"production audio must use a production provider "
-                f"(got '{provider}', accepted: {sorted(PRODUCTION_PROVIDERS)})"
+                f"(got '{provider}', accepted: {sorted(allowed_prod_providers)})"
             )
         if audio.get("real_tts") is not True:
             return False, "production audio must have real_tts=True"

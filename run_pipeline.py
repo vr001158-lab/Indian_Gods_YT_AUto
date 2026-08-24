@@ -31,6 +31,7 @@ def main():
     resume_id = None
     dry_run = False
     content_type = "short"
+    format_type = "narrated"
 
     # ── CLI parsing ───────────────────────────────────────────────────────────
     args = sys.argv[1:]
@@ -48,9 +49,15 @@ def main():
                 print(f"❌ Invalid content-type: '{args[i+1]}'. Must be 'short' or 'long'", file=sys.stderr)
                 sys.exit(1)
             i += 2
+        elif args[i] == "--format" and i + 1 < len(args):
+            format_type = args[i + 1].lower().strip()
+            if format_type not in ("narrated", "old"):
+                print(f"❌ Invalid format: '{args[i+1]}'. Must be 'narrated' or 'old'", file=sys.stderr)
+                sys.exit(1)
+            i += 2
         else:
             print(f"❌ Unknown argument: {args[i]}", file=sys.stderr)
-            print("Usage: python run_pipeline.py [--content-type short|long] [--resume PIPELINE_ID] [--dry-run]", file=sys.stderr)
+            print("Usage: python run_pipeline.py [--content-type short|long] [--format narrated|old] [--resume PIPELINE_ID] [--dry-run]", file=sys.stderr)
             sys.exit(1)
 
     # ── Initialize State ──────────────────────────────────────────────────────
@@ -58,17 +65,18 @@ def main():
         if resume_id:
             PipelineLogger.info(f"Loading state file for resumption of: {resume_id}...")
             state = PipelineState.load(resume_id)
+            format_type = getattr(state, "format", format_type)
             PipelineLogger.info(f"Resuming from current stage: {state.current_stage}")
         else:
-            state = PipelineState()
-            PipelineLogger.info(f"Initialized new pipeline run: {state.pipeline_id} ({content_type.upper()})")
+            state = PipelineState(format=format_type)
+            PipelineLogger.info(f"Initialized new pipeline run: {state.pipeline_id} ({content_type.upper()}, {format_type.upper()})")
     except FileNotFoundError as e:
         PipelineLogger.error(str(e))
         sys.exit(1)
 
     # ── Execute Orchestrator ──────────────────────────────────────────────────
     try:
-        runner = PipelineRunner(state=state, dry_run=dry_run, content_type=content_type)
+        runner = PipelineRunner(state=state, dry_run=dry_run, content_type=content_type, format=format_type)
         runner.execute_pipeline()
     except Exception as e:
         PipelineLogger.error(f"Pipeline run stopped with error: {e}")

@@ -92,6 +92,7 @@ def main():
     voice_id = "default"
     language_code = None
     mode = "production"
+    format_type = "narrated"
     save_output = True
 
     args = sys.argv[1:]
@@ -112,6 +113,9 @@ def main():
         elif args[i] == "--mode" and i + 1 < len(args):
             mode = args[i + 1].lower()
             i += 2
+        elif args[i] == "--format" and i + 1 < len(args):
+            format_type = args[i + 1].lower().strip()
+            i += 2
         elif args[i] == "--no-save":
             save_output = False
             i += 1
@@ -120,7 +124,7 @@ def main():
             print(
                 "Usage: python run_voice_generator.py "
                 "[--input FILE] [--provider NAME] [--voice-id ID] "
-                "[--language hi-IN|te-IN|ta-IN] [--mode production|test] [--no-save]",
+                "[--language hi-IN|te-IN|ta-IN] [--mode production|test] [--format narrated|old] [--no-save]",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -150,6 +154,7 @@ def main():
                 output_dir=AUDIO_DIR,
                 mode=mode,
                 language_code=language_code,
+                format=format_type,
             )
             print(f"📂 Audio timing map saved to: {out_file}", file=sys.stderr)
             audio_map = json.loads(out_file.read_text(encoding="utf-8"))
@@ -160,6 +165,7 @@ def main():
                 voice_id=voice_id,
                 output_dir=AUDIO_DIR,
                 mode=mode,
+                format=format_type,
             )
             print("🔬 [DRY RUN] Skipping timing map file persistence.", file=sys.stderr)
 

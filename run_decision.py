@@ -48,6 +48,7 @@ def main():
     input_file  = None
     min_score   = DEFAULT_MIN_SCORE
     save_output = True
+    format_type = "narrated"
 
     # ── CLI parsing ───────────────────────────────────────────────────────────
     args = sys.argv[1:]
@@ -63,12 +64,15 @@ def main():
                 print(f"❌ --min-score must be an integer, got: {args[i+1]}", file=sys.stderr)
                 sys.exit(1)
             i += 2
+        elif args[i] == "--format" and i + 1 < len(args):
+            format_type = args[i + 1].lower().strip()
+            i += 2
         elif args[i] == "--no-save":
             save_output = False
             i += 1
         else:
             print(f"❌ Unknown argument: {args[i]}", file=sys.stderr)
-            print("Usage: python run_decision.py [--input FILE] [--min-score N] [--no-save]", file=sys.stderr)
+            print("Usage: python run_decision.py [--input FILE] [--min-score N] [--format narrated|old] [--no-save]", file=sys.stderr)
             sys.exit(1)
 
     # ── Locate research file ──────────────────────────────────────────────────
@@ -101,6 +105,7 @@ def main():
         candidates=candidates,
         min_score=min_score,
         save=save_output,
+        format=format_type,
     )
 
     # ── Print report ──────────────────────────────────────────────────────────

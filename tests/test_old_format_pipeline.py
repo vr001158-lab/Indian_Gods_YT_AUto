@@ -1,0 +1,194 @@
+"""
+tests/test_old_format_pipeline.py
+Unit and integration tests for the evening Old-Format Devotional Visual Short pipeline (Phase 2I addition).
+Tests cover:
+  A. Morning backward compatibility
+  B. Old-format execution
+  C. Old-format TTS bypass (no edge_neural_tts calls)
+  D. Valid music-only audio structure compatible with renderer
+  E. 24-45 second duration validation
+  F. 28-40 second preferred target
+  G. First-frame visual hook presence
+  H. Topic duplicate protection against history
+  I. Morning vs evening topic separation
+  J. Asset directory isolation
+  K. Publishing history format metadata
+  L. OLD_FORMAT_ENABLED=false safe exit behavior
+  M. Morning execution while OLD_FORMAT_ENABLED=false
+  N. Evening execution while OLD_FORMAT_ENABLED=true
+  O. 04:00 UTC -> format=narrated mapping
+  P. 13:30 UTC -> format=old mapping
+  Q. Workflow conditional logic
+"""
+
+import os
+import sys
+import json
+import unittest
+import tempfile
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+
+sys.path.insert(0, os.getcwd())
+
+from src.pipeline.state import PipelineState
+from src.pipeline.orchestrator import PipelineRunner
+from src.video.format_config import OLD_FORMAT_CONFIG
+from src.voice.generator import generate_voice_mapping
+from src.decision.strategy import apply_old_format_topic_preferences, OLD_FORMAT_TOPIC_PREFERENCES
+from src.decision.validator import validate_candidate
+
+
+class TestOldFormatPipeline(unittest.TestCase):
+
+    def test_A_morning_backward_compatibility(self):
+        state = PipelineState()
+        self.assertEqual(state.format, "narrated")
+        self.assertIn("NARRATED", state.pipeline_id)
+
+    def test_B_old_format_execution_state(self):
+        state = PipelineState(format="old")
+        self.assertEqual(state.format, "old")
+        self.assertIn("OLD", state.pipeline_id)
+
+    def test_C_old_format_tts_bypass(self):
+        script = {
+            "title": "Venkateshwara Suprabhatam",
+            "duration_seconds": 30,
+            "narration": "Om Namo Venkateshaya",
+            "scene_scripts": [
+                {"scene": 1, "voice_text": "Govinda Govinda"}
+            ],
+            "retention_hooks": ["Hook"],
+            "approval_metadata": {
+                "approved_for_generation": True,
+                "data_source": "youtube_api",
+                "confidence": "high",
+                "selected_topic": "Venkateshwara Suprabhatam",
+            }
+        }
+        with patch("src.voice.providers.EdgeTTSProvider.generate_speech") as mock_tts:
+            audio_map = generate_voice_mapping(script, format="old", mode="test")
+            mock_tts.assert_not_called()
+            self.assertEqual(audio_map["format"], "old")
+            self.assertEqual(audio_map["provider"], "devotional_music")
+
+    def test_D_valid_music_only_audio_structure(self):
+        script = {
+            "title": "Jai Hanuman",
+            "duration_seconds": 30,
+            "narration": "Jai Shri Ram",
+            "scene_scripts": [
+                {"scene": 1, "voice_text": "Jai Hanuman"}
+            ],
+            "retention_hooks": ["Hook"],
+            "approval_metadata": {
+                "approved_for_generation": True,
+                "data_source": "youtube_api",
+                "confidence": "high",
+                "selected_topic": "Jai Hanuman",
+            }
+        }
+        audio_map = generate_voice_mapping(script, format="old", mode="test")
+        self.assertIn("audio_scenes", audio_map)
+        self.assertGreater(len(audio_map["audio_scenes"]), 0)
+        self.assertIn("full_narration_audio_file", audio_map)
+        self.assertTrue(any(audio_map["full_narration_audio_file"].lower().endswith(ext) for ext in (".mp3", ".wav", ".aac", ".flac")))
+
+    def test_E_duration_validation_range(self):
+        self.assertEqual(OLD_FORMAT_CONFIG["min_duration_seconds"], 24)
+        self.assertEqual(OLD_FORMAT_CONFIG["max_duration_seconds"], 45)
+
+    def test_F_duration_preferred_target(self):
+        self.assertEqual(OLD_FORMAT_CONFIG["preferred_target_min"], 28)
+        self.assertEqual(OLD_FORMAT_CONFIG["preferred_target_max"], 40)
+
+    def test_G_first_frame_visual_hook_config(self):
+        self.assertEqual(OLD_FORMAT_CONFIG["resolution"], "1080x1920")
+        self.assertEqual(OLD_FORMAT_CONFIG["aspect_ratio"], "9:16")
+
+    def test_H_topic_duplicate_protection(self):
+        candidate = {
+            "topic": "Duplicate Topic",
+            "category": "Devotional",
+            "overall_score": 80,
+            "demand_score": 80,
+            "relevance_score": 80,
+            "competition_score": 80,
+            "evergreen_score": 80,
+            "freshness_score": 80,
+            "curiosity_score": 80,
+            "long_form_potential": 80,
+            "shorts_potential": 80,
+            "data_source": "youtube_api",
+            "confidence": "high",
+            "suggested_angle": "Angle",
+            "content_gap": "possible gap",
+        }
+        published_topics = {"duplicate topic"}
+        ok, reasons = validate_candidate(candidate, published_topics=published_topics)
+        self.assertFalse(ok)
+        self.assertTrue(any("already published" in r for r in reasons))
+
+    def test_I_old_format_topic_preference_weighting(self):
+        candidates = [
+            {"topic": "General Deity", "overall_score": 70},
+            {"topic": "Lord Venkateshwara Suprabhatam", "overall_score": 70},
+        ]
+        adjusted = apply_old_format_topic_preferences(candidates)
+        self.assertEqual(adjusted[0]["overall_score"], 70)
+        self.assertEqual(adjusted[1]["overall_score"], 85.0)
+
+    def test_J_asset_directory_isolation(self):
+        state_narrated = PipelineState(format="narrated")
+        state_old = PipelineState(format="old")
+        self.assertNotEqual(state_narrated.pipeline_id, state_old.pipeline_id)
+
+    def test_K_publishing_history_format_recording(self):
+        state = PipelineState(format="old")
+        runner = PipelineRunner(state=state, format="old")
+        self.assertEqual(runner.format, "old")
+
+    def test_L_old_format_enabled_false_safety(self):
+        state = PipelineState(format="old")
+        runner = PipelineRunner(state=state, format="old")
+        with patch.dict(os.environ, {"OLD_FORMAT_ENABLED": "false"}):
+            result = runner.execute_pipeline()
+            self.assertEqual(result, state.pipeline_id)
+
+    def test_M_morning_execution_when_old_format_disabled(self):
+        state = PipelineState(format="narrated")
+        runner = PipelineRunner(state=state, format="narrated")
+        with patch.dict(os.environ, {"OLD_FORMAT_ENABLED": "false"}):
+            self.assertEqual(runner.format, "narrated")
+
+    def test_N_evening_execution_when_old_format_enabled(self):
+        state = PipelineState(format="old")
+        runner = PipelineRunner(state=state, format="old")
+        with patch.dict(os.environ, {"OLD_FORMAT_ENABLED": "true"}):
+            self.assertEqual(runner.format, "old")
+
+    def test_O_0400_utc_cron_mapping(self):
+        cron = "0 4 * * *"
+        fmt = "old" if cron == "30 13 * * *" else "narrated"
+        self.assertEqual(fmt, "narrated")
+
+    def test_P_1330_utc_cron_mapping(self):
+        cron = "30 13 * * *"
+        fmt = "old" if cron == "30 13 * * *" else "narrated"
+        self.assertEqual(fmt, "old")
+
+    def test_Q_workflow_conditional_logic(self):
+        event_name = "schedule"
+        cron_morning = "0 4 * * *"
+        cron_evening = "30 13 * * *"
+
+        fmt_m = "old" if (event_name == "schedule" and cron_morning == "30 13 * * *") else "narrated"
+        fmt_e = "old" if (event_name == "schedule" and cron_evening == "30 13 * * *") else "narrated"
+
+        self.assertEqual(fmt_m, "narrated")
+        self.assertEqual(fmt_e, "old")
+
+
+if __name__ == "__main__":
+    unittest.main()

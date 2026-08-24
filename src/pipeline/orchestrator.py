@@ -13,8 +13,11 @@ from src.pipeline.logger import PipelineLogger
 class PipelineRunner:
     """End-to-end Pipeline Orchestrator executing stages from Research to Upload Prep."""
 
-    def __init__(self, state: PipelineState = None, dry_run: bool = False, content_type: str = "short"):
-        self.state = state or PipelineState()
+    def __init__(self, state: PipelineState = None, dry_run: bool = False, content_type: str = "short", format: str = "narrated"):
+        self.format = (format or getattr(state, "format", "narrated")).lower()
+        self.state = state or PipelineState(format=self.format)
+        if hasattr(self.state, "format"):
+            self.state.format = self.format
         self.dry_run = dry_run
         self.content_type = content_type
 
@@ -86,7 +89,7 @@ class PipelineRunner:
             raise ValueError(f"Missing or invalid research input file: {research_file}")
 
         try:
-            cmd = [sys.executable, "run_decision.py", "--input", str(research_file)]
+            cmd = [sys.executable, "run_decision.py", "--input", str(research_file), "--format", self.format]
             self._execute_cmd(cmd, stage)
             out_file = self._find_latest_file(Path("data/decision"), "decision_*.json")
             decision_data = json.loads(out_file.read_text(encoding="utf-8"))
@@ -174,6 +177,7 @@ class PipelineRunner:
             "--input", str(script_file),
             "--provider", provider,
             "--mode", mode,
+            "--format", self.format,
         ]
         self._execute_cmd(cmd, stage)
 
@@ -352,7 +356,15 @@ class PipelineRunner:
         Orchestrates pipeline execution starting from the current_stage.
         Allows resuming from previous execution states.
         """
-        PipelineLogger.info(f"Starting orchestration pipeline execution. ID: {self.state.pipeline_id}")
+        if self.format == "old":
+            enabled = os.environ.get("OLD_FORMAT_ENABLED", "true").lower()
+            if enabled == "false":
+                PipelineLogger.info("⚠️ OLD_FORMAT_ENABLED is set to 'false'. Exiting evening old-format pipeline safely without upload.")
+                return self.state.pipeline_id
+
+        schedule = "evening" if self.format == "old" else "morning"
+        PipelineLogger.info(f"🚀 Executing pipeline CONTENT_TYPE={self.content_type.upper()} FORMAT={self.format.upper()} SCHEDULE={schedule}")
+        PipelineLogger.info(f"Pipeline ID: {self.state.pipeline_id}")
         if self.dry_run:
             PipelineLogger.info("🌵 Dry Run Mode Enabled.")
 

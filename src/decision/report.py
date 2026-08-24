@@ -9,6 +9,7 @@ from pathlib import Path
 
 from src.decision.validator import validate_candidates
 from src.decision.selector  import select_topic
+from src.decision.strategy  import apply_old_format_topic_preferences
 
 OUTPUT_DIR = Path("data/decision")
 
@@ -31,6 +32,7 @@ def run_decision_pipeline(
     candidates: list,
     min_score:  int = 60,
     save:       bool = True,
+    format:     str = "narrated",
 ) -> dict:
     """
     Runs the full decision pipeline on a list of research candidates.
@@ -40,6 +42,7 @@ def run_decision_pipeline(
     candidates : list  — raw list loaded from a research_results_*.json
     min_score  : int   — minimum overall_score required (default 60)
     save       : bool  — if True, writes decision JSON to data/decision/
+    format     : str   — content format ('narrated' or 'old')
 
     Returns
     -------
@@ -51,7 +54,8 @@ def run_decision_pipeline(
     valid, rejected = validate_candidates(candidates, min_score=min_score)
 
     # ── 2. Select ─────────────────────────────────────────────────────────────
-    result = select_topic(valid)
+    candidates_to_select = apply_old_format_topic_preferences(valid) if (format or "").lower() == "old" else valid
+    result = select_topic(candidates_to_select)
     selected = result["selected"]
     ranked   = result["ranked"]
     dedup_removed = result["dedup_removed"]
@@ -60,6 +64,7 @@ def run_decision_pipeline(
     if selected is not None:
         decision = {
             "approved_for_generation": True,
+            "format":           (format or "narrated").lower(),
             "selected_topic":   selected["topic"],
             "score":            selected["overall_score"],
             "confidence":       selected["confidence"],

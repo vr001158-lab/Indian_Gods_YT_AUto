@@ -25,8 +25,10 @@ STAGES = [
 class PipelineState:
     """Manages tracking, persistence, and loading of pipeline state."""
 
-    def __init__(self, pipeline_id: str = None):
-        self.pipeline_id = pipeline_id or f"run_{time.strftime('%Y%m%d_%H%M%S')}"
+    def __init__(self, pipeline_id: str = None, format: str = "narrated"):
+        fmt_suffix = "OLD" if (format or "").lower() == "old" else "NARRATED"
+        self.format = (format or "narrated").lower()
+        self.pipeline_id = pipeline_id or f"run_{time.strftime('%Y%m%d_%H%M%S')}_{fmt_suffix}"
         self.current_stage = "RESEARCH"
         self.completed_stages = []
         self.failed_stage = None
@@ -72,6 +74,7 @@ class PipelineState:
         
         data = {
             "pipeline_id":      self.pipeline_id,
+            "format":           self.format,
             "current_stage":     self.current_stage,
             "completed_stages":  self.completed_stages,
             "failed_stage":      self.failed_stage,
@@ -91,7 +94,7 @@ class PipelineState:
 
         data = json.loads(file_path.read_text(encoding="utf-8"))
         
-        state = cls(pipeline_id=data["pipeline_id"])
+        state = cls(pipeline_id=data["pipeline_id"], format=data.get("format", "narrated"))
         state.current_stage = data["current_stage"]
         state.completed_stages = data["completed_stages"]
         state.failed_stage = data.get("failed_stage")
