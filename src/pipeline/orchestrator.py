@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 from src.pipeline.state import PipelineState
 from src.pipeline.logger import PipelineLogger
@@ -51,11 +52,13 @@ class PipelineRunner:
             self.state.save()
             raise
 
-    def _find_latest_file(self, directory: Path, pattern: str) -> Path:
+    def _find_latest_file(self, directory: Path, pattern: str, min_mtime: float | None = None) -> Path:
         """Helper to find the latest file in a directory matching a pattern by mtime."""
         files = sorted(directory.glob(pattern), key=lambda p: p.stat().st_mtime)
+        if min_mtime is not None:
+            files = [p for p in files if p.stat().st_mtime >= min_mtime]
         if not files:
-            raise FileNotFoundError(f"No files matching {pattern} found in {directory}")
+            raise FileNotFoundError(f"No files matching {pattern} created since stage start found in {directory}")
         return files[-1]
 
     def run_research(self) -> Path:
@@ -65,12 +68,13 @@ class PipelineRunner:
         self.state.update_stage(stage, "IN_PROGRESS")
         self.state.save()
 
+        start_time = time.time()
         research_limit = os.environ.get("RESEARCH_LIMIT", "10")
         cmd = [sys.executable, "run_research.py", "--limit", str(research_limit)]
         self._execute_cmd(cmd, stage)
 
         # Auto-discover output path
-        out_file = self._find_latest_file(Path("data/research"), "research_results_*.json")
+        out_file = self._find_latest_file(Path("data/research"), "research_results_*.json", min_mtime=start_time - 2)
         self.state.set_output("research_output", out_file)
         self.state.update_stage(stage, "COMPLETED")
         self.state.save()
@@ -88,28 +92,18 @@ class PipelineRunner:
         if not research_file or not Path(research_file).exists():
             raise ValueError(f"Missing or invalid research input file: {research_file}")
 
-        try:
-            cmd = [sys.executable, "run_decision.py", "--input", str(research_file), "--format", self.format]
-            self._execute_cmd(cmd, stage)
-            out_file = self._find_latest_file(Path("data/decision"), "decision_*.json")
-            decision_data = json.loads(out_file.read_text(encoding="utf-8"))
-            if not decision_data.get("approved_for_generation"):
-                raise ValueError("Decision rejected")
-        except Exception as exc:
-            # Fallback to latest pre-approved production decision if research was mock or rejected
-            PipelineLogger.info("Searching for latest pre-approved production decision fallback...")
-            approved_files = sorted(Path("data/decision").glob("decision_*.json"))
-            out_file = None
-            for af in reversed(approved_files):
-                try:
-                    ddata = json.loads(af.read_text(encoding="utf-8"))
-                    if ddata.get("approved_for_generation") and ddata.get("data_source") in ("youtube_api", "cached_youtube_api"):
-                        out_file = af
-                        break
-                except Exception:
-                    continue
-            if not out_file:
-                raise ValueError(f"Stage DECISION execution failed: {exc}")
+        start_time = time.time()
+        cmd = [sys.executable, "run_decision.py", "--input", str(research_file), "--format", self.format]
+        self._execute_cmd(cmd, stage)
+        out_file = self._find_latest_file(Path("data/decision"), "decision_*.json", min_mtime=start_time - 2)
+        decision_data = json.loads(out_file.read_text(encoding="utf-8"))
+        if not decision_data.get("approved_for_generation"):
+            self.state.update_stage(stage, "FAILED")
+            self.state.save()
+            raise ValueError(
+                "Stage DECISION execution failed: no research candidate passed "
+                "production safety gates"
+            )
 
         self.state.set_output("decision_output", out_file)
         self.state.update_stage(stage, "COMPLETED")
@@ -128,10 +122,11 @@ class PipelineRunner:
         if not decision_file or not Path(decision_file).exists():
             raise ValueError(f"Missing or invalid decision input file: {decision_file}")
 
+        start_time = time.time()
         cmd = [sys.executable, "run_content_brief.py", "--input", str(decision_file)]
         self._execute_cmd(cmd, stage)
 
-        out_file = self._find_latest_file(Path("data/content_briefs"), "content_brief_*.json")
+        out_file = self._find_latest_file(Path("data/content_briefs"), "content_brief_*.json", min_mtime=start_time - 2)
         self.state.set_output("content_brief_output", out_file)
         self.state.update_stage(stage, "COMPLETED")
         self.state.save()
@@ -149,10 +144,11 @@ class PipelineRunner:
         if not brief_file or not Path(brief_file).exists():
             raise ValueError(f"Missing or invalid brief input file: {brief_file}")
 
+        start_time = time.time()
         cmd = [sys.executable, "run_script_generator.py", "--input", str(brief_file)]
         self._execute_cmd(cmd, stage)
 
-        out_file = self._find_latest_file(Path("data/scripts"), "script_*.json")
+        out_file = self._find_latest_file(Path("data/scripts"), "script_*.json", min_mtime=start_time - 2)
         self.state.set_output("script_output", out_file)
         self.state.update_stage(stage, "COMPLETED")
         self.state.save()
@@ -170,6 +166,7 @@ class PipelineRunner:
         if not script_file or not Path(script_file).exists():
             raise ValueError(f"Missing or invalid script input file: {script_file}")
 
+        start_time = time.time()
         provider = "mock" if self.dry_run else "edge_neural_tts"
         mode = "test" if self.dry_run else "production"
         cmd = [
@@ -181,7 +178,7 @@ class PipelineRunner:
         ]
         self._execute_cmd(cmd, stage)
 
-        out_file = self._find_latest_file(Path("data/audio"), "audio_map_*.json")
+        out_file = self._find_latest_file(Path("data/audio"), "audio_map_*.json", min_mtime=start_time - 2)
         self.state.set_output("audio_map_output", out_file)
         self.state.update_stage(stage, "COMPLETED")
         self.state.save()
@@ -199,11 +196,12 @@ class PipelineRunner:
         if not script_file or not Path(script_file).exists():
             raise ValueError(f"Missing or invalid script input file: {script_file}")
 
+        start_time = time.time()
         provider = "mock" if self.dry_run else "flux"
         cmd = [sys.executable, "run_visual_generator.py", "--input", str(script_file), "--provider", provider]
         self._execute_cmd(cmd, stage)
 
-        out_file = self._find_latest_file(Path("data/visuals"), "visual_map_*.json")
+        out_file = self._find_latest_file(Path("data/visuals"), "visual_map_*.json", min_mtime=start_time - 2)
         self.state.set_output("visual_map_output", out_file)
         self.state.update_stage(stage, "COMPLETED")
         self.state.save()
@@ -224,6 +222,7 @@ class PipelineRunner:
         if not visual_file or not Path(visual_file).exists():
             raise ValueError(f"Missing or invalid visual map input file: {visual_file}")
 
+        start_time = time.time()
         # Always run mock composition in dry_run to prevent heavy render
         composer = "mock" if self.dry_run else "ffmpeg"
         cmd = [
@@ -235,7 +234,7 @@ class PipelineRunner:
         ]
         self._execute_cmd(cmd, stage)
 
-        out_file = self._find_latest_file(Path("data/videos"), "video_map_*.json")
+        out_file = self._find_latest_file(Path("data/videos"), "video_map_*.json", min_mtime=start_time - 2)
         
         # Pull video file path from video map file
         video_map_data = json.loads(out_file.read_text(encoding="utf-8"))
@@ -263,12 +262,13 @@ class PipelineRunner:
         if not decision_file or not Path(decision_file).exists():
             raise ValueError(f"Missing or invalid decision input file: {decision_file}")
 
+        start_time = time.time()
         provider = "mock" if self.dry_run else "pil"
         cmd = [sys.executable, "run_thumbnail_generator.py", "--input", str(decision_file), "--provider", provider]
         self._execute_cmd(cmd, stage)
 
-        out_file = self._find_latest_file(Path("data/thumbnails"), "thumbnail_metadata_*.json")
-        thumbnail_png = self._find_latest_file(Path("data/thumbnails"), "thumbnail_*.png")
+        out_file = self._find_latest_file(Path("data/thumbnails"), "thumbnail_metadata_*.json", min_mtime=start_time - 2)
+        thumbnail_png = self._find_latest_file(Path("data/thumbnails"), "thumbnail_*.png", min_mtime=start_time - 2)
 
         self.state.set_output("thumbnail_metadata_output", out_file)
         self.state.set_output("thumbnail_output", thumbnail_png)

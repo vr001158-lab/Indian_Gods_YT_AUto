@@ -95,7 +95,7 @@ def check_provenance_consistency(manifests: dict[str, dict]) -> tuple[bool, str]
 
 def _normalise(s: str) -> str:
     import re
-    return re.sub(r"[^a-z0-9\s]", "", s.strip().lower())
+    return re.sub(r"[^a-z0-9\s]", " ", s.strip().lower())
 
 
 def check_topic_consistency(decision: dict, manifests: dict[str, dict]) -> tuple[bool, str]:

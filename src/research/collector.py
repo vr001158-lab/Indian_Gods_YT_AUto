@@ -142,7 +142,8 @@ class ResearchCollector:
         cache_ttl_hours  : cache entry freshness window
         """
         # Resolve API key from argument → env var → None (offline)
-        self.api_key: str = api_key or os.environ.get(YOUTUBE_API_KEY_ENV) or None
+        raw_key = api_key or os.environ.get(YOUTUBE_API_KEY_ENV) or None
+        self.api_key: str = raw_key.strip("'\" \t\r\n") if raw_key else None
         self.youtube = None
         self.max_search_calls = max_search_calls
         self.cache_ttl_hours = cache_ttl_hours
@@ -295,13 +296,16 @@ class ResearchCollector:
         # 1. Fresh cache hit
         cached = self._cache_get(query)
         if cached and not cached.get("stale", False):
-            src = "cached_youtube_api" if not cached.get("is_mock") else "mock"
-            return {
-                "videos":      cached["result"],
-                "data_source": src,
-                "is_mock":     cached.get("is_mock", False),
-                "stale":       False,
-            }
+            is_cached_mock = cached.get("is_mock", False)
+            # If live API client is available, bypass unexpired mock cache entries
+            if not (is_cached_mock and self.youtube is not None):
+                src = "cached_youtube_api" if not is_cached_mock else "mock"
+                return {
+                    "videos":      cached["result"],
+                    "data_source": src,
+                    "is_mock":     is_cached_mock,
+                    "stale":       False,
+                }
 
         # 2. Quota budget exhausted
         if self._search_calls_used >= self.max_search_calls:
@@ -329,6 +333,7 @@ class ResearchCollector:
                 type="video",
                 maxResults=5,
                 safeSearch="strict",
+                regionCode="IN",
             ).execute()
 
             video_ids = [

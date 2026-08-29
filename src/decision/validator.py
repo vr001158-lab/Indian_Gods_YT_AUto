@@ -54,9 +54,13 @@ def _load_published_topics(history_file: str | Path = "data/publishing_history.j
                     top = (rec.get("topic") or "").strip().lower()
                     if top:
                         published.add(top)
+                    title = (rec.get("title") or "").strip().lower()
+                    if title:
+                        published.add(title)
         except Exception:
             pass
     return published
+
 
 
 def validate_candidate(
@@ -121,11 +125,12 @@ def validate_candidate(
             f"overall_score {overall_score} is below minimum threshold {min_score}"
         )
 
-    # Gate 5: topic must not already be in publishing_history
-    if published_topics and candidate.get("topic"):
-        t_norm = candidate["topic"].strip().lower()
-        if t_norm in published_topics:
+    # Gate 5: topic or title must not already be in publishing_history
+    if published_topics:
+        if candidate.get("topic") and candidate["topic"].strip().lower() in published_topics:
             reasons.append(f"Topic '{candidate['topic']}' was already published in publishing_history.json")
+        elif candidate.get("title") and candidate["title"].strip().lower() in published_topics:
+            reasons.append(f"Title '{candidate['title']}' was already published in publishing_history.json")
 
     if reasons:
         return False, reasons
