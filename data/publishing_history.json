@@ -64,5 +64,16 @@
     "duration_seconds": 130.04,
     "published_at": "20260820_043149",
     "video_file_name": "video_short_20260820_042951.mp4"
+  },
+  {
+    "youtube_video_id": "GRb_zsqlPGY",
+    "topic": "Why Hanuman Covered Himself in Sindoor",
+    "title": "Secrets of Hanuman: The Story Behind Why Hanuman Covered Himself in Sindoor",
+    "content_type": "short",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 28.0,
+    "published_at": "20260829_152509",
+    "video_file_name": "video_short_20260829_152441.mp4"
   }
 ]
