@@ -211,21 +211,36 @@ def generate_voice_mapping(
     run_audio_dir.mkdir(parents=True, exist_ok=True)
 
     if fmt == "old":
-        from src.audio.music import select_background_music_v2
+        from src.audio.music import select_background_music_v2, validate_music_provenance
         music_track, sel_type = select_background_music_v2(category="devotional")
         
-        # Determine music file path
-        if music_track and music_track.exists():
+        # Determine music file path and validate in production
+        if mode == "production":
+            if not music_track:
+                raise ValueError("No approved devotional music track could be selected for old format.")
+            is_ok, reason, track_info = validate_music_provenance(music_track)
+            if not is_ok:
+                raise ValueError(f"Selected music track failed provenance check: {reason}")
+            if not music_track.exists() or music_track.stat().st_size == 0:
+                raise ValueError(f"Selected music track file is missing or empty: {music_track}")
+            try:
+                perform_audio_qa(music_track, allow_mock=False)
+            except Exception as exc:
+                raise ValueError(f"Selected music track failed audio QA check: {exc}")
             full_audio_file = music_track
         else:
-            # Use .wav extension so content and extension agree — FFmpeg probes by content,
-            # but keeping them consistent avoids any format-detection confusion.
-            full_audio_file = run_audio_dir / "devotional_music_30s.wav"
-            if not full_audio_file.exists():
-                # Write a valid WAV silence stub (30 s) — FFmpeg and ffprobe can decode this.
-                # Pure null bytes (\'\\x00' * N) are NOT a valid audio container and
-                # cause FFmpeg to fail with exit code 234 (AVERROR_INVALIDDATA).
-                full_audio_file.write_bytes(_make_silent_wav_bytes(30))
+            if music_track and music_track.exists():
+                is_ok, _, _ = validate_music_provenance(music_track)
+                if is_ok:
+                    full_audio_file = music_track
+                else:
+                    full_audio_file = run_audio_dir / "devotional_music_30s.wav"
+                    if not full_audio_file.exists():
+                        full_audio_file.write_bytes(_make_silent_wav_bytes(30))
+            else:
+                full_audio_file = run_audio_dir / "devotional_music_30s.wav"
+                if not full_audio_file.exists():
+                    full_audio_file.write_bytes(_make_silent_wav_bytes(30))
 
         scene_scripts = script.get("scene_scripts", [])
         num_scenes = max(1, len(scene_scripts))

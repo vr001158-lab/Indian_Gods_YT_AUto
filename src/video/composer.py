@@ -26,6 +26,7 @@ class VideoComposer:
         output_file: Path,
         background_music: Path = None,
         bgm_volume: float = 0.15,
+        bgm_db: float = -22.0,
         resolution: str = "1080x1920",
     ) -> bool:
         """
@@ -50,13 +51,14 @@ class MockVideoComposer(VideoComposer):
         output_file: Path,
         background_music: Path = None,
         bgm_volume: float = 0.15,
+        bgm_db: float = -22.0,
         resolution: str = "1080x1920",
     ) -> bool:
         output_file.parent.mkdir(parents=True, exist_ok=True)
         summary = (
             f"MOCK_MP4_VIDEO: resolution={resolution}, format=yuv420p, codec=h264\n"
             f"Scenes composed: {len(scenes)}\n"
-            f"BGM: {background_music} (volume={bgm_volume})\n"
+            f"BGM: {background_music} (volume={bgm_volume}, db={bgm_db})\n"
         )
         for s in scenes:
             summary += f" - Scene {s['scene']}: img={s['image_file']}, aud={s['audio_file']}, dur={s['duration_seconds']}s\n"
@@ -110,6 +112,12 @@ class FFmpegVideoComposer(VideoComposer):
                Used instead of linear bgm_volume for accurate loudness targeting.
         """
         width, height = _parse_resolution(resolution)
+        
+        # Check if it's old format (all scenes have empty voice_text)
+        is_old = all(not s.get("voice_text") for s in scenes)
+        if is_old and bgm_db == -22.0:
+            bgm_db = -4.0
+
         cmd = ["ffmpeg", "-y"]  # overwrite output files
 
         # ── 1. Register Inputs ────────────────────────────────────────────────

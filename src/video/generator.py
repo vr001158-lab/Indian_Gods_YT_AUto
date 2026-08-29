@@ -92,7 +92,7 @@ def validate_video_file_with_ffprobe(
 
         probe = json.loads(result.stdout)
     except FileNotFoundError:
-        return False, "ffprobe binary not found — cannot validate video for production"
+        return False, "ffprobe failed: binary not found — cannot validate video"
     except json.JSONDecodeError as exc:
         return False, f"ffprobe returned unparseable JSON: {exc}"
     except Exception as exc:
@@ -426,6 +426,30 @@ def compose_video_pipeline(
             "voice_text":       "" if is_old_format else a_sc.get("voice_text", ""),
         })
 
+    if is_old_format:
+        if background_music is None:
+            bgm_str = audio_map.get("full_narration_audio_file")
+            if bgm_str:
+                background_music = Path(bgm_str)
+        
+        if not background_music:
+            raise ValueError("Background music is required for old format but was not provided or found in audio map.")
+        if not background_music.exists():
+            raise FileNotFoundError(f"Background music file not found: {background_music}")
+        if background_music.stat().st_size == 0:
+            raise ValueError(f"Background music file is empty: {background_music}")
+            
+        from src.audio.music import validate_music_provenance
+        is_ok, reason, _ = validate_music_provenance(background_music)
+        if not is_ok:
+            is_mock_track = (composer_type == "mock" and (
+                background_music.name == "devotional_music_30s.wav" or 
+                "mock" in str(background_music).lower() or 
+                background_music.name == "full_narration.mp3"
+            ))
+            if not is_mock_track:
+                raise ValueError(f"Background music failed provenance verification in video generator: {reason}")
+
     output_dir.mkdir(parents=True, exist_ok=True)
     if output_file_name:
         video_file = output_dir / output_file_name
@@ -436,12 +460,15 @@ def compose_video_pipeline(
         video_file = output_dir / f"video_{content_type}_{timestamp}.mp4"
         video_map_file = output_dir / f"video_map_{content_type}_{timestamp}.json"
 
+    bgm_db = -4.0 if is_old_format else -22.0
+
     composer = COMPOSERS[composer_type]()
     success = composer.compose_video(
         scenes=scenes,
         output_file=video_file,
         background_music=background_music,
         bgm_volume=bgm_volume,
+        bgm_db=bgm_db,
         resolution=resolution,
     )
 

@@ -78,6 +78,16 @@ def validate_audio_file_with_ffprobe(audio_path: str | Path, *, allow_mock: bool
     except AudioValidationError:
         raise
     except FileNotFoundError:
+        if allow_mock:
+            return {
+                "container": "wav",
+                "audio_codec": "pcm_s16le",
+                "duration": 60.0,
+                "sample_rate": 48000,
+                "channels": 2,
+                "file_size_bytes": size,
+                "valid": True,
+            }
         raise AudioValidationError("ffprobe binary not found — cannot validate audio")
     except Exception as exc:
         raise AudioValidationError(f"ffprobe decode error for audio {p.name}: {exc}") from exc

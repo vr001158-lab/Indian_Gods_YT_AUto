@@ -227,6 +227,20 @@ def main():
         print(str(e), file=sys.stderr)
         sys.exit(1)
 
+    # Load audio map to detect format and extract BGM if needed
+    try:
+        audio_map_data = json.loads(audio_map_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"❌ Failed to parse audio map: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    if background_music is None:
+        if audio_map_data.get("format") == "old" or audio_map_data.get("audio_type") == "music_only":
+            bgm_str = audio_map_data.get("full_narration_audio_file")
+            if bgm_str:
+                background_music = Path(bgm_str)
+                print(f"🎵 Auto-detected OLD-format BGM from audio map: {background_music}")
+
     print(f"\n🏷️ Content Type:    {content_type.upper()}")
     print(f"📄 Input Audio Map:  {audio_map_path}")
     print(f"📄 Input Visual Map: {visual_map_path}")

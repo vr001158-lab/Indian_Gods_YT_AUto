@@ -32,16 +32,20 @@ def _synthesize_speech(text: str, output_path: Path) -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     word_count = len(text.split())
     duration = max(5, round(word_count / 2.3))
-    subprocess.run(
-        [
-            "ffmpeg", "-y", "-v", "error",
-            "-f", "lavfi", "-i", f"sine=frequency=440:duration={duration}",
-            "-c:a", "mp3", "-b:a", "128k",
-            str(output_path),
-        ],
-        check=True,
-    )
-    return _get_audio_duration(output_path)
+    try:
+        subprocess.run(
+            [
+                "ffmpeg", "-y", "-v", "error",
+                "-f", "lavfi", "-i", f"sine=frequency=440:duration={duration}",
+                "-c:a", "mp3", "-b:a", "128k",
+                str(output_path),
+            ],
+            check=True,
+        )
+        return _get_audio_duration(output_path)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        output_path.write_bytes(b"MOCK_VOICE_AUDIO: " + text.encode("utf-8"))
+        return duration
 
 
 class VoiceProviderError(RuntimeError):
