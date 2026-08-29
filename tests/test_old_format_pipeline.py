@@ -189,6 +189,46 @@ class TestOldFormatPipeline(unittest.TestCase):
         self.assertEqual(fmt_m, "narrated")
         self.assertEqual(fmt_e, "old")
 
+    def test_R_old_format_no_captions_subtitles(self):
+        """Verify that OLD format has no captions/subtitles, while NEW format retains them."""
+        from tests.test_video_generator import _make_timing_maps
+        from src.video.generator import compose_video_pipeline
+        from src.video.composer import FFmpegVideoComposer
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+
+            # Case 1: format = old -> voice_text in video map must be empty, no drawtext in ffmpeg command
+            amap, vmap = _make_timing_maps(create_files=True, tmp_dir=tmp_path, scene_count=2)
+            amap["format"] = "old"
+            video_map_old = compose_video_pipeline(amap, vmap, composer_type="mock", output_dir=tmp_path)
+
+            for scene in video_map_old["scenes"]:
+                self.assertEqual(scene["voice_text"], "")
+
+            composer = FFmpegVideoComposer()
+            cmd_old = composer.build_ffmpeg_command(
+                scenes=video_map_old["scenes"],
+                output_file=tmp_path / "video_old.mp4"
+            )
+            cmd_str_old = " ".join(cmd_old)
+            self.assertNotIn("drawtext", cmd_str_old)
+
+            # Case 2: format = narrated -> voice_text must be preserved, drawtext must be in ffmpeg command
+            amap, vmap = _make_timing_maps(create_files=True, tmp_dir=tmp_path, scene_count=2)
+            amap["format"] = "narrated"
+            video_map_narrated = compose_video_pipeline(amap, vmap, composer_type="mock", output_dir=tmp_path)
+
+            for i, scene in enumerate(video_map_narrated["scenes"]):
+                self.assertEqual(scene["voice_text"], amap["audio_scenes"][i]["voice_text"])
+
+            cmd_narrated = composer.build_ffmpeg_command(
+                scenes=video_map_narrated["scenes"],
+                output_file=tmp_path / "video_narrated.mp4"
+            )
+            cmd_str_narrated = " ".join(cmd_narrated)
+            self.assertIn("drawtext", cmd_str_narrated)
+
 
 if __name__ == "__main__":
     unittest.main()

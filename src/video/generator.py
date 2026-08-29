@@ -417,12 +417,13 @@ def compose_video_pipeline(
         duration = a_sc["duration_seconds"]
         total_duration += duration
 
+        is_old_format = (audio_map.get("format") == "old" or audio_map.get("audio_type") == "music_only")
         scenes.append({
             "scene":            a_sc["scene"],
             "image_file":       str(img_path.absolute()).replace("\\", "/"),
             "audio_file":       str(aud_path.absolute()).replace("\\", "/"),
             "duration_seconds": duration,
-            "voice_text":       a_sc.get("voice_text", ""),
+            "voice_text":       "" if is_old_format else a_sc.get("voice_text", ""),
         })
 
     output_dir.mkdir(parents=True, exist_ok=True)
