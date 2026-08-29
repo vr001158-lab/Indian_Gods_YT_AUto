@@ -61,6 +61,27 @@ PRODUCTION_FALLBACK_CHAIN = [
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _make_silent_wav_bytes(duration_seconds: int, sample_rate: int = 24000) -> bytes:
+    """
+    Generate a valid WAV file containing pure silence, using only the Python
+    standard library (no FFmpeg, no external packages required).
+
+    Returns raw bytes that form a syntactically correct RIFF/PCM WAV container.
+    FFmpeg and ffprobe recognise these bytes as a valid audio stream regardless
+    of the filename extension.
+    """
+    import io
+    import wave as _wave
+    buf = io.BytesIO()
+    with _wave.open(buf, "wb") as w:
+        w.setnchannels(1)          # mono
+        w.setsampwidth(2)          # 16-bit
+        w.setframerate(sample_rate)
+        # Write silence — sample_rate * bytes_per_sample * duration frames of zeros
+        w.writeframes(b"\x00" * (sample_rate * 2 * max(1, duration_seconds)))
+    return buf.getvalue()
+
+
 def _resolve_language(script: dict) -> str:
     return script.get("language_code") or "hi-IN"
 
@@ -197,9 +218,14 @@ def generate_voice_mapping(
         if music_track and music_track.exists():
             full_audio_file = music_track
         else:
-            full_audio_file = run_audio_dir / "devotional_music_30s.mp3"
+            # Use .wav extension so content and extension agree — FFmpeg probes by content,
+            # but keeping them consistent avoids any format-detection confusion.
+            full_audio_file = run_audio_dir / "devotional_music_30s.wav"
             if not full_audio_file.exists():
-                full_audio_file.write_bytes(b"\x00" * 1024)  # Stub for test/mock if music track unavailable
+                # Write a valid WAV silence stub (30 s) — FFmpeg and ffprobe can decode this.
+                # Pure null bytes (\'\\x00' * N) are NOT a valid audio container and
+                # cause FFmpeg to fail with exit code 234 (AVERROR_INVALIDDATA).
+                full_audio_file.write_bytes(_make_silent_wav_bytes(30))
 
         scene_scripts = script.get("scene_scripts", [])
         num_scenes = max(1, len(scene_scripts))
@@ -207,19 +233,32 @@ def generate_voice_mapping(
         per_scene_duration = max(1, target_total_duration // num_scenes)
         total_duration = per_scene_duration * num_scenes
 
+        allow_mock = mode == "test"
         audio_scenes = []
         for i, item in enumerate(scene_scripts):
             scene_num = item.get("scene", i + 1)
             txt = item.get("voice_text") or item.get("narration_text") or item.get("visual_prompt") or "Om Namah Shivaya"
-            scene_file = run_audio_dir / f"scene_{scene_num}.mp3"
+            # Use .wav extension so file content and extension agree.
+            # In the old (music-only) format, TTS is bypassed; per-scene audio files
+            # are silence placeholders — the music track drives the actual audio.
+            # Writing null bytes with a .mp3 extension caused FFmpeg exit 234
+            # ("Failed to read frame size") because null bytes are not valid MP3 data.
+            scene_file = run_audio_dir / f"scene_{scene_num}.wav"
             if not scene_file.exists():
-                scene_file.write_bytes(b"\x00" * 512)
+                scene_file.write_bytes(_make_silent_wav_bytes(per_scene_duration))
+
+            if mode == "production":
+                _validate_production_audio(scene_file, allow_mock=allow_mock)
+
             audio_scenes.append({
                 "scene": scene_num,
                 "voice_text": str(txt),
                 "audio_file": str(scene_file.absolute()).replace("\\", "/"),
                 "duration_seconds": per_scene_duration,
             })
+
+        if mode == "production":
+            _validate_production_audio(full_audio_file, allow_mock=allow_mock)
 
         run_id = script.get("run_id") or f"run_{timestamp}_OLD"
         audio_map = {

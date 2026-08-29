@@ -211,6 +211,18 @@ def check_audio_map(audio_map: dict) -> tuple[bool, str]:
             return False, f"Scene {scene.get('scene')} audio file missing: {p}"
         if p.stat().st_size == 0:
             return False, f"Scene {scene.get('scene')} audio file is zero bytes: {p}"
+        # Null-byte guard: reject files whose header is all-zero bytes.
+        # Null bytes are NOT a valid audio container — they have no RIFF/ID3/MP3
+        # sync-word header and cause FFmpeg to fail with AVERROR_INVALIDDATA (exit 234).
+        try:
+            header = p.read_bytes()[:4]
+            if len(header) == 4 and header == b"\x00\x00\x00\x00":
+                return False, (
+                    f"Scene {scene.get('scene')} audio file has null-byte header "
+                    f"(not a valid audio container): {p}"
+                )
+        except OSError:
+            pass  # Let downstream checks handle unreadable files
 
     return True, "OK"
 
