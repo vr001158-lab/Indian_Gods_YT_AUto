@@ -211,8 +211,13 @@ def generate_voice_mapping(
     run_audio_dir.mkdir(parents=True, exist_ok=True)
 
     if fmt == "old":
-        from src.audio.music import select_background_music_v2, validate_music_provenance
-        music_track, sel_type = select_background_music_v2(category="devotional")
+        from src.audio.music import (
+            select_background_music_v2,
+            validate_music_provenance,
+            get_bgm_metadata_for_track,
+        )
+        music_track, sel_type = select_background_music_v2(category="devotional", script=script)
+        bgm_meta = get_bgm_metadata_for_track(music_track, script=script)
         
         # Determine music file path and validate in production
         if mode == "production":
@@ -289,6 +294,9 @@ def generate_voice_mapping(
             "mode": mode,
             "audio_scenes": audio_scenes,
             "full_narration_audio_file": str(full_audio_file.absolute()).replace("\\", "/"),
+            "bgm_title": bgm_meta.get("title", "Devotional Music"),
+            "bgm_artist": bgm_meta.get("artist", "Traditional / Various Artists"),
+            "bgm_deity": bgm_meta.get("deity", "devotional"),
             "approval_metadata": script.get("approval_metadata", {}),
         }
 
