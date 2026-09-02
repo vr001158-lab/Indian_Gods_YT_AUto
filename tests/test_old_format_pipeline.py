@@ -237,7 +237,7 @@ class TestOldFormatPipeline(unittest.TestCase):
         from src.voice.generator import generate_voice_mapping
         from src.video.generator import compose_video_pipeline
         from tests.test_video_generator import _make_timing_maps
-
+        
         script = {
             "title": "Jai Hanuman",
             "duration_seconds": 30,
@@ -253,23 +253,13 @@ class TestOldFormatPipeline(unittest.TestCase):
                 "selected_topic": "Jai Hanuman",
             }
         }
-
+        
         # Test 1: OLD format selects a music track in test/mock mode
         audio_map = generate_voice_mapping(script, format="old", mode="test")
         self.assertEqual(audio_map["format"], "old")
         self.assertEqual(audio_map["audio_type"], "music_only")
         self.assertTrue(audio_map["full_narration_audio_file"].endswith(".wav"))
-
-
-
-
-
-
-
-
-
-
-
+        
         # Test 2: Production must fail closed when music selection returns no BGM.
         with patch(
             "src.audio.music.select_background_music_v2",
@@ -277,23 +267,6 @@ class TestOldFormatPipeline(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 generate_voice_mapping(script, format="old", mode="production")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         # Test 3: Video composition fails closed if background music file doesn't exist
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -303,7 +276,7 @@ class TestOldFormatPipeline(unittest.TestCase):
             amap["full_narration_audio_file"] = str(tmp_path / "non_existent_music.wav")
             with self.assertRaises(FileNotFoundError):
                 compose_video_pipeline(amap, vmap, composer_type="mock", output_dir=tmp_path)
-
+                
     def test_T_ffmpeg_command_and_mapping(self):
         """Verify BGM mapping in FFmpeg command and audibility parameters."""
         from src.video.composer import FFmpegVideoComposer
@@ -314,19 +287,19 @@ class TestOldFormatPipeline(unittest.TestCase):
             tmp_path = Path(tmp_dir)
             amap, vmap = _make_timing_maps(create_files=True, tmp_dir=tmp_path, scene_count=2)
             amap["format"] = "old"
-
+            
             # Create a fake BGM file that exists and has 'mock' in the name
             bgm_file = tmp_path / "mock_devotional_music.wav"
             bgm_file.write_text("fake wav content", encoding="utf-8")
             amap["full_narration_audio_file"] = str(bgm_file.absolute()).replace("\\", "/")
-
+            
             # Compose video
             video_map = compose_video_pipeline(amap, vmap, composer_type="mock", output_dir=tmp_path)
-
+            
             # Check scene voice texts are empty
             for sc in video_map["scenes"]:
                 self.assertEqual(sc["voice_text"], "")
-
+                
             # Build FFmpeg command and check inputs and filtergraph
             composer = FFmpegVideoComposer()
             cmd = composer.build_ffmpeg_command(
@@ -335,7 +308,7 @@ class TestOldFormatPipeline(unittest.TestCase):
                 background_music=bgm_file,
             )
             cmd_str = " ".join(cmd)
-
+            
             # Must contain BGM file as an input
             self.assertIn("mock_devotional_music.wav", cmd_str)
             # Must map final audio stream
