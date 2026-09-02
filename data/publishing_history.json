@@ -86,5 +86,16 @@
     "duration_seconds": 30.0,
     "published_at": "20260829_154122",
     "video_file_name": "video_short_20260829_154103.mp4"
+  },
+  {
+    "youtube_video_id": "zOGw4KmZw0o",
+    "topic": "The Hidden Meaning of Lord Shiva's Trishul",
+    "title": "Secrets of Shiva's Snake: The Mastery Over Ego and Poison",
+    "content_type": "short",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 30.0,
+    "published_at": "20260902_161251",
+    "video_file_name": "video_short_20260902_161227.mp4"
   }
 ]
