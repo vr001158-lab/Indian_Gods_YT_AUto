@@ -445,6 +445,43 @@ class TestOldFormatPipeline(unittest.TestCase):
             for sc in video_map["scenes"]:
                 self.assertEqual(sc["voice_text"], "")
 
+    def test_VI_old_format_ganesha_scene_count_alignment(self):
+        """Verify OLD format voice and visual generation produces matching scene counts for Ganesha."""
+        from src.voice.generator import generate_voice_mapping
+        from src.visual.generator import generate_visual_mapping
+        from src.video.schemas import validate_input_maps
+
+        ganesha_script = {
+            "run_id": "run_test_ganesha_old",
+            "title": "The Sacrifice of Ganesha: The Story of the Broken Tusk",
+            "duration_seconds": 390,
+            "narration": "Sacrifice for wisdom",
+            "scene_scripts": [
+                {"scene": 1, "duration_seconds": 60, "voice_text": "Scene 1"},
+                {"scene": 2, "duration_seconds": 90, "voice_text": "Scene 2"},
+                {"scene": 3, "duration_seconds": 90, "voice_text": "Scene 3"},
+                {"scene": 4, "duration_seconds": 60, "voice_text": "Scene 4"},
+                {"scene": 5, "duration_seconds": 60, "voice_text": "Scene 5"},
+            ],
+            "retention_hooks": ["Wisdom hook"],
+            "shorts_scripts": [],
+            "approval_metadata": {
+                "approved_for_generation": True,
+                "data_source": "youtube_api",
+                "confidence": "high",
+                "selected_topic": "ganesha",
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            amap = generate_voice_mapping(ganesha_script, provider_name="mock", mode="test", format="old", content_type="short", output_dir=tmp_path / "audio")
+            vmap = generate_visual_mapping(ganesha_script, provider_name="mock", format="old", content_type="short", output_dir=tmp_path / "visuals")
+
+            self.assertEqual(len(amap["audio_scenes"]), len(vmap["visual_scenes"]))
+            ok, msg = validate_input_maps(amap, vmap)
+            self.assertTrue(ok, f"Input map validation failed: {msg}")
+
 
 if __name__ == "__main__":
     unittest.main()

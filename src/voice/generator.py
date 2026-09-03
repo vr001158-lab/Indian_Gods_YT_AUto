@@ -249,14 +249,16 @@ def generate_voice_mapping(
 
         topic = script.get("title") or script.get("approval_metadata", {}).get("selected_topic", "")
         from src.assets.selector import resolve_deity, build_deity_visual_timeline
+        from src.assets.manifest import load_asset_manifest
         deity = resolve_deity(topic)
 
-        content_type = (script.get("content_type") or "short").lower()
+        content_type = (content_type or script.get("content_type") or "short").lower()
         target_total_dur = float(script.get("duration_seconds") or script.get("total_duration_seconds") or 45.0)
         if content_type == "short" and (target_total_dur < 35.0 or target_total_dur >= 60.0):
             target_total_dur = 45.0
 
-        timeline_scenes = build_deity_visual_timeline(deity, target_duration=target_total_dur, content_type=content_type)
+        manifest = load_asset_manifest()
+        timeline_scenes = build_deity_visual_timeline(deity, target_duration=target_total_dur, content_type=content_type, manifest=manifest)
 
         allow_mock = mode == "test"
         audio_scenes = []
@@ -440,6 +442,7 @@ def process_script_file(
     mode: str = "production",
     language_code: str | None = None,
     format: str = "narrated",
+    content_type: str = "short",
 ) -> Path:
     """Loads a script file, runs voice generation mapping, and saves the mapping JSON."""
     if not script_path.exists():
@@ -460,6 +463,7 @@ def process_script_file(
         output_dir=output_dir,
         mode=mode,
         format=format,
+        content_type=content_type,
     )
 
     timestamp = time.strftime("%Y%m%d_%H%M%S")

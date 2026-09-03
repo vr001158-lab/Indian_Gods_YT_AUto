@@ -27,12 +27,19 @@ def generate_visual_mapping(
     provider_name: str = "mock",
     style_preset: str = "Devotional Cinematic Painting, 8k, divine golden glow",
     output_dir: Path = Path("data/visuals"),
+    format: str | None = None,
+    content_type: str | None = None,
 ) -> dict:
     """
     Orchestrates the conversion of a validated script into a visual mapping and asset collection.
 
     Raises ValueError if input fails safety gates.
     """
+    if format:
+        script["format"] = format
+    if content_type:
+        script["content_type"] = content_type
+
     ok, error_msg = validate_script_input(script)
     if not ok:
         raise ValueError(f"❌ Safety Gate Rejection: {error_msg}")
@@ -55,6 +62,9 @@ def generate_visual_mapping(
         output_dir=output_dir,
     )
 
+    fmt = (script.get("format") or "").lower()
+    is_retention_timeline = (fmt == "old" or script.get("use_retention_timeline"))
+
     # 2. Synthesize/resolve scene visual assets according to asset plan
     visual_scenes = []
     for scene_item in asset_plan["scenes"]:
@@ -63,10 +73,12 @@ def generate_visual_mapping(
         asset_path = scene_item["asset"]
         source = scene_item["source"]
         visual_ref = ""
+        duration = int(round(scene_item.get("duration_seconds", 30)))
         for sc in script.get("scene_scripts", []):
             if sc["scene"] == scene_num:
-                duration = sc.get("duration_seconds", 30)
                 visual_ref = sc.get("visual_reference", "")
+                if not is_retention_timeline:
+                    duration = int(round(sc.get("duration_seconds", 30)))
                 break
 
         # Output asset file for this run
@@ -120,6 +132,8 @@ def process_script_file(
     provider_name: str = "mock",
     style_preset: str = "Devotional Cinematic Painting, 8k, divine golden glow",
     output_dir: Path = Path("data/visuals"),
+    format: str | None = None,
+    content_type: str | None = None,
 ) -> Path:
     """
     Loads a script file, runs visual generation mapping, and saves the mapping JSON.
@@ -137,6 +151,8 @@ def process_script_file(
         provider_name=provider_name,
         style_preset=style_preset,
         output_dir=output_dir,
+        format=format,
+        content_type=content_type,
     )
 
     # Persist the mapping JSON

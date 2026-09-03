@@ -68,6 +68,8 @@ def main():
     input_file = None
     provider_name = "mock"
     style_preset = DEFAULT_STYLE
+    format_type = "narrated"
+    content_type = "short"
     save_output = True
 
     # ── CLI parsing ───────────────────────────────────────────────────────────
@@ -83,12 +85,18 @@ def main():
         elif args[i] == "--style-preset" and i + 1 < len(args):
             style_preset = args[i + 1]
             i += 2
+        elif args[i] == "--format" and i + 1 < len(args):
+            format_type = args[i + 1].lower().strip()
+            i += 2
+        elif args[i] == "--content-type" and i + 1 < len(args):
+            content_type = args[i + 1].lower().strip()
+            i += 2
         elif args[i] == "--no-save":
             save_output = False
             i += 1
         else:
             print(f"❌ Unknown argument: {args[i]}", file=sys.stderr)
-            print("Usage: python run_visual_generator.py [--input FILE] [--provider NAME] [--style-preset PRESET] [--no-save]", file=sys.stderr)
+            print("Usage: python run_visual_generator.py [--input FILE] [--provider NAME] [--style-preset PRESET] [--format narrated|old] [--content-type short|long] [--no-save]", file=sys.stderr)
             sys.exit(1)
 
     # ── Locate script file ────────────────────────────────────────────────────
@@ -111,7 +119,9 @@ def main():
                 script_path=input_file,
                 provider_name=provider_name,
                 style_preset=style_preset,
-                output_dir=VISUAL_DIR
+                output_dir=VISUAL_DIR,
+                format=format_type,
+                content_type=content_type,
             )
             print(f"📂 Visual map saved to: {out_file}", file=sys.stderr)
             visual_map = json.loads(out_file.read_text(encoding="utf-8"))
@@ -121,7 +131,9 @@ def main():
                 script=script,
                 provider_name=provider_name,
                 style_preset=style_preset,
-                output_dir=VISUAL_DIR
+                output_dir=VISUAL_DIR,
+                format=format_type,
+                content_type=content_type,
             )
             print("🔬 [DRY RUN] Skipping visual map file persistence.", file=sys.stderr)
         

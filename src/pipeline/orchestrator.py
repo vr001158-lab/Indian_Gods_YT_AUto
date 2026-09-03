@@ -178,6 +178,7 @@ class PipelineRunner:
             "--provider", provider,
             "--mode", mode,
             "--format", self.format,
+            "--content-type", self.content_type,
         ]
         self._execute_cmd(cmd, stage)
 
@@ -201,7 +202,13 @@ class PipelineRunner:
 
         start_time = time.time()
         provider = "mock" if self.dry_run else "flux"
-        cmd = [sys.executable, "run_visual_generator.py", "--input", str(script_file), "--provider", provider]
+        cmd = [
+            sys.executable, "run_visual_generator.py",
+            "--input", str(script_file),
+            "--provider", provider,
+            "--format", self.format,
+            "--content-type", self.content_type,
+        ]
         self._execute_cmd(cmd, stage)
 
         out_file = self._find_latest_file(Path("data/visuals"), "visual_map_*.json", min_mtime=start_time - 2)

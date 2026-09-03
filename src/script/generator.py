@@ -344,6 +344,10 @@ def generate_script(brief: dict) -> dict:
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     script_data["run_id"] = f"run_{timestamp}"
     script_data["approval_metadata"] = brief["approval_metadata"]
+    if brief.get("format"):
+        script_data["format"] = brief["format"]
+    if brief.get("content_type"):
+        script_data["content_type"] = brief["content_type"]
     if brief.get("experiment_tag"):
         script_data["experiment_tag"] = brief["experiment_tag"]
     elif brief["approval_metadata"].get("experiment_tag"):
