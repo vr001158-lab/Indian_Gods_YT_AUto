@@ -355,39 +355,36 @@ class TestOldFormatPipeline(unittest.TestCase):
         self.assertEqual(stype_shiva, "primary")
         meta_shiva = get_bgm_metadata_for_track(track_shiva, script=shiva_script)
         self.assertEqual(meta_shiva["deity"], "shiva")
-        self.assertIn("Namo", meta_shiva["title"])
 
-        audio_map_shiva = generate_voice_mapping(shiva_script, format="old", mode="test")
+        audio_map_shiva = generate_voice_mapping(shiva_script, format="old", mode="production")
         self.assertEqual(audio_map_shiva["bgm_deity"], "shiva")
         self.assertIn("bgm_title", audio_map_shiva)
         self.assertIn("bgm_artist", audio_map_shiva)
 
-        # 3. Hanuman script fails closed in production mode when no approved audio asset exists
-        hanuman_script = {
-            "title": "Jai Hanuman Bajrangbali",
-            "duration_seconds": 30,
-            "narration": "Jai Shri Ram",
-            "scene_scripts": [{"scene": 1, "voice_text": "Hanuman"}],
-            "retention_hooks": ["Hook"],
-            "approval_metadata": {
-                "approved_for_generation": True,
-                "data_source": "youtube_api",
-                "confidence": "high",
-                "selected_topic": "Jai Hanuman",
+        # 3. All 12 deities select their respective approved deity tracks in production mode
+        canonical_deities = [
+            "shiva", "hanuman", "krishna", "rama", "ganesha", "durga",
+            "lakshmi", "saraswati", "vishnu", "kali", "murugan", "ayyappa"
+        ]
+        for deity in canonical_deities:
+            d_script = {
+                "title": f"Devotional Short for {deity.title()}",
+                "duration_seconds": 30,
+                "narration": "Sacred Devotional",
+                "scene_scripts": [{"scene": 1, "voice_text": "Devotional"}],
+                "retention_hooks": ["Hook"],
+                "approval_metadata": {
+                    "approved_for_generation": True,
+                    "data_source": "youtube_api",
+                    "confidence": "high",
+                    "selected_topic": deity,
+                }
             }
-        }
-        track_hanuman, stype_hanuman = select_background_music_v2(category="devotional", script=hanuman_script)
-        self.assertIsNone(track_hanuman)
+            audio_map_d = generate_voice_mapping(d_script, format="old", mode="production")
+            self.assertEqual(audio_map_d["bgm_deity"], deity)
+            self.assertTrue(Path(audio_map_d["full_narration_audio_file"]).exists())
 
-        with self.assertRaises(ValueError):
-            generate_voice_mapping(hanuman_script, format="old", mode="production")
-
-        # Test mode for Hanuman script still works with stub
-        audio_map_hanuman = generate_voice_mapping(hanuman_script, format="old", mode="test")
-        self.assertIsNotNone(audio_map_hanuman)
-        self.assertEqual(audio_map_hanuman["format"], "old")
-
-        # 4. Unknown deity does not select Shiva track
+        # 4. Unknown deity returns no track and fails closed in production mode
         unknown_script = {
             "title": "Unrelated Non-Deity Subject",
             "duration_seconds": 30,

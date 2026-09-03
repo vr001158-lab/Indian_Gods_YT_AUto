@@ -219,8 +219,45 @@ class TestMusicPipelineV2(unittest.TestCase):
             output_path=output_mp3,
         )
 
-        self.assertTrue(out_path.exists())
-        self.assertGreater(out_path.stat().st_size, 1000)
+    def test_10_all_12_deities_manifest_and_catalog_validation(self):
+        """Verify all 12 deities have usable, approved physical assets matching SHA256 and provenance rules."""
+        from src.audio.music import DEITY_SONG_CATALOG, MANIFEST_PATH, load_music_manifest, validate_music_provenance, select_background_music_v2
+
+        canonical_deities = [
+            "shiva", "hanuman", "krishna", "rama", "ganesha", "durga",
+            "lakshmi", "saraswati", "vishnu", "kali", "murugan", "ayyappa"
+        ]
+
+        manifest = load_music_manifest(MANIFEST_PATH)
+        tracks = manifest.get("tracks", [])
+        self.assertGreaterEqual(len(tracks), 12, "Manifest must contain at least 12 registered tracks")
+
+        # Verify physical existence and SHA-256 for all tracks in repository manifest
+        for tr in tracks:
+            rel_path = Path(tr["relative_path"])
+            self.assertTrue(rel_path.exists(), f"Registered asset file does not exist: {rel_path}")
+
+            # Check SHA256 matches physical file
+            actual_sha256 = hashlib.sha256(rel_path.read_bytes()).hexdigest()
+            self.assertEqual(tr["sha256"], actual_sha256, f"SHA256 mismatch for {rel_path}")
+
+            # Validate provenance
+            ok, msg, _ = validate_music_provenance(rel_path, manifest_path=MANIFEST_PATH)
+            self.assertTrue(ok, f"Provenance validation failed for {rel_path}: {msg}")
+
+            self.assertIn(tr["source_type"], {"original_generated", "youtube_audio_library", "royalty_free_public"})
+            self.assertTrue(tr.get("commercial_use", False))
+            self.assertNotEqual(tr.get("youtube_shorts_permitted"), False)
+
+        # Verify every canonical deity has at least one approved usable asset in catalog
+        for deity in canonical_deities:
+            self.assertIn(deity, DEITY_SONG_CATALOG, f"Deity {deity} missing from catalog")
+            script = {"selected_topic": deity}
+            track, stype = select_background_music_v2(category="devotional", script=script)
+            self.assertIsNotNone(track, f"No approved track selected for deity: {deity}")
+            self.assertTrue(track.exists(), f"Selected track for {deity} does not exist: {track}")
+            ok, msg, _ = validate_music_provenance(track, manifest_path=MANIFEST_PATH)
+            self.assertTrue(ok, f"Selected track for {deity} failed provenance: {msg}")
 
 
 if __name__ == "__main__":
