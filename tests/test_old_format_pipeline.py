@@ -258,7 +258,7 @@ class TestOldFormatPipeline(unittest.TestCase):
         audio_map = generate_voice_mapping(script, format="old", mode="test")
         self.assertEqual(audio_map["format"], "old")
         self.assertEqual(audio_map["audio_type"], "music_only")
-        self.assertTrue(audio_map["full_narration_audio_file"].endswith(".wav"))
+        self.assertTrue(audio_map["full_narration_audio_file"].endswith(".wav") or audio_map["full_narration_audio_file"].endswith(".mp3"))
         
         # Test 2: Production must fail closed when music selection returns no BGM.
         with patch(

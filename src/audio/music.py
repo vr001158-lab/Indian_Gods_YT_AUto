@@ -51,7 +51,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Shiv Sama Rahe", "artist": "Hansraj Raghuwanshi", "audio_file": None},
     ],
     "hanuman": [
-        {"title": "Hanuman Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/hanuman_devotional_original.wav"},
+        {"title": "Hanuman Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/hanuman_devotional_original.mp3"},
         {"title": "Shree Hanuman Chalisa", "artist": "Hariharan", "audio_file": None},
         {"title": "Sankatmochan Hanuman Ashtak", "artist": "Hariharan", "audio_file": None},
         {"title": "Bajrang Baan (Lofi)", "artist": "Rasraj Ji Maharaj", "audio_file": None},
@@ -59,7 +59,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Raghunandana (From \"HanuMan\")", "artist": "GowraHari, Saicharan Bhaskaruni, Lokeshwar Edara, Harshavardhan Chavali", "audio_file": None},
     ],
     "krishna": [
-        {"title": "Krishna Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/krishna_devotional_original.wav"},
+        {"title": "Krishna Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/krishna_devotional_original.mp3"},
         {"title": "Shri Krishna Govind Hare Murari", "artist": "Jubin Nautiyal / Simpal Kharel", "audio_file": None},
         {"title": "Tum Prem Ho (Reprise)", "artist": "Mohit Lalwani & Bharat Kamal", "audio_file": None},
         {"title": "Radhe Radhe", "artist": "Hansraj Raghuwanshi", "audio_file": None},
@@ -67,7 +67,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Achyutam Keshavam", "artist": "Madhuraa Bhattacharya", "audio_file": None},
     ],
     "rama": [
-        {"title": "Rama Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/rama_devotional_original.wav"},
+        {"title": "Rama Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/rama_devotional_original.mp3"},
         {"title": "Ram Siya Ram", "artist": "Sachet Tandon & Parampara Tandon", "audio_file": None},
         {"title": "Mangal Bhavan Amangal Hari", "artist": "Ravindra Jain", "audio_file": None},
         {"title": "Ram Aaye Hain", "artist": "Swasti Mehul", "audio_file": None},
@@ -75,7 +75,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Bharat Ka Bacha Bacha Jai Shree Ram Bolega", "artist": "Devendra Pathak", "audio_file": None},
     ],
     "ganesha": [
-        {"title": "Ganesha Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/ganesha_devotional_original.wav"},
+        {"title": "Ganesha Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/ganesha_devotional_original.mp3"},
         {"title": "Sukhkarta Dukhharta", "artist": "Lata Mangeshkar", "audio_file": None},
         {"title": "Deva Shree Ganesha", "artist": "Ajay-Atul & Ajay Gogavale", "audio_file": None},
         {"title": "Ganesh Chalisa", "artist": "Anuradha Paudwal", "audio_file": None},
@@ -83,7 +83,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Ekadantaya Vakratundaya", "artist": "Shankar Mahadevan", "audio_file": None},
     ],
     "durga": [
-        {"title": "Durga Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/durga_devotional_original.wav"},
+        {"title": "Durga Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/durga_devotional_original.mp3"},
         {"title": "Aigiri Nandini (Mahishasura Mardini Stotram)", "artist": "Rajalakshmee Sanjay", "audio_file": None},
         {"title": "Durga Chalisa", "artist": "Anuradha Paudwal", "audio_file": None},
         {"title": "Jai Ambe Gauri", "artist": "Anuradha Paudwal", "audio_file": None},
@@ -91,7 +91,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Chalo Bulawa Aaya Hai", "artist": "Narendra Chanchal, Mahendra Kapoor, Asha Bhosle", "audio_file": None},
     ],
     "lakshmi": [
-        {"title": "Lakshmi Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/lakshmi_devotional_original.wav"},
+        {"title": "Lakshmi Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/lakshmi_devotional_original.mp3"},
         {"title": "Mahalakshmi Ashtakam", "artist": "Bombay Jayashri / Uma Mohan", "audio_file": None},
         {"title": "Sri Lakshmi Sahasranamam", "artist": "M.S. Subbulakshmi", "audio_file": None},
         {"title": "Om Jai Lakshmi Mata", "artist": "Anuradha Paudwal", "audio_file": None},
@@ -99,7 +99,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Kanakadhara Stotram", "artist": "M.S. Subbulakshmi", "audio_file": None},
     ],
     "saraswati": [
-        {"title": "Saraswati Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/saraswati_devotional_original.wav"},
+        {"title": "Saraswati Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/saraswati_devotional_original.mp3"},
         {"title": "Saraswati Vandana (Ya Kundendu)", "artist": "Anuradha Paudwal", "audio_file": None},
         {"title": "Saraswati Chalisa", "artist": "Suresh Wadkar", "audio_file": None},
         {"title": "Om Airim Namah (Saraswati Mantra)", "artist": "Sadhana Sargam", "audio_file": None},
@@ -107,7 +107,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Namostute Saraswati", "artist": "Devaki Pandit", "audio_file": None},
     ],
     "vishnu": [
-        {"title": "Vishnu Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/vishnu_devotional_original.wav"},
+        {"title": "Vishnu Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/vishnu_devotional_original.mp3"},
         {"title": "Vishnu Sahasranamam", "artist": "M.S. Subbulakshmi", "audio_file": None},
         {"title": "Achyutam Keshavam Krishna Damodaram", "artist": "Anup Jalota", "audio_file": None},
         {"title": "Om Jai Jagdish Hare", "artist": "Anuradha Paudwal", "audio_file": None},
@@ -115,7 +115,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Narayana Stotram", "artist": "Uma Mohan", "audio_file": None},
     ],
     "kali": [
-        {"title": "Kali Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/kali_devotional_original.wav"},
+        {"title": "Kali Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/kali_devotional_original.mp3"},
         {"title": "Mahakali Stotram", "artist": "Shankar Mahadevan", "audio_file": None},
         {"title": "Jai Kali Maa", "artist": "Anuradha Paudwal", "audio_file": None},
         {"title": "Shyamama Sangey", "artist": "Kumar Sanu", "audio_file": None},
@@ -123,7 +123,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Kali Chalisa", "artist": "Lakhbir Singh Lakkha", "audio_file": None},
     ],
     "murugan": [
-        {"title": "Murugan Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/murugan_devotional_original.wav"},
+        {"title": "Murugan Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/murugan_devotional_original.mp3"},
         {"title": "Kanda Sashti Kavasam", "artist": "Soolamangalam Sisters", "audio_file": None},
         {"title": "Vel Vel Muruga", "artist": "Gajwel Venu", "audio_file": None},
         {"title": "Arupadai Veedu", "artist": "T.M. Soundararajan", "audio_file": None},
@@ -131,7 +131,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Muruga Saranam", "artist": "Mahanadhi Shobana", "audio_file": None},
     ],
     "ayyappa": [
-        {"title": "Ayyappa Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/ayyappa_devotional_original.wav"},
+        {"title": "Ayyappa Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/ayyappa_devotional_original.mp3"},
         {"title": "Harivarasanam", "artist": "K.J. Yesudas", "audio_file": None},
         {"title": "Pallikettu Sabarimalaikku", "artist": "K.J. Yesudas", "audio_file": None},
         {"title": "Bhagavan Saranam", "artist": "K.J. Yesudas", "audio_file": None},
