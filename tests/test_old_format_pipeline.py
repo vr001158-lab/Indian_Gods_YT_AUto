@@ -446,10 +446,12 @@ class TestOldFormatPipeline(unittest.TestCase):
                 self.assertEqual(sc["voice_text"], "")
 
     def test_VI_old_format_ganesha_scene_count_alignment(self):
-        """Verify OLD format voice and visual generation produces matching scene counts for Ganesha."""
+        """Verify OLD format script, voice, visual, and video generation produce 8==8==8==8 synchronized scene counts."""
         from src.voice.generator import generate_voice_mapping
         from src.visual.generator import generate_visual_mapping
+        from src.video.generator import compose_video_pipeline
         from src.video.schemas import validate_input_maps
+        from src.qa.checks import check_scene_sync
 
         ganesha_script = {
             "run_id": "run_test_ganesha_old",
@@ -477,10 +479,63 @@ class TestOldFormatPipeline(unittest.TestCase):
             tmp_path = Path(tmp_dir)
             amap = generate_voice_mapping(ganesha_script, provider_name="mock", mode="test", format="old", content_type="short", output_dir=tmp_path / "audio")
             vmap = generate_visual_mapping(ganesha_script, provider_name="mock", format="old", content_type="short", output_dir=tmp_path / "visuals")
+            video_map = compose_video_pipeline(amap, vmap, composer_type="mock", output_dir=tmp_path / "video", content_type="short")
 
-            self.assertEqual(len(amap["audio_scenes"]), len(vmap["visual_scenes"]))
-            ok, msg = validate_input_maps(amap, vmap)
-            self.assertTrue(ok, f"Input map validation failed: {msg}")
+            # 1. Input map safety gate validation
+            ok_maps, msg_maps = validate_input_maps(amap, vmap)
+            self.assertTrue(ok_maps, f"Input map validation failed: {msg_maps}")
+
+            # 2. Final QA full scene synchronization check
+            ok_sync, msg_sync = check_scene_sync(ganesha_script, amap, vmap, video_map)
+            self.assertTrue(ok_sync, f"Final QA check_scene_sync failed: {msg_sync}")
+
+            # 3. Assert 8 == 8 == 8 == 8 scene counts
+            script_scenes_count = len(ganesha_script["scene_scripts"])
+            audio_scenes_count = len(amap["audio_scenes"])
+            visual_scenes_count = len(vmap["visual_scenes"])
+            video_scenes_count = len(video_map["scenes"])
+
+            self.assertEqual(script_scenes_count, 8)
+            self.assertEqual(audio_scenes_count, 8)
+            self.assertEqual(visual_scenes_count, 8)
+            self.assertEqual(video_scenes_count, 8)
+
+            # 4. Assert voice_text is empty for every OLD scene
+            for sc in ganesha_script["scene_scripts"]:
+                self.assertEqual(sc["voice_text"], "")
+
+    def test_VII_old_format_script_generator_canonical_timeline(self):
+        """Verify generate_script() produces canonical 8-scene retention timeline when format='old'."""
+        from src.content.brief_generator import generate_content_brief
+        from src.script.generator import generate_script
+
+        brief = generate_content_brief({
+            "topic": "The Sacrifice of Ganesha: The Story of the Broken Tusk",
+            "selected_topic": "ganesha",
+            "deity": "ganesha",
+            "category": "Hindu mythology",
+            "selected_angle": "Story of broken tusk",
+            "suggested_angle": "Story of broken tusk",
+            "content_gap": "Low competition",
+            "score": 80,
+            "format": "old",
+            "approved_for_generation": True,
+            "data_source": "youtube_api",
+            "confidence": "high",
+            "approval_metadata": {
+                "approved_for_generation": True,
+                "data_source": "youtube_api",
+                "confidence": "high",
+                "selected_topic": "ganesha",
+            }
+        })
+
+        script = generate_script(brief)
+
+        self.assertEqual(script["format"], "old")
+        self.assertEqual(len(script["scene_scripts"]), 8)
+        for sc in script["scene_scripts"]:
+            self.assertEqual(sc["voice_text"], "")
 
 
 if __name__ == "__main__":

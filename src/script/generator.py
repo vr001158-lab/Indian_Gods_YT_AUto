@@ -353,8 +353,44 @@ def generate_script(brief: dict) -> dict:
     elif brief["approval_metadata"].get("experiment_tag"):
         script_data["experiment_tag"] = brief["approval_metadata"]["experiment_tag"]
 
+    fmt = (brief.get("format") or script_data.get("format") or "").lower()
+    if fmt == "old":
+        from src.assets.selector import resolve_deity, build_deity_visual_timeline
+        from src.assets.manifest import load_asset_manifest
+
+        meta = script_data.get("approval_metadata") or brief.get("approval_metadata") or {}
+        topic = meta.get("selected_topic") or script_data.get("title") or brief.get("primary_title") or ""
+        deity_key = resolve_deity(topic)
+
+        content_type = (brief.get("content_type") or script_data.get("content_type") or "short").lower()
+        target_dur = float(brief.get("target_duration_seconds") or brief.get("duration_seconds") or script_data.get("duration_seconds") or 45.0)
+        if content_type == "short" and (target_dur < 35.0 or target_dur >= 60.0):
+            target_dur = 45.0
+
+        manifest = load_asset_manifest()
+        timeline_scenes = build_deity_visual_timeline(
+            deity_key=deity_key,
+            target_duration=target_dur,
+            content_type=content_type,
+            manifest=manifest,
+        )
+
+        old_scene_scripts = []
+        for sc in timeline_scenes:
+            old_scene_scripts.append({
+                "scene": sc["scene"],
+                "duration_seconds": int(round(sc["duration_seconds"])),
+                "visual_reference": sc.get("visual_reference") or f"{deity_key.capitalize()} scene #{sc['scene']}",
+                "voice_text": "",
+                "emotion": "Devotional",
+            })
+
+        script_data["scene_scripts"] = old_scene_scripts
+        script_data["duration_seconds"] = int(round(sum(s["duration_seconds"] for s in old_scene_scripts)))
+        script_data["narration"] = f"Music-only devotional video for {script_data.get('title', deity_key)}"
+
     # Validate output schema
-    ok_out, err_out = validate_script_output(script_data)
+    ok_out, err_out = validate_script_output(script_data, content_type=script_data.get("content_type", "short"))
     if not ok_out:
         raise RuntimeError(f"❌ Internal Error: Generated script does not conform to schema: {err_out}")
 

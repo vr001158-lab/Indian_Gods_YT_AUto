@@ -260,6 +260,19 @@ def generate_voice_mapping(
         manifest = load_asset_manifest()
         timeline_scenes = build_deity_visual_timeline(deity, target_duration=target_total_dur, content_type=content_type, manifest=manifest)
 
+        # Reconcile script["scene_scripts"] to match canonical retention timeline
+        script["scene_scripts"] = [
+            {
+                "scene": sc["scene"],
+                "duration_seconds": int(round(sc["duration_seconds"])),
+                "visual_reference": sc.get("visual_reference") or f"{deity.capitalize()} scene #{sc['scene']}",
+                "voice_text": "",
+                "emotion": "Devotional",
+            }
+            for sc in timeline_scenes
+        ]
+        script["duration_seconds"] = int(round(sum(s["duration_seconds"] for s in script["scene_scripts"])))
+
         allow_mock = mode == "test"
         audio_scenes = []
         total_duration = 0.0
@@ -465,6 +478,13 @@ def process_script_file(
         format=format,
         content_type=content_type,
     )
+
+    # Save reconciled script JSON back to script_path for OLD format
+    if format == "old" or script.get("format") == "old":
+        script_path.write_text(
+            json.dumps(script, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     out_file = output_dir / f"audio_map_{timestamp}.json"

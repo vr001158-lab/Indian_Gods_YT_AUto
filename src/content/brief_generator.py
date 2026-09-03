@@ -295,6 +295,10 @@ def generate_content_brief(decision: dict) -> dict:
         "data_source": decision["data_source"],
         "category": decision["category"]
     }
+    if decision.get("format"):
+        brief_data["format"] = decision["format"]
+    if decision.get("content_type"):
+        brief_data["content_type"] = decision["content_type"]
 
     # Validate output structure
     ok_out, err_out = validate_brief_output(brief_data)
