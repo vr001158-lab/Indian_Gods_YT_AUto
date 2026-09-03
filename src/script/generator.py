@@ -344,6 +344,10 @@ def generate_script(brief: dict) -> dict:
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     script_data["run_id"] = f"run_{timestamp}"
     script_data["approval_metadata"] = brief["approval_metadata"]
+    if brief.get("experiment_tag"):
+        script_data["experiment_tag"] = brief["experiment_tag"]
+    elif brief["approval_metadata"].get("experiment_tag"):
+        script_data["experiment_tag"] = brief["approval_metadata"]["experiment_tag"]
 
     # Validate output schema
     ok_out, err_out = validate_script_output(script_data)

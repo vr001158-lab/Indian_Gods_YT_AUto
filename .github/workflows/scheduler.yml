@@ -4,15 +4,15 @@ env:
   YOUTUBE_PUBLISH: "false"
   ENABLE_GOOGLE_DRIVE: "true"
 
-on:
-  schedule:
-    # Short A (multi-image): 7:00 AM IST = 01:30 UTC
-    - cron: '30 01 * * *'
-    # Short B (single-image): 7:00 PM IST = 13:30 UTC
-    - cron: '30 13 * * *'
-    # Long video: 12:00 PM IST = 06:30 UTC
-    - cron: '30 06 * * *'
+# Scheduled triggers disabled in favor of divine-dharshanam-daily.yml to eliminate duplicate-upload hazards.
+# Use workflow_dispatch below for manual execution if required.
+# on:
+#   schedule:
+#     - cron: '30 01 * * *'
+#     - cron: '30 13 * * *'
+#     - cron: '30 06 * * *'
 
+on:
   workflow_dispatch:
     inputs:
       mode:

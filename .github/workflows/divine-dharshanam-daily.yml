@@ -2,10 +2,14 @@ name: Divine Dharshanam Daily — Production Automated Pipeline
 
 on:
   schedule:
-    # Morning Short (narrated): 04:00 UTC (09:30 AM IST)
+    # 1. Daily Primary Short (OLD format devotional): 04:00 UTC (09:30 AM IST) - Every day (Mon-Sun)
     - cron: '0 4 * * *'
-    # Evening Short (old format devotional): 13:30 UTC (07:00 PM IST / 19:00 IST)
-    - cron: '30 13 * * *'
+    # 2. Second Short (OLD format devotional): 13:30 UTC (07:00 PM IST) - Wed, Fri, Sun only
+    - cron: '30 13 * * 0,3,5'
+    # 3. Long Video (OLD format 16:9): 06:30 UTC (12:00 PM IST) - Tuesday & Saturday only
+    - cron: '30 6 * * 2,6'
+    # 4. Narrated Experiment (Short with overlay text): 05:00 UTC (10:30 AM IST) - Monday & Thursday only
+    - cron: '0 5 * * 1,4'
   workflow_dispatch:
     inputs:
       content_type:
@@ -17,13 +21,13 @@ on:
           - short
           - long
       format:
-        description: 'Production Format (narrated: 09:30 AM narrated | old: 19:00 PM devotional visual)'
+        description: 'Production Format (old: devotional visual | narrated: narrated with captions)'
         required: true
-        default: 'narrated'
+        default: 'old'
         type: choice
         options:
-          - narrated
           - old
+          - narrated
       language_code:
         description: 'Target Language (hi-IN | te-IN | ta-IN)'
         required: true
@@ -130,20 +134,39 @@ jobs:
           SCHEDULE_CRON: ${{ github.event.schedule }}
         run: |
           CT="${CONTENT_TYPE_INPUT:-short}"
-          FMT="${FORMAT_INPUT:-narrated}"
+          FMT="${FORMAT_INPUT:-old}"
+          EXP_TAG=""
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            if [ "$SCHEDULE_CRON" = "30 13 * * *" ]; then
-              FMT="old"
-            else
-              FMT="narrated"
-            fi
+            case "$SCHEDULE_CRON" in
+              "0 4 * * *")
+                CT="short"
+                FMT="old"
+                ;;
+              "30 13 * * 0,3,5")
+                CT="short"
+                FMT="old"
+                ;;
+              "30 6 * * 2,6")
+                CT="long"
+                FMT="old"
+                ;;
+              "0 5 * * 1,4")
+                CT="short"
+                FMT="narrated"
+                EXP_TAG="--experiment-tag narrated_experiment"
+                ;;
+              *)
+                CT="short"
+                FMT="old"
+                ;;
+            esac
           fi
           DRY=""
           if [ "$DRY_RUN_INPUT" = "true" ]; then
             DRY="--dry-run"
           fi
-          echo "🚀 Executing pipeline with content-type=$CT format=$FMT $DRY"
-          python run_pipeline.py --content-type "$CT" --format "$FMT" $DRY
+          echo "🚀 Executing pipeline with content-type=$CT format=$FMT $EXP_TAG $DRY"
+          python run_pipeline.py --content-type "$CT" --format "$FMT" $EXP_TAG $DRY
 
       - name: Persist Lightweight Publishing History State
         if: always()

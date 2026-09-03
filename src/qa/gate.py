@@ -53,6 +53,7 @@ class QAResult:
         self.data_source:     str      = ""
         self.approved_at:     str      = ""
         self.content_type:    str      = DEFAULT_CONTENT_TYPE
+        self.experiment_tag:  str      = ""
         self.aspect_ratio:    str      = ""
         self.resolution:      str      = ""
 
@@ -78,6 +79,7 @@ class QAResult:
             "confidence":              self.confidence,
             "data_source":             self.data_source,
             "content_type":            self.content_type,
+            "experiment_tag":          self.experiment_tag,
             "aspect_ratio":            self.aspect_ratio,
             "resolution":              self.resolution,
             "artifacts": {
@@ -244,8 +246,12 @@ class FinalQAGate:
         }
         result.approved_at = datetime.now(timezone.utc).isoformat()
 
-        # ── Step 11b: Populate format metadata ────────────────────────────
+        # ── Step 11b: Populate format & experiment metadata ────────────────
         result.content_type = self._content_type
+        if arts.script and isinstance(arts.script, dict):
+            result.experiment_tag = arts.script.get("experiment_tag", "")
+        elif decision and isinstance(decision, dict):
+            result.experiment_tag = decision.get("experiment_tag", "")
         try:
             fmt_cfg = get_format_config(self._content_type)
             result.aspect_ratio = fmt_cfg["aspect_ratio"]

@@ -14,11 +14,14 @@ from src.pipeline.logger import PipelineLogger
 class PipelineRunner:
     """End-to-end Pipeline Orchestrator executing stages from Research to Upload Prep."""
 
-    def __init__(self, state: PipelineState = None, dry_run: bool = False, content_type: str = "short", format: str = "narrated"):
+    def __init__(self, state: PipelineState = None, dry_run: bool = False, content_type: str = "short", format: str = "narrated", experiment_tag: str | None = None):
         self.format = (format or getattr(state, "format", "narrated")).lower()
-        self.state = state or PipelineState(format=self.format)
+        self.experiment_tag = experiment_tag or getattr(state, "experiment_tag", None)
+        self.state = state or PipelineState(format=self.format, experiment_tag=self.experiment_tag)
         if hasattr(self.state, "format"):
             self.state.format = self.format
+        if hasattr(self.state, "experiment_tag") and self.experiment_tag:
+            self.state.experiment_tag = self.experiment_tag
         self.dry_run = dry_run
         self.content_type = content_type
 

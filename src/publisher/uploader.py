@@ -180,6 +180,7 @@ def publish_video(
         "approval_metadata":  qa.get("approval_metadata", {}),
         # ── Content format metadata ────────────────────────────────────────────
         "content_type":       ct,
+        "experiment_tag":     qa.get("experiment_tag", ""),
         "aspect_ratio":       qa.get("aspect_ratio", ""),
         "resolution":         qa.get("resolution", ""),
         "duration_seconds":   qa.get("video_validation", {}).get("duration_seconds"),
@@ -229,6 +230,7 @@ def publish_video(
             "topic":            qa.get("selected_topic", ""),
             "title":            title,
             "content_type":     ct,
+            "experiment_tag":   qa.get("experiment_tag", ""),
             "aspect_ratio":     qa.get("aspect_ratio", ""),
             "resolution":       qa.get("resolution", ""),
             "duration_seconds": qa.get("video_validation", {}).get("duration_seconds"),
