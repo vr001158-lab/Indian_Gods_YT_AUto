@@ -259,6 +259,53 @@ class TestMusicPipelineV2(unittest.TestCase):
             ok, msg, _ = validate_music_provenance(track, manifest_path=MANIFEST_PATH)
             self.assertTrue(ok, f"Selected track for {deity} failed provenance: {msg}")
 
+    def test_11_youtube_audio_library_tracks_and_rama_mapping(self):
+        """Verify YouTube Audio Library tracks integration, SHA-256 verification, and Rama -> Bhaj Le Ram mapping."""
+        from src.audio.music import MANIFEST_PATH, load_music_manifest, validate_music_provenance, select_background_music_v2, get_bgm_metadata_for_track
+
+        manifest = load_music_manifest(MANIFEST_PATH)
+        tracks_by_fn = {tr["filename"]: tr for tr in manifest.get("tracks", [])}
+
+        yt_files = [
+            "Bhaj Le Ram - Bhajan (Voice, Sarangi, Tabla) - Sandeep Das,  Ujjwal Sahani,  Aneesh Mishra.mp3",
+            "Calcutta Sunset - E's Jammy Jams.mp3",
+            "Raag Charukeshi - Madhyalaya Teentaal (Sitar, Tabla) - Sandeep Das,  Amrendra Mishra.mp3"
+        ]
+
+        for fn in yt_files:
+            self.assertIn(fn, tracks_by_fn, f"YouTube Audio Library file {fn} missing from manifest")
+            tr = tracks_by_fn[fn]
+            self.assertEqual(tr["source"], "YouTube Audio Library")
+            self.assertEqual(tr["source_type"], "youtube_audio_library")
+            self.assertEqual(tr["license"], "Attribution not required")
+            self.assertTrue(tr["approved"])
+
+            rel_path = Path(tr["relative_path"])
+            self.assertTrue(rel_path.exists(), f"Physical audio file missing: {rel_path}")
+            actual_sha = hashlib.sha256(rel_path.read_bytes()).hexdigest()
+            self.assertEqual(tr["sha256"], actual_sha, f"SHA256 mismatch for {fn}")
+
+            ok, reason, _ = validate_music_provenance(rel_path, manifest_path=MANIFEST_PATH)
+            self.assertTrue(ok, f"Provenance failed for {fn}: {reason}")
+
+        # Verify Rama script MUST map to Bhaj Le Ram
+        rama_script = {"title": "Shri Ram Ayodhya Dharshanam", "selected_topic": "Rama"}
+        track, stype = select_background_music_v2(category="devotional", script=rama_script)
+        self.assertIsNotNone(track)
+        self.assertEqual(stype, "primary")
+        self.assertIn("Bhaj Le Ram", track.name)
+
+        bgm_meta = get_bgm_metadata_for_track(track, script=rama_script)
+        self.assertEqual(bgm_meta["title"], "Bhaj Le Ram - Bhajan (Voice, Sarangi, Tabla)")
+        self.assertIn("Sandeep Das", bgm_meta["artist"])
+        self.assertEqual(bgm_meta["deity"], "rama")
+
+        # Verify unmapped deity returns None (fail closed)
+        unmapped_script = {"title": "Unknown Entity Mystery", "selected_topic": "Unknown Deity X"}
+        unmapped_track, unmapped_stype = select_background_music_v2(category="devotional", script=unmapped_script)
+        self.assertIsNone(unmapped_track)
+        self.assertEqual(unmapped_stype, "narration_only")
+
 
 if __name__ == "__main__":
     unittest.main()

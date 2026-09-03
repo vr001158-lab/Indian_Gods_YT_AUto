@@ -121,13 +121,21 @@ class FFmpegVideoComposer(VideoComposer):
         cmd = ["ffmpeg", "-y"]  # overwrite output files
 
         # ── 1. Register Inputs ────────────────────────────────────────────────
-        # Inputs alternate: [loop image i], [scene audio i]
         for s in scenes:
-            cmd.extend([
-                "-loop", "1",
-                "-t", str(s["duration_seconds"]),
-                "-i", s["image_file"]
-            ])
+            img_p = Path(s["image_file"])
+            is_video = s.get("asset_type") == "video" or img_p.suffix.lower() in (".mp4", ".mov", ".mkv", ".webm")
+            if is_video:
+                cmd.extend([
+                    "-stream_loop", "-1",
+                    "-t", str(s["duration_seconds"]),
+                    "-i", str(img_p)
+                ])
+            else:
+                cmd.extend([
+                    "-loop", "1",
+                    "-t", str(s["duration_seconds"]),
+                    "-i", str(img_p)
+                ])
             cmd.extend([
                 "-i", s["audio_file"]
             ])

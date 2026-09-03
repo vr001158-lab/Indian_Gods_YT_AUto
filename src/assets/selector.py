@@ -50,6 +50,95 @@ def _score_semantic_match(asset_path: str, keywords: Sequence[str]) -> int:
     return score
 
 
+def build_deity_visual_timeline(
+    deity_key: str,
+    target_duration: float = 45.0,
+    content_type: str = "short",
+    manifest: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Constructs a retention-optimized visual timeline (mixing images & video clips)
+    strictly for `deity_key`.
+
+    Shorts:
+      - target_duration: >=35s and <60s (default 45.0s)
+      - images: 4s - 8s per image
+      - videos: 5s - 15s per clip
+      - early visual change (first segment ~4-5s)
+      - mixes images & videos if both exist
+
+    Long:
+      - target_duration: e.g. 180s+
+      - images: 4s - 8s per image
+      - videos: 5s - 15s per clip
+      - continuous coverage with no long static sections
+    """
+    if manifest is None:
+        from src.assets.manifest import load_asset_manifest
+        manifest = load_asset_manifest()
+
+    deities = manifest.get("deities", {})
+    target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
+
+    repo_images = target_deity_assets.get("images", [])
+    repo_videos = target_deity_assets.get("videos", [])
+
+    if not repo_images and not repo_videos:
+        raise ValueError(f"No visual assets found in repository for deity '{deity_key}'")
+
+    # Combine pool: alternate between videos and images if both exist
+    mixed_pool = []
+    max_len = max(len(repo_images), len(repo_videos))
+    for i in range(max_len):
+        if i < len(repo_videos):
+            mixed_pool.append(repo_videos[i])
+        if i < len(repo_images):
+            mixed_pool.append(repo_images[i])
+
+    timeline: list[dict[str, Any]] = []
+    current_time = 0.0
+    scene_idx = 1
+    pool_len = len(mixed_pool)
+
+    # Durations pattern for image segments (4s to 8s)
+    image_durations = [5.0, 6.0, 4.0, 7.0, 5.0, 6.0, 4.0, 8.0]
+
+    while current_time < target_duration:
+        asset_item = mixed_pool[(scene_idx - 1) % pool_len]
+        atype = asset_item.get("type", "image")
+
+        if atype == "video":
+            clip_dur = float(asset_item.get("duration", 8.0) or 8.0)
+            seg_dur = min(max(5.0, clip_dur), 15.0)
+        else:
+            seg_dur = image_durations[(scene_idx - 1) % len(image_durations)]
+
+        rem = target_duration - current_time
+        if rem < 3.0 and timeline:
+            timeline[-1]["duration_seconds"] = round(timeline[-1]["duration_seconds"] + rem, 2)
+            break
+        elif rem < seg_dur:
+            seg_dur = rem
+
+        timeline.append({
+            "scene": scene_idx,
+            "asset_type": atype,
+            "asset": asset_item["path"],
+            "image_file": asset_item["path"],
+            "asset_id": asset_item.get("asset_id", f"{deity_key}_{scene_idx}"),
+            "deity": deity_key,
+            "duration_seconds": round(seg_dur, 2),
+            "source": "repository",
+            "reason_for_selection": f"Visual timeline segment #{scene_idx} ({atype}) for deity '{deity_key}'",
+            "validation_result": "OK",
+        })
+
+        current_time += seg_dur
+        scene_idx += 1
+
+    return timeline
+
+
 def select_scene_assets(
     deity_key: str,
     scene_scripts: list[dict[str, Any]],
@@ -60,27 +149,19 @@ def select_scene_assets(
     Select scene-aware visual assets for scene_scripts according to Priority rules:
 
     Priority 1: Local repository assets in assets/gods/<deity_key>/
-    Priority 2: Other repository assets locally
-    Priority 3: Online asset fetching ONLY when local repository has no usable assets
+    Priority 2: Strict deity isolation (never borrowing from other deities)
+    Priority 3: Online asset fetching ONLY when local repository has no usable assets for deity
 
     Returns a list of scene asset decision dicts.
     """
     deities = manifest.get("deities", {})
     target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
-    
+
     repo_images = target_deity_assets.get("images", [])
     repo_videos = target_deity_assets.get("videos", [])
-    all_repo_assets = repo_videos + repo_images  # Prefer videos if available, then images
+    all_repo_assets = repo_videos + repo_images  # Strictly target deity assets
 
     scene_plan: list[dict[str, Any]] = []
-
-    # If priority 1 has no assets for this deity, check priority 2 (other deity folders)
-    if not all_repo_assets:
-        for other_deity, assets_dict in deities.items():
-            combined = assets_dict.get("videos", []) + assets_dict.get("images", [])
-            if combined:
-                all_repo_assets = combined
-                break
 
     for item in scene_scripts:
         scene_num = item["scene"]
@@ -95,7 +176,7 @@ def select_scene_assets(
         selection_source = "repository"
         selection_reason = ""
 
-        # Priority 1 & 2: Local repo semantic search
+        # Priority 1: Local repo semantic search for target deity
         if all_repo_assets:
             best_score = -1
             best_candidate = None
@@ -114,7 +195,7 @@ def select_scene_assets(
                 selected_asset = all_repo_assets[idx]
                 selection_reason = f"Deity repository asset fallback for '{deity_key}' (scene #{scene_num})"
 
-        # Priority 3: Online fallback if no local repo assets exist
+        # Online fallback if no local repo assets exist for target deity
         if not selected_asset:
             if not allow_online_fallback:
                 raise RuntimeError(f"No repository assets found for deity '{deity_key}' and online fallback disabled.")

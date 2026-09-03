@@ -403,6 +403,48 @@ class TestOldFormatPipeline(unittest.TestCase):
         with self.assertRaises(ValueError):
             generate_voice_mapping(unknown_script, format="old", mode="production")
 
+    def test_V_youtube_audio_library_rama_integration(self):
+        """Verify OLD format video for Rama selects Bhaj Le Ram, receives BGM, and contains no captions or text overlays."""
+        from src.voice.generator import generate_voice_mapping
+        from src.video.generator import compose_video_pipeline
+        from tests.test_video_generator import _make_timing_maps
+
+        rama_script = {
+            "title": "Maryada Purushottam Shri Ram Ayodhya Dharshanam",
+            "duration_seconds": 60,
+            "narration": "Jai Shri Ram",
+            "scene_scripts": [
+                {"scene": 1, "voice_text": "Shri Ram Ayodhya"},
+                {"scene": 2, "voice_text": "Bhaj Le Ram"}
+            ],
+            "retention_hooks": ["Jai Shri Ram"],
+            "approval_metadata": {
+                "approved_for_generation": True,
+                "data_source": "youtube_api",
+                "confidence": "high",
+                "selected_topic": "Shri Ram Ayodhya",
+            }
+        }
+
+        # 1. Voice mapping for OLD format generates music-only map with Bhaj Le Ram
+        audio_map = generate_voice_mapping(rama_script, format="old", mode="production")
+        self.assertEqual(audio_map["format"], "old")
+        self.assertEqual(audio_map["audio_type"], "music_only")
+        self.assertEqual(audio_map["bgm_deity"], "rama")
+        self.assertIn("Bhaj Le Ram", audio_map["full_narration_audio_file"])
+        self.assertTrue(Path(audio_map["full_narration_audio_file"]).exists())
+
+        # 2. Video composition for OLD format forces empty voice_text (zero captions/subtitles)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            amap, vmap = _make_timing_maps(create_files=True, tmp_dir=tmp_path, scene_count=2)
+            amap["format"] = "old"
+            amap["full_narration_audio_file"] = audio_map["full_narration_audio_file"]
+
+            video_map = compose_video_pipeline(amap, vmap, composer_type="mock", output_dir=tmp_path)
+            for sc in video_map["scenes"]:
+                self.assertEqual(sc["voice_text"], "")
+
 
 if __name__ == "__main__":
     unittest.main()

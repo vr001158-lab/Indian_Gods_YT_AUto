@@ -67,6 +67,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Achyutam Keshavam", "artist": "Madhuraa Bhattacharya", "audio_file": None},
     ],
     "rama": [
+        {"title": "Bhaj Le Ram - Bhajan (Voice, Sarangi, Tabla)", "artist": "Sandeep Das, Ujjwal Sahani, Aneesh Mishra", "audio_file": "assets/music/devotional/Bhaj Le Ram - Bhajan (Voice, Sarangi, Tabla) - Sandeep Das,  Ujjwal Sahani,  Aneesh Mishra.mp3"},
         {"title": "Rama Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/rama_devotional_original.mp3"},
         {"title": "Ram Siya Ram", "artist": "Sachet Tandon & Parampara Tandon", "audio_file": None},
         {"title": "Mangal Bhavan Amangal Hari", "artist": "Ravindra Jain", "audio_file": None},
@@ -336,19 +337,33 @@ def select_background_music_v2(
             tr_relevance = str(tr.get("deity_relevance", "")).lower()
             if tr_deity == norm_deity or norm_deity in tr_relevance:
                 rel_p = tr.get("relative_path", "")
-                fpath = Path(music_dir).parent / rel_p if not Path(rel_p).is_absolute() else Path(rel_p)
+                fpath = Path(rel_p) if not Path(rel_p).is_absolute() else Path(rel_p)
                 if not fpath.exists():
                     fpath = Path(music_dir) / tr.get("category", "") / tr.get("filename", "")
+                if not fpath.exists():
+                    fpath = Path(music_dir) / "devotional" / tr.get("filename", "")
                 if fpath.exists():
                     ok, _, _ = validate_music_provenance(fpath, manifest_path=manifest_file)
                     if ok and fpath not in deity_candidates:
                         deity_candidates.append(fpath)
 
         if deity_candidates:
+            primary_deity_candidates = []
+            fallback_deity_candidates = []
+            for p in deity_candidates:
+                _, _, tinfo = validate_music_provenance(p, manifest_path=manifest_file)
+                if tinfo.get("source_type") in PRIMARY_SOURCE_TYPES:
+                    primary_deity_candidates.append(p)
+                else:
+                    fallback_deity_candidates.append(p)
+
+            target_list = primary_deity_candidates if primary_deity_candidates else fallback_deity_candidates
+            sel_kind = "primary" if primary_deity_candidates else "fallback_generated"
+
             if script and isinstance(script, dict) and script.get("title"):
-                idx = sum(ord(c) for c in script["title"]) % len(deity_candidates)
-                return deity_candidates[idx], "primary"
-            return deity_candidates[0], "primary"
+                idx = sum(ord(c) for c in script["title"]) % len(target_list)
+                return target_list[idx], "primary"
+            return target_list[0], "primary"
 
         # Deity identified, but NO approved audio asset exists -> fail closed (None)
         return None, "narration_only"
@@ -363,9 +378,11 @@ def select_background_music_v2(
 
     for tr in tracks:
         rel_p = tr.get("relative_path", "")
-        fpath = Path(music_dir).parent / rel_p if not Path(rel_p).is_absolute() else Path(rel_p)
+        fpath = Path(rel_p) if not Path(rel_p).is_absolute() else Path(rel_p)
         if not fpath.exists():
             fpath = Path(music_dir) / tr.get("category", "") / tr.get("filename", "")
+        if not fpath.exists():
+            fpath = Path(music_dir) / "devotional" / tr.get("filename", "")
         if not fpath.exists():
             continue
 

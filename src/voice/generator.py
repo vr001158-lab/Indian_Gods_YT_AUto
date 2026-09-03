@@ -247,34 +247,36 @@ def generate_voice_mapping(
                 if not full_audio_file.exists():
                     full_audio_file.write_bytes(_make_silent_wav_bytes(30))
 
-        scene_scripts = script.get("scene_scripts", [])
-        num_scenes = max(1, len(scene_scripts))
-        target_total_duration = 30  # Default within 28-40s preferred range
-        per_scene_duration = max(1, target_total_duration // num_scenes)
-        total_duration = per_scene_duration * num_scenes
+        topic = script.get("title") or script.get("approval_metadata", {}).get("selected_topic", "")
+        from src.assets.selector import resolve_deity, build_deity_visual_timeline
+        deity = resolve_deity(topic)
+
+        content_type = (script.get("content_type") or "short").lower()
+        target_total_dur = float(script.get("duration_seconds") or script.get("total_duration_seconds") or 45.0)
+        if content_type == "short" and (target_total_dur < 35.0 or target_total_dur >= 60.0):
+            target_total_dur = 45.0
+
+        timeline_scenes = build_deity_visual_timeline(deity, target_duration=target_total_dur, content_type=content_type)
 
         allow_mock = mode == "test"
         audio_scenes = []
-        for i, item in enumerate(scene_scripts):
-            scene_num = item.get("scene", i + 1)
-            txt = item.get("voice_text") or item.get("narration_text") or item.get("visual_prompt") or "Om Namah Shivaya"
-            # Use .wav extension so file content and extension agree.
-            # In the old (music-only) format, TTS is bypassed; per-scene audio files
-            # are silence placeholders — the music track drives the actual audio.
-            # Writing null bytes with a .mp3 extension caused FFmpeg exit 234
-            # ("Failed to read frame size") because null bytes are not valid MP3 data.
+        total_duration = 0.0
+        for i, sc in enumerate(timeline_scenes):
+            scene_num = sc["scene"]
+            dur = sc["duration_seconds"]
+            total_duration += dur
             scene_file = run_audio_dir / f"scene_{scene_num}.wav"
             if not scene_file.exists():
-                scene_file.write_bytes(_make_silent_wav_bytes(per_scene_duration))
+                scene_file.write_bytes(_make_silent_wav_bytes(int(dur) or 1))
 
             if mode == "production":
                 _validate_production_audio(scene_file, allow_mock=allow_mock)
 
             audio_scenes.append({
                 "scene": scene_num,
-                "voice_text": str(txt),
+                "voice_text": script.get("title") or "Devotional Dharshanam",
                 "audio_file": str(scene_file.absolute()).replace("\\", "/"),
-                "duration_seconds": per_scene_duration,
+                "duration_seconds": int(round(dur)),
             })
 
         if mode == "production":
@@ -286,7 +288,7 @@ def generate_voice_mapping(
             "format": "old",
             "audio_type": "music_only",
             "script_title": script.get("title", "Devotional Short"),
-            "total_duration_seconds": total_duration,
+            "total_duration_seconds": int(round(total_duration)),
             "provider": "devotional_music",
             "voice_name": "none",
             "language_code": _resolve_language(script),

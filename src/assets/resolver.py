@@ -31,12 +31,28 @@ def create_scene_asset_plan(
     manifest = load_asset_manifest(manifest_path=manifest_path, gods_dir=gods_dir)
     scene_scripts = script.get("scene_scripts", [])
 
-    scene_decisions = select_scene_assets(
-        deity_key=deity,
-        scene_scripts=scene_scripts,
-        manifest=manifest,
-        allow_online_fallback=True,
-    )
+    content_type = (script.get("content_type") or "short").lower()
+    fmt = (script.get("format") or "").lower()
+
+    # Determine if timeline generator should build multi-segment retention timeline
+    if fmt == "old" or len(scene_scripts) <= 2 or script.get("use_retention_timeline"):
+        target_dur = float(script.get("duration_seconds") or script.get("total_duration_seconds") or 45.0)
+        if content_type == "short" and (target_dur < 35.0 or target_dur >= 60.0):
+            target_dur = 45.0
+        from src.assets.selector import build_deity_visual_timeline
+        scene_decisions = build_deity_visual_timeline(
+            deity_key=deity,
+            target_duration=target_dur,
+            content_type=content_type,
+            manifest=manifest,
+        )
+    else:
+        scene_decisions = select_scene_assets(
+            deity_key=deity,
+            scene_scripts=scene_scripts,
+            manifest=manifest,
+            allow_online_fallback=True,
+        )
 
     asset_plan = {
         "topic": topic,

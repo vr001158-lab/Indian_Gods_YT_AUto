@@ -220,6 +220,64 @@ class TestAssetResolverSubsystem(unittest.TestCase):
                 self.assertEqual(plan1["topic"], plan2["topic"])
                 self.assertEqual(plan1["scenes"], plan2["scenes"])
 
+    # ── Test 31: High Retention Visual Engine & Strict Deity Isolation ──────────
+    def test_31_high_retention_visual_engine_and_deity_isolation(self):
+        from src.assets.selector import build_deity_visual_timeline, select_scene_assets
+
+        manifest = {
+            "deities": {
+                "ram": {
+                    "images": [
+                        {"asset_id": "r_img1", "type": "image", "path": "assets/gods/ram/r1.png"},
+                        {"asset_id": "r_img2", "type": "image", "path": "assets/gods/ram/r2.png"},
+                        {"asset_id": "r_img3", "type": "image", "path": "assets/gods/ram/r3.png"},
+                    ],
+                    "videos": [
+                        {"asset_id": "r_vid1", "type": "video", "path": "assets/gods_processed/ram/v1.mp4", "duration": 10.0},
+                    ]
+                },
+                "lord_shiva": {
+                    "images": [
+                        {"asset_id": "s_img1", "type": "image", "path": "assets/gods/lord_shiva/s1.png"}
+                    ],
+                    "videos": []
+                }
+            }
+        }
+
+        # 1. Shorts retention timeline: target 45s, mixing images + videos for Ram
+        timeline_short = build_deity_visual_timeline("ram", target_duration=45.0, content_type="short", manifest=manifest)
+        total_dur = sum(s["duration_seconds"] for s in timeline_short)
+        self.assertGreaterEqual(total_dur, 35.0)
+        self.assertLess(total_dur, 60.0)
+        self.assertGreaterEqual(len(timeline_short), 5, "Shorts must contain multiple visual segments for retention")
+
+        # Verify images + videos mixed
+        types_used = {s["asset_type"] for s in timeline_short}
+        self.assertIn("image", types_used)
+        self.assertIn("video", types_used)
+
+        # Verify strict deity isolation: NO lord_shiva assets in ram timeline!
+        for s in timeline_short:
+            self.assertEqual(s["deity"], "ram")
+            self.assertIn("ram", s["asset"])
+            self.assertNotIn("lord_shiva", s["asset"])
+
+        # 2. Long video timeline: target 180s, full coverage, max static image duration <= 8s
+        timeline_long = build_deity_visual_timeline("ram", target_duration=180.0, content_type="long", manifest=manifest)
+        total_dur_long = sum(s["duration_seconds"] for s in timeline_long)
+        self.assertEqual(round(total_dur_long, 2), 180.0)
+        self.assertGreaterEqual(len(timeline_long), 20)
+
+        for s in timeline_long:
+            self.assertEqual(s["deity"], "ram")
+            if s["asset_type"] == "image":
+                self.assertLessEqual(s["duration_seconds"], 8.0, "No static image section > 8s allowed")
+
+        # 3. Verify error raised if deity has no repository visual assets (no cross-deity borrowing)
+        with self.assertRaises(ValueError):
+            build_deity_visual_timeline("unknown_deity_without_assets", manifest=manifest)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
