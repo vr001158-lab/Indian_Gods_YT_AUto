@@ -163,8 +163,8 @@ class TestMusicPipelineV2(unittest.TestCase):
     # -------------------------------------------------------------------------
     # 3. Fallback Selection Tests
     # -------------------------------------------------------------------------
-    def test_06_fallback_to_generated_track(self):
-        # Only fallback track registered in manifest
+    def test_06_synthetic_tracks_never_auto_selected(self):
+        # Only fallback synthetic track registered in manifest -> must fail closed to None
         tracks = [{
             "filename": "fallback_track.wav",
             "relative_path": "assets/music/devotional/fallback_track.wav",
@@ -178,9 +178,8 @@ class TestMusicPipelineV2(unittest.TestCase):
         self._write_manifest(tracks)
 
         selected_path, stype = select_background_music_v2(category="devotional", music_dir=self.music_dir)
-        self.assertIsNotNone(selected_path)
-        self.assertEqual(stype, "fallback_generated")
-        self.assertEqual(selected_path.name, "fallback_track.wav")
+        self.assertIsNone(selected_path)
+        self.assertEqual(stype, "narration_only")
 
     def test_07_fallback_to_narration_only(self):
         # Empty manifest
@@ -300,11 +299,60 @@ class TestMusicPipelineV2(unittest.TestCase):
         self.assertIn("Sandeep Das", bgm_meta["artist"])
         self.assertEqual(bgm_meta["deity"], "rama")
 
-        # Verify unmapped deity returns None (fail closed)
+        # Verify unmapped deity falls back to Calcutta Sunset
         unmapped_script = {"title": "Unknown Entity Mystery", "selected_topic": "Unknown Deity X"}
         unmapped_track, unmapped_stype = select_background_music_v2(category="devotional", script=unmapped_script)
-        self.assertIsNone(unmapped_track)
-        self.assertEqual(unmapped_stype, "narration_only")
+        self.assertIsNotNone(unmapped_track)
+        self.assertIn("Calcutta Sunset", unmapped_track.name)
+        self.assertEqual(unmapped_stype, "primary")
+
+    def test_12_production_music_fallback_priority(self):
+        """Verify production music selection priority: Deity-specific trusted track -> Calcutta Sunset -> Fail Closed."""
+        from src.audio.music import select_background_music_v2, validate_music_provenance, MANIFEST_PATH
+
+        # A. Ganesha with no deity-specific trusted track -> Calcutta Sunset
+        ganesha_script = {"title": "Sacrifice of Ganesha", "selected_topic": "ganesha"}
+        ganesha_track, stype = select_background_music_v2(category="devotional", script=ganesha_script)
+        self.assertIsNotNone(ganesha_track)
+        self.assertIn("Calcutta Sunset", ganesha_track.name)
+        self.assertEqual(stype, "primary")
+
+        # B. Rama with Bhaj Le Ram available -> Bhaj Le Ram
+        rama_script = {"title": "Shri Ram Ayodhya Dharshanam", "selected_topic": "rama"}
+        rama_track, r_stype = select_background_music_v2(category="devotional", script=rama_script)
+        self.assertIsNotNone(rama_track)
+        self.assertIn("Bhaj Le Ram", rama_track.name)
+        self.assertEqual(r_stype, "primary")
+
+        # C. Another deity (Shiva / Hanuman / Krishna) -> Calcutta Sunset
+        shiva_script = {"title": "Secrets of Shiva", "selected_topic": "shiva"}
+        shiva_track, s_stype = select_background_music_v2(category="devotional", script=shiva_script)
+        self.assertIsNotNone(shiva_track)
+        self.assertIn("Calcutta Sunset", shiva_track.name)
+        self.assertEqual(s_stype, "primary")
+
+        # D. Synthetic tracks are NEVER selected by normal production fallback
+        self.assertNotIn("original", ganesha_track.name.lower())
+        self.assertNotIn("flute", ganesha_track.name.lower())
+        self.assertNotIn("original", shiva_track.name.lower())
+
+        # E. If Calcutta Sunset is unavailable or fails provenance validation, fail closed
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_music_dir = Path(tmp_dir) / "assets" / "music"
+            tmp_music_dir.mkdir(parents=True, exist_ok=True)
+            empty_manifest = tmp_music_dir / "music_manifest.json"
+            empty_manifest.write_text(json.dumps({"tracks": [
+                {
+                    "filename": "synthetic_only.mp3",
+                    "relative_path": "assets/music/devotional/synthetic_only.mp3",
+                    "source_type": "original_generated",
+                    "approved": True
+                }
+            ]}), encoding="utf-8")
+
+            failed_track, failed_stype = select_background_music_v2(category="devotional", music_dir=tmp_music_dir, script=ganesha_script)
+            self.assertIsNone(failed_track)
+            self.assertEqual(failed_stype, "narration_only")
 
 
 if __name__ == "__main__":

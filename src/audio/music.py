@@ -303,12 +303,10 @@ def select_background_music_v2(
     Music Pipeline v2 Deity-Specific Selection Strategy.
 
     Priority Order:
-      1. Deity-Specific Path: If a deity is specified/detected from script or deity param,
-         matches approved deity-specific songs from DEITY_SONG_CATALOG or music_manifest.json.
-         Fails closed (returns None, "narration_only") if no approved audio asset exists for that deity.
-      2. General Category Path (when no deity specified): Searches category tracks in manifest.
-
-    Returns (selected_track_path, selection_type)
+      1. Deity-Specific Approved Trusted Track (youtube_audio_library or royalty_free_public).
+      2. Approved General Trusted Fallback: "Calcutta Sunset - E's Jammy Jams.mp3" (youtube_audio_library).
+      3. Fail closed (returns None, "narration_only") if no trusted track is available.
+      4. Synthetic (original_generated) tracks are NEVER automatically selected as production fallback.
     """
     manifest_file = Path(music_dir) / "music_manifest.json"
     manifest = load_music_manifest(manifest_file)
@@ -316,22 +314,22 @@ def select_background_music_v2(
 
     norm_deity = normalize_deity(deity) or normalize_deity(script)
 
-    # 1. Deity-specific selection
+    # 1. Deity-specific trusted track selection (youtube_audio_library or royalty_free_public)
     if norm_deity:
-        deity_candidates = []
+        primary_deity_candidates = []
 
-        # Check DEITY_SONG_CATALOG
+        # Check DEITY_SONG_CATALOG for trusted primary tracks
         catalog_songs = DEITY_SONG_CATALOG.get(norm_deity, [])
         for item in catalog_songs:
             af = item.get("audio_file")
             if af:
                 p = Path(af) if Path(af).is_absolute() else Path(music_dir).parent / af
                 if p.exists():
-                    ok, _, _ = validate_music_provenance(p, manifest_path=manifest_file)
-                    if ok:
-                        deity_candidates.append(p)
+                    ok, _, tinfo = validate_music_provenance(p, manifest_path=manifest_file)
+                    if ok and tinfo.get("source_type") in PRIMARY_SOURCE_TYPES:
+                        primary_deity_candidates.append(p)
 
-        # Check manifest tracks matching deity
+        # Check manifest tracks matching deity for trusted primary tracks
         for tr in tracks:
             tr_deity = tr.get("deity") or ""
             tr_relevance = str(tr.get("deity_relevance", "")).lower()
@@ -343,69 +341,42 @@ def select_background_music_v2(
                 if not fpath.exists():
                     fpath = Path(music_dir) / "devotional" / tr.get("filename", "")
                 if fpath.exists():
-                    ok, _, _ = validate_music_provenance(fpath, manifest_path=manifest_file)
-                    if ok and fpath not in deity_candidates:
-                        deity_candidates.append(fpath)
+                    ok, _, tinfo = validate_music_provenance(fpath, manifest_path=manifest_file)
+                    if ok and tinfo.get("source_type") in PRIMARY_SOURCE_TYPES and fpath not in primary_deity_candidates:
+                        primary_deity_candidates.append(fpath)
 
-        if deity_candidates:
-            primary_deity_candidates = []
-            fallback_deity_candidates = []
-            for p in deity_candidates:
-                _, _, tinfo = validate_music_provenance(p, manifest_path=manifest_file)
-                if tinfo.get("source_type") in PRIMARY_SOURCE_TYPES:
-                    primary_deity_candidates.append(p)
-                else:
-                    fallback_deity_candidates.append(p)
-
-            target_list = primary_deity_candidates if primary_deity_candidates else fallback_deity_candidates
-            sel_kind = "primary" if primary_deity_candidates else "fallback_generated"
-
+        if primary_deity_candidates:
             if script and isinstance(script, dict) and script.get("title"):
-                idx = sum(ord(c) for c in script["title"]) % len(target_list)
-                return target_list[idx], "primary"
-            return target_list[0], "primary"
+                idx = sum(ord(c) for c in script["title"]) % len(primary_deity_candidates)
+                return primary_deity_candidates[idx], "primary"
+            return primary_deity_candidates[0], "primary"
 
-        # Deity identified, but NO approved audio asset exists -> fail closed (None)
-        return None, "narration_only"
+    # 2. Approved General Trusted Fallback: "Calcutta Sunset - E's Jammy Jams.mp3"
+    fallback_filename = "Calcutta Sunset - E's Jammy Jams.mp3"
+    fallback_path = Path(music_dir) / "devotional" / fallback_filename
+    if not fallback_path.exists():
+        fallback_path = Path(music_dir).parent / "assets/music/devotional" / fallback_filename
 
-    # If deity or script was supplied but no deity could be detected (e.g. unknown deity topic)
-    if deity or (script and isinstance(script, dict)):
-        return None, "narration_only"
+    if fallback_path.exists():
+        ok, _, tinfo = validate_music_provenance(fallback_path, manifest_path=manifest_file)
+        if ok and tinfo.get("source_type") in PRIMARY_SOURCE_TYPES:
+            return fallback_path, "primary"
 
-    # 2. General Category selection (when neither deity nor script is specified)
-    primary_candidates = []
-    fallback_candidates = []
-
+    # 3. If Calcutta Sunset is missing or fails provenance, check any other trusted primary track in manifest
     for tr in tracks:
-        rel_p = tr.get("relative_path", "")
-        fpath = Path(rel_p) if not Path(rel_p).is_absolute() else Path(rel_p)
-        if not fpath.exists():
-            fpath = Path(music_dir) / tr.get("category", "") / tr.get("filename", "")
-        if not fpath.exists():
-            fpath = Path(music_dir) / "devotional" / tr.get("filename", "")
-        if not fpath.exists():
-            continue
+        if tr.get("source_type") in PRIMARY_SOURCE_TYPES:
+            rel_p = tr.get("relative_path", "")
+            fpath = Path(rel_p) if not Path(rel_p).is_absolute() else Path(rel_p)
+            if not fpath.exists():
+                fpath = Path(music_dir) / tr.get("category", "") / tr.get("filename", "")
+            if not fpath.exists():
+                fpath = Path(music_dir) / "devotional" / tr.get("filename", "")
+            if fpath.exists():
+                ok, _, _ = validate_music_provenance(fpath, manifest_path=manifest_file)
+                if ok:
+                    return fpath, "primary"
 
-        ok, _, tinfo = validate_music_provenance(fpath, manifest_path=manifest_file)
-        if not ok:
-            continue
-
-        cat = tinfo.get("category", "devotional")
-        if cat != category and category != "devotional":
-            continue
-
-        stype = tinfo.get("source_type", "")
-        if stype in PRIMARY_SOURCE_TYPES:
-            primary_candidates.append(fpath)
-        elif stype == "original_generated":
-            fallback_candidates.append(fpath)
-
-    if primary_candidates:
-        return primary_candidates[0], "primary"
-
-    if fallback_candidates:
-        return fallback_candidates[0], "fallback_generated"
-
+    # 4. Fail closed (NEVER automatically select original_generated synthetic tracks)
     return None, "narration_only"
 
 

@@ -384,7 +384,7 @@ class TestOldFormatPipeline(unittest.TestCase):
             self.assertEqual(audio_map_d["bgm_deity"], deity)
             self.assertTrue(Path(audio_map_d["full_narration_audio_file"]).exists())
 
-        # 4. Unknown deity returns no track and fails closed in production mode
+        # 4. Unknown deity falls back to Calcutta Sunset
         unknown_script = {
             "title": "Unrelated Non-Deity Subject",
             "duration_seconds": 30,
@@ -399,9 +399,10 @@ class TestOldFormatPipeline(unittest.TestCase):
             }
         }
         track_unk, _ = select_background_music_v2(category="devotional", script=unknown_script)
-        self.assertIsNone(track_unk)
-        with self.assertRaises(ValueError):
-            generate_voice_mapping(unknown_script, format="old", mode="production")
+        self.assertIsNotNone(track_unk)
+        self.assertIn("Calcutta Sunset", track_unk.name)
+        audio_map_unk = generate_voice_mapping(unknown_script, format="old", mode="production")
+        self.assertTrue(Path(audio_map_unk["full_narration_audio_file"]).exists())
 
     def test_V_youtube_audio_library_rama_integration(self):
         """Verify OLD format video for Rama selects Bhaj Le Ram, receives BGM, and contains no captions or text overlays."""
