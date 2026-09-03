@@ -41,7 +41,8 @@ data/pipeline/*
 data/publishing/*
 data/qa/*
 
-# Keep gitkeep, persistent history file, and canonical test asset plan fixture
+# Keep gitkeep, persistent history file, canonical test asset plan fixture, and devotional audio assets
 !data/publishing_history.json
 !.gitkeep
 !data/visuals/asset_plan_20260814_071510.json
+!assets/music/devotional/*.mp3

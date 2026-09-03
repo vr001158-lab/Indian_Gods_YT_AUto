@@ -233,5 +233,26 @@ def bootstrap():
             assert actual_sha == CANONICAL_MUSIC_SHA256, f"WAV SHA256 mismatch! Got {actual_sha}, expected {CANONICAL_MUSIC_SHA256}"
             print(f"[CI BOOTSTRAP] Canonical WAV created: {mpath}")
 
+    # 4. Verify all registered devotional music assets in assets/music/music_manifest.json
+    manifest_path = Path("assets/music/music_manifest.json")
+    if manifest_path.exists():
+        manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        tracks = manifest_data.get("tracks", [])
+        for track in tracks:
+            rel_path = Path(track.get("relative_path", ""))
+            if not rel_path.exists():
+                raise FileNotFoundError(
+                    f"[CI BOOTSTRAP ERROR] Registered audio asset missing from checkout: {rel_path}. "
+                    "Ensure production audio assets are tracked in Git."
+                )
+            actual_sha = hashlib.sha256(rel_path.read_bytes()).hexdigest()
+            expected_sha = track.get("sha256")
+            if actual_sha != expected_sha:
+                raise ValueError(
+                    f"[CI BOOTSTRAP ERROR] SHA-256 mismatch for {rel_path}: "
+                    f"expected {expected_sha}, got {actual_sha}"
+                )
+        print(f"[CI BOOTSTRAP] All {len(tracks)} registered music assets verified against manifest SHA-256 integrity.")
+
 if __name__ == "__main__":
     bootstrap()
