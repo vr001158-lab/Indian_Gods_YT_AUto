@@ -108,5 +108,17 @@
     "duration_seconds": 28.0,
     "published_at": "20260903_052048",
     "video_file_name": "video_short_20260903_052025.mp4"
+  },
+  {
+    "youtube_video_id": "sCcR41XzSrE",
+    "topic": "Why Ganesha's Mouse Is His Vehicle",
+    "title": "The Sacrifice of Ganesha: The Story of the Broken Tusk",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260903_132911",
+    "video_file_name": "video_short_20260903_132834.mp4"
   }
 ]
