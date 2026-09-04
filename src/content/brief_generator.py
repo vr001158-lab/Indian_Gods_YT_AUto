@@ -163,6 +163,29 @@ _DEITY_BLUEPRINTS = {
 }
 
 
+BLUEPRINT_KEYWORDS = {
+    "shiva": {"snake", "serpent", "vasuki", "neelkanth", "halahala", "poison", "cobra"},
+    "ganesha": {"tusk", "ekadanta", "mahabharata", "vyasa", "broken tusk"},
+}
+
+
+def is_blueprint_topic_matching(topic: str, deity: str) -> bool:
+    """
+    Checks whether a selected_topic semantically matches a pre-built deity profile.
+    Prevents assigning a hardcoded blueprint (e.g. Shiva's Snake) to an unrelated
+    deity topic (e.g. Why Rudraksha Beads Are Worn).
+    """
+    if not topic or not deity:
+        return False
+    d_key = deity.lower().strip()
+    if d_key not in BLUEPRINT_KEYWORDS:
+        return False
+
+    topic_clean = topic.lower()
+    keywords = BLUEPRINT_KEYWORDS[d_key]
+    return any(kw in topic_clean for kw in keywords)
+
+
 def _generate_fallback_brief(topic: str, deity: str, category: str, suggested_angle: str) -> dict:
     """
     Dynamically generates a content brief for any topic not in the pre-built registry.
@@ -279,9 +302,7 @@ def generate_content_brief(decision: dict) -> dict:
     suggested_angle = decision["suggested_angle"]
 
     # Retrieve pre-built or generate fallback brief
-    if deity in _DEITY_BLUEPRINTS:
-        # Check if the topic matches or is similar to our pre-built deity profile
-        # Use pre-built if appropriate, otherwise build fallback
+    if deity in _DEITY_BLUEPRINTS and is_blueprint_topic_matching(topic, deity):
         brief_data = dict(_DEITY_BLUEPRINTS[deity])
     else:
         brief_data = dict(_generate_fallback_brief(topic, deity, category, suggested_angle))

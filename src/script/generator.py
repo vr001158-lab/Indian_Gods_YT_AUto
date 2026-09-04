@@ -334,7 +334,13 @@ def generate_script(brief: dict) -> dict:
     topic = meta["selected_topic"]
     deity = meta.get("deity", "").lower()
 
-    if deity in _DEITY_SCRIPTS and brief["primary_title"] == _DEITY_SCRIPTS[deity]["title"]:
+    from src.content.brief_generator import is_blueprint_topic_matching
+
+    if (
+        deity in _DEITY_SCRIPTS
+        and is_blueprint_topic_matching(topic, deity)
+        and brief["primary_title"] == _DEITY_SCRIPTS[deity]["title"]
+    ):
         script = _DEITY_SCRIPTS[deity]
     else:
         script = _generate_fallback_script(brief)
@@ -388,6 +394,20 @@ def generate_script(brief: dict) -> dict:
         script_data["scene_scripts"] = old_scene_scripts
         script_data["duration_seconds"] = int(round(sum(s["duration_seconds"] for s in old_scene_scripts)))
         script_data["narration"] = f"Music-only devotional video for {script_data.get('title', deity_key)}"
+
+    # Early Validation: Verify generated script title is semantically aligned with selected topic
+    canonical_topic = meta.get("selected_topic", "")
+    script_title = script_data.get("title", "")
+    if canonical_topic and script_title:
+        import re
+        STOP = {"a", "an", "the", "of", "in", "on", "at", "to", "and", "or", "for", "is", "it", "its", "why", "how", "what", "does"}
+        canon_words = {w for w in re.sub(r"[^a-z0-9\s]", " ", canonical_topic.lower()).split() if w not in STOP and len(w) >= 3}
+        title_words = {w for w in re.sub(r"[^a-z0-9\s]", " ", script_title.lower()).split() if w not in STOP and len(w) >= 3}
+        overlap = canon_words & title_words
+        if len(overlap) == 0:
+            raise ValueError(
+                f"❌ Early Safety Gate Rejection: Script title '{script_title}' has no keyword overlap with selected topic '{canonical_topic}'"
+            )
 
     # Validate output schema
     ok_out, err_out = validate_script_output(script_data, content_type=script_data.get("content_type", "short"))

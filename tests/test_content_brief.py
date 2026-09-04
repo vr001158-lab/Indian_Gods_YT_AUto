@@ -280,7 +280,7 @@ class TestContentBriefCLI(unittest.TestCase):
 
     def test_cli_custom_input_works(self):
         custom_dec = Path(self.tmp_dir.name) / "custom_decision.json"
-        custom_dec.write_text(json.dumps(_make_decision(deity="ganesha")), encoding="utf-8")
+        custom_dec.write_text(json.dumps(_make_decision(deity="ganesha", topic="Why Does Lord Ganesha Have a Broken Tusk?")), encoding="utf-8")
 
         with patch("sys.argv", ["run_content_brief.py", "--input", str(custom_dec)]):
             run_content_brief.main()

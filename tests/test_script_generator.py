@@ -328,6 +328,39 @@ class TestScriptCLI(unittest.TestCase):
         saved = list(self.script_dir.glob("script_*.json"))
         self.assertEqual(len(saved), 0)
 
+    def test_rudraksha_beads_topic_propagation(self):
+        """Verify 'Why Rudraksha Beads Are Worn' produces a script title about Rudraksha beads and not Shiva's Snake."""
+        decision = {
+            "approved_for_generation": True,
+            "selected_topic": "Why Rudraksha Beads Are Worn",
+            "score": 85,
+            "confidence": "high",
+            "data_source": "youtube_api",
+            "category": "Stories of deities",
+            "deity": "shiva",
+            "suggested_angle": "The spiritual and physical significance of wearing Rudraksha beads.",
+            "content_gap": "Low competition"
+        }
+        brief = generate_content_brief(decision)
+        self.assertIn("Rudraksha", brief["primary_title"])
+        self.assertNotIn("Snake", brief["primary_title"])
+
+        script = generate_script(brief)
+        self.assertIn("Rudraksha", script["title"])
+        self.assertNotIn("Snake", script["title"])
+        self.assertEqual(script["approval_metadata"]["selected_topic"], "Why Rudraksha Beads Are Worn")
+
+    def test_mismatched_title_early_rejection(self):
+        """Verify an unrelated script title for a given topic triggers early safety gate rejection."""
+        brief = _make_brief(deity="shiva")
+        brief["approval_metadata"]["selected_topic"] = "Why Rudraksha Beads Are Worn"
+        # Manually force primary_title to mismatched Shiva's Snake title
+        brief["primary_title"] = "Secrets of Shiva's Snake: The Mastery Over Ego and Poison"
+
+        with self.assertRaises(ValueError) as ctx:
+            generate_script(brief)
+        self.assertIn("Early Safety Gate Rejection", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
