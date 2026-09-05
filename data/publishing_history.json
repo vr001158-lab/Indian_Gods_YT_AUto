@@ -156,5 +156,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260905_075830",
     "video_file_name": "video_short_20260905_075743.mp4"
+  },
+  {
+    "youtube_video_id": "x6OU36yoSFM",
+    "topic": "Why Rudraksha Beads Are Worn",
+    "title": "Secrets of Shiva: The Story Behind Why Rudraksha Beads Are Worn",
+    "content_type": "long",
+    "experiment_tag": "",
+    "aspect_ratio": "16:9",
+    "resolution": "1920x1080",
+    "duration_seconds": 45.0,
+    "published_at": "20260905_104914",
+    "video_file_name": "video_long_20260905_104849.mp4"
   }
 ]
