@@ -240,9 +240,12 @@ class TestMusicPipelineV2(unittest.TestCase):
             actual_sha256 = hashlib.sha256(rel_path.read_bytes()).hexdigest()
             self.assertEqual(tr["sha256"], actual_sha256, f"SHA256 mismatch for {rel_path}")
 
-            # Validate provenance
+            # Validate provenance according to approval state
             ok, msg, _ = validate_music_provenance(rel_path, manifest_path=MANIFEST_PATH)
-            self.assertTrue(ok, f"Provenance validation failed for {rel_path}: {msg}")
+            if tr.get("approved", False):
+                self.assertTrue(ok, f"Provenance validation failed for approved track {rel_path}: {msg}")
+            else:
+                self.assertFalse(ok, f"Unapproved track {rel_path} unexpectedly passed provenance")
 
             self.assertIn(tr["source_type"], {"original_generated", "youtube_audio_library", "royalty_free_public"})
             self.assertTrue(tr.get("commercial_use", False))
@@ -287,16 +290,14 @@ class TestMusicPipelineV2(unittest.TestCase):
             ok, reason, _ = validate_music_provenance(rel_path, manifest_path=MANIFEST_PATH)
             self.assertTrue(ok, f"Provenance failed for {fn}: {reason}")
 
-        # Verify Rama script MUST map to Bhaj Le Ram
+        # Verify Rama script maps to an approved Rama track
         rama_script = {"title": "Shri Ram Ayodhya Dharshanam", "selected_topic": "Rama"}
         track, stype = select_background_music_v2(category="devotional", script=rama_script)
         self.assertIsNotNone(track)
         self.assertEqual(stype, "primary")
-        self.assertIn("Bhaj Le Ram", track.name)
+        self.assertTrue("Bhaj Le Ram" in track.name or "ram-bhajan" in track.name)
 
         bgm_meta = get_bgm_metadata_for_track(track, script=rama_script)
-        self.assertEqual(bgm_meta["title"], "Bhaj Le Ram - Bhajan (Voice, Sarangi, Tabla)")
-        self.assertIn("Sandeep Das", bgm_meta["artist"])
         self.assertEqual(bgm_meta["deity"], "rama")
 
         # Verify unmapped deity falls back to Calcutta Sunset
@@ -310,31 +311,31 @@ class TestMusicPipelineV2(unittest.TestCase):
         """Verify production music selection priority: Deity-specific trusted track -> Calcutta Sunset -> Fail Closed."""
         from src.audio.music import select_background_music_v2, validate_music_provenance, MANIFEST_PATH
 
-        # A. Ganesha with no deity-specific trusted track -> Calcutta Sunset
+        # A. Ganesha with approved deity-specific trusted Pixabay track -> elijah_k-ganesha-323827.mp3
         ganesha_script = {"title": "Sacrifice of Ganesha", "selected_topic": "ganesha"}
         ganesha_track, stype = select_background_music_v2(category="devotional", script=ganesha_script)
         self.assertIsNotNone(ganesha_track)
-        self.assertIn("Calcutta Sunset", ganesha_track.name)
+        self.assertIn("ganesha", ganesha_track.name.lower())
         self.assertEqual(stype, "primary")
 
-        # B. Rama with Bhaj Le Ram available -> Bhaj Le Ram
+        # B. Rama with approved Rama tracks available -> Bhaj Le Ram / kontraa-ram-bhajan
         rama_script = {"title": "Shri Ram Ayodhya Dharshanam", "selected_topic": "rama"}
         rama_track, r_stype = select_background_music_v2(category="devotional", script=rama_script)
         self.assertIsNotNone(rama_track)
-        self.assertIn("Bhaj Le Ram", rama_track.name)
+        self.assertTrue("Bhaj Le Ram" in rama_track.name or "ram-bhajan" in rama_track.name)
         self.assertEqual(r_stype, "primary")
 
-        # C. Another deity (Shiva / Hanuman / Krishna) -> Calcutta Sunset
-        shiva_script = {"title": "Secrets of Shiva", "selected_topic": "shiva"}
-        shiva_track, s_stype = select_background_music_v2(category="devotional", script=shiva_script)
-        self.assertIsNotNone(shiva_track)
-        self.assertIn("Calcutta Sunset", shiva_track.name)
+        # C. Unmapped deity (Surya) -> Calcutta Sunset fallback
+        surya_script = {"title": "Secrets of Surya", "selected_topic": "surya"}
+        surya_track, s_stype = select_background_music_v2(category="devotional", script=surya_script)
+        self.assertIsNotNone(surya_track)
+        self.assertIn("Calcutta Sunset", surya_track.name)
         self.assertEqual(s_stype, "primary")
 
         # D. Synthetic tracks are NEVER selected by normal production fallback
         self.assertNotIn("original", ganesha_track.name.lower())
         self.assertNotIn("flute", ganesha_track.name.lower())
-        self.assertNotIn("original", shiva_track.name.lower())
+        self.assertNotIn("original", surya_track.name.lower())
 
         # E. If Calcutta Sunset is unavailable or fails provenance validation, fail closed
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -353,6 +354,62 @@ class TestMusicPipelineV2(unittest.TestCase):
             failed_track, failed_stype = select_background_music_v2(category="devotional", music_dir=tmp_music_dir, script=ganesha_script)
             self.assertIsNone(failed_track)
             self.assertEqual(failed_stype, "narration_only")
+
+    def test_13_pixabay_approved_tracks_selection(self):
+        """Verify Pixabay approved tracks can be selected for deity and fallback works."""
+        from src.audio.music import select_background_music_v2
+
+        # Ganesha -> Pixabay approved Ganesha track
+        g_track, g_stype = select_background_music_v2(deity="ganesha")
+        self.assertIsNotNone(g_track)
+        self.assertIn("ganesha-323827", g_track.name)
+        self.assertEqual(g_stype, "primary")
+
+        # Krishna -> Pixabay approved Krishna track
+        k_track, k_stype = select_background_music_v2(deity="krishna")
+        self.assertIsNotNone(k_track)
+        self.assertIn("krishna", k_track.name.lower())
+        self.assertEqual(k_stype, "primary")
+
+        # Unmapped deity -> Calcutta Sunset
+        u_track, u_stype = select_background_music_v2(deity="unmapped_deity_test")
+        self.assertIsNotNone(u_track)
+        self.assertIn("Calcutta Sunset", u_track.name)
+        self.assertEqual(u_stype, "primary")
+
+    def test_14_pixabay_provenance_validation(self):
+        """Verify all Pixabay approved tracks pass hard provenance gate."""
+        from src.audio.music import validate_music_provenance, MANIFEST_PATH
+
+        approved_files = [
+            Path("assets/music/pixabay/elijah_k-ganesha-323827.mp3"),
+            Path("assets/music/pixabay/photowhole22--231281.mp3"),
+            Path("assets/music/pixabay/emand_edroff-om-namah-shivaya-475721.mp3")
+        ]
+        for af in approved_files:
+            self.assertTrue(af.exists())
+            ok, msg, track_info = validate_music_provenance(af, manifest_path=MANIFEST_PATH)
+            self.assertTrue(ok, f"Provenance validation failed for {af}: {msg}")
+
+    def test_15_pixabay_credits_generation(self):
+        """Verify automated YouTube description credits formatting from manifest metadata."""
+        from src.audio.music import get_bgm_credit_for_track
+
+        # Cert-backed track with URL
+        ganesha_track = Path("assets/music/pixabay/elijah_k-ganesha-323827.mp3")
+        credit = get_bgm_credit_for_track(ganesha_track)
+        self.assertIsNotNone(credit)
+        self.assertIn("Music: Ganesha", credit)
+        self.assertIn("Artist: elijah_k", credit)
+        self.assertIn("Source: Pixabay", credit)
+        self.assertIn("URL: https://pixabay.com/music/india-ganesha-323827/", credit)
+
+        # Cert-less track with Hindi title (photowhole22)
+        photowhole_track = Path("assets/music/pixabay/photowhole22--231281.mp3")
+        pw_credit = get_bgm_credit_for_track(photowhole_track)
+        self.assertIsNotNone(pw_credit)
+        self.assertIn("Photowhole22", pw_credit)
+        self.assertIn("Pixabay", pw_credit)
 
 
 if __name__ == "__main__":

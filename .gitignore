@@ -46,3 +46,4 @@ data/qa/*
 !.gitkeep
 !data/visuals/asset_plan_20260814_071510.json
 !assets/music/devotional/*.mp3
+!assets/music/pixabay/*.mp3

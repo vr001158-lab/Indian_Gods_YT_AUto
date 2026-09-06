@@ -43,6 +43,8 @@ DEITY_ALIASES: dict[str, list[str]] = {
 # Curated Deity -> Song Catalog (Metadata + Approved Assets)
 DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
     "shiva": [
+        {"title": "Om Namah Shivaya", "artist": "emand_edroff", "audio_file": "assets/music/pixabay/emand_edroff-om-namah-shivaya-475721.mp3"},
+        {"title": "Har Har Bhole Shiv Shambhu", "artist": "kalsstockmedia", "audio_file": "assets/music/pixabay/kalsstockmedia-free-soul-short-har-har-bhole-shiv-shambhu-503765.mp3"},
         {"title": "Shiva Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/shiva_devotional_shivaranjani_flute.wav"},
         {"title": "Namo Namo", "artist": "Amit Trivedi", "audio_file": None},
         {"title": "Shiv Tandav Stotram", "artist": "Ravana / Various Artists", "audio_file": None},
@@ -51,6 +53,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Shiv Sama Rahe", "artist": "Hansraj Raghuwanshi", "audio_file": None},
     ],
     "hanuman": [
+        {"title": "Partial Short Hanuman Chalisa Fast Version", "artist": "kalsstockmedia", "audio_file": "assets/music/pixabay/kalsstockmedia-partial-short-hanuman-chalisa-fast-version-512080.mp3"},
         {"title": "Hanuman Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/hanuman_devotional_original.mp3"},
         {"title": "Shree Hanuman Chalisa", "artist": "Hariharan", "audio_file": None},
         {"title": "Sankatmochan Hanuman Ashtak", "artist": "Hariharan", "audio_file": None},
@@ -59,6 +62,10 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Raghunandana (From \"HanuMan\")", "artist": "GowraHari, Saicharan Bhaskaruni, Lokeshwar Edara, Harshavardhan Chavali", "audio_file": None},
     ],
     "krishna": [
+        {"title": "Indian Hindu Krishna Music", "artist": "krasnoshchok", "audio_file": "assets/music/pixabay/krasnoshchok-indian-hindu-krishna-music-429048.mp3"},
+        {"title": "Krishna Flute Hindu Music", "artist": "krasnoshchok", "audio_file": "assets/music/pixabay/krasnoshchok-krishna-flute-hindu-music-450217.mp3"},
+        {"title": "Indian Hindu Krishna Music", "artist": "maksymmalko", "audio_file": "assets/music/pixabay/maksymmalko-indian-hindu-krishna-music-432726.mp3"},
+        {"title": "Radhe Krishna Geet", "artist": "Photowhole22", "audio_file": "assets/music/pixabay/photowhole22--231281.mp3"},
         {"title": "Krishna Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/krishna_devotional_original.mp3"},
         {"title": "Shri Krishna Govind Hare Murari", "artist": "Jubin Nautiyal / Simpal Kharel", "audio_file": None},
         {"title": "Tum Prem Ho (Reprise)", "artist": "Mohit Lalwani & Bharat Kamal", "audio_file": None},
@@ -68,6 +75,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
     ],
     "rama": [
         {"title": "Bhaj Le Ram - Bhajan (Voice, Sarangi, Tabla)", "artist": "Sandeep Das, Ujjwal Sahani, Aneesh Mishra", "audio_file": "assets/music/devotional/Bhaj Le Ram - Bhajan (Voice, Sarangi, Tabla) - Sandeep Das,  Ujjwal Sahani,  Aneesh Mishra.mp3"},
+        {"title": "Ram Bhajan - Hindu Festive Music", "artist": "kontraa", "audio_file": "assets/music/pixabay/kontraa-ram-bhajan-hindu-festive-music-446987.mp3"},
         {"title": "Rama Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/rama_devotional_original.mp3"},
         {"title": "Ram Siya Ram", "artist": "Sachet Tandon & Parampara Tandon", "audio_file": None},
         {"title": "Mangal Bhavan Amangal Hari", "artist": "Ravindra Jain", "audio_file": None},
@@ -76,6 +84,7 @@ DEITY_SONG_CATALOG: dict[str, list[dict[str, Any]]] = {
         {"title": "Bharat Ka Bacha Bacha Jai Shree Ram Bolega", "artist": "Devendra Pathak", "audio_file": None},
     ],
     "ganesha": [
+        {"title": "Ganesha", "artist": "elijah_k", "audio_file": "assets/music/pixabay/elijah_k-ganesha-323827.mp3"},
         {"title": "Ganesha Original Devotional", "artist": "Acoustic Modal Synthesizer", "audio_file": "assets/music/devotional/ganesha_devotional_original.mp3"},
         {"title": "Sukhkarta Dukhharta", "artist": "Lata Mangeshkar", "audio_file": None},
         {"title": "Deva Shree Ganesha", "artist": "Ajay-Atul & Ajay Gogavale", "audio_file": None},
@@ -347,7 +356,7 @@ def select_background_music_v2(
 
         if primary_deity_candidates:
             if script and isinstance(script, dict) and script.get("title"):
-                idx = sum(ord(c) for c in script["title"]) % len(primary_deity_candidates)
+                idx = int(hashlib.sha256(script["title"].encode("utf-8")).hexdigest(), 16) % len(primary_deity_candidates)
                 return primary_deity_candidates[idx], "primary"
             return primary_deity_candidates[0], "primary"
 
@@ -459,3 +468,37 @@ def select_background_music(
     """
     track, _ = select_background_music_v2(category=category, music_dir=music_dir)
     return track
+
+
+def get_bgm_credit_for_track(
+    track_path: Path | str | None,
+    manifest_path: str | Path = MANIFEST_PATH,
+) -> str | None:
+    """
+    Returns automated YouTube description credit text for a selected BGM track.
+    Reads from music_manifest.json if available. Returns None if track is None or uncredited.
+    """
+    if not track_path:
+        return None
+
+    tp = Path(track_path)
+    manifest = load_music_manifest(manifest_path)
+
+    for tr in manifest.get("tracks", []):
+        tr_rel = tr.get("relative_path", "").replace("\\", "/")
+        tr_name = tr.get("filename", "")
+        if tr_rel == str(tp.as_posix()) or tr_name == tp.name:
+            if tr.get("credit"):
+                return tr["credit"]
+
+            title = tr.get("track_name", song_title_from_filename(tp.name))
+            artist = tr.get("artist") or tr.get("source", "Royalty-Free Artist")
+            source = tr.get("copyright_source") or tr.get("source", "Public Domain / License")
+            url = tr.get("source_url")
+
+            lines = [f"Music: {title}", f"Artist: {artist}", f"Source: {source}"]
+            if url and not url.startswith("internal://"):
+                lines.append(f"URL: {url}")
+            return "\n".join(lines)
+
+    return f"Music: {song_title_from_filename(tp.name)}"
