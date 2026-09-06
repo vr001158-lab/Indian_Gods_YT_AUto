@@ -168,5 +168,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260905_104914",
     "video_file_name": "video_long_20260905_104849.mp4"
+  },
+  {
+    "youtube_video_id": "QxQopRtT5PY",
+    "topic": "Why Rama Drew His Bow",
+    "title": "Secrets of Rama: The Story Behind Why Rama Drew His Bow",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260906_081555",
+    "video_file_name": "video_short_20260906_081518.mp4"
   }
 ]
