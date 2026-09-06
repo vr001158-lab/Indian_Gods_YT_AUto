@@ -180,5 +180,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260906_081555",
     "video_file_name": "video_short_20260906_081518.mp4"
+  },
+  {
+    "youtube_video_id": "czgItgOzHS4",
+    "topic": "Why Lakshmi Chooses the Lotus",
+    "title": "Secrets of Lakshmi: The Story Behind Why Lakshmi Chooses the Lotus",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260906_162627",
+    "video_file_name": "video_short_20260906_162541.mp4"
   }
 ]
