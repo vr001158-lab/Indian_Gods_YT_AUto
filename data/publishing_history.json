@@ -204,5 +204,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260907_084810",
     "video_file_name": "video_short_20260907_084734.mp4"
+  },
+  {
+    "youtube_video_id": "uu-1VeAYAPY",
+    "topic": "Why Nandi Guards Kailash",
+    "title": "Secrets of Shiva: The Story Behind Why Nandi Guards Kailash",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 125.44,
+    "published_at": "20260907_100143",
+    "video_file_name": "video_short_20260907_100006.mp4"
   }
 ]
