@@ -228,5 +228,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260908_083009",
     "video_file_name": "video_short_20260908_082922.mp4"
+  },
+  {
+    "youtube_video_id": "jjAOaOAOEEo",
+    "topic": "Why Parvati Performed Severe Tapas for Shiva",
+    "title": "Secrets of Parvati: The Story Behind Why Parvati Performed Severe Tapas for Shiva",
+    "content_type": "long",
+    "experiment_tag": "",
+    "aspect_ratio": "16:9",
+    "resolution": "1920x1080",
+    "duration_seconds": 45.0,
+    "published_at": "20260908_113321",
+    "video_file_name": "video_long_20260908_113255.mp4"
   }
 ]
