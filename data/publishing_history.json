@@ -276,5 +276,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260910_083333",
     "video_file_name": "video_short_20260910_083252.mp4"
+  },
+  {
+    "youtube_video_id": "NfMUsHvcs78",
+    "topic": "Why Temple Lamps Stay Lit Overnight",
+    "title": "Secrets of Traditions: The Story Behind Why Temple Lamps Stay Lit Overnight",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 129.48,
+    "published_at": "20260910_092734",
+    "video_file_name": "video_short_20260910_092626.mp4"
   }
 ]
