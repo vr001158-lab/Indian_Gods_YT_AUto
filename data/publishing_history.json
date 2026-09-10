@@ -264,5 +264,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260909_171627",
     "video_file_name": "video_short_20260909_171551.mp4"
+  },
+  {
+    "youtube_video_id": "V_kfIaLzs64",
+    "topic": "Why Garuda Is Vishnu's Eternal Vahana",
+    "title": "Secrets of Garuda: The Story Behind Why Garuda Is Vishnu's Eternal Vahana",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260910_083333",
+    "video_file_name": "video_short_20260910_083252.mp4"
   }
 ]
