@@ -288,5 +288,17 @@
     "duration_seconds": 129.48,
     "published_at": "20260910_092734",
     "video_file_name": "video_short_20260910_092626.mp4"
+  },
+  {
+    "youtube_video_id": "ALiGSIuugRE",
+    "topic": "Why Kalabhairava Guards the Sacred City of Kashi",
+    "title": "Secrets of Shiva: The Story Behind Why Kalabhairava Guards the Sacred City of Kashi",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260911_082804",
+    "video_file_name": "video_short_20260911_082736.mp4"
   }
 ]
