@@ -300,5 +300,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260911_082804",
     "video_file_name": "video_short_20260911_082736.mp4"
+  },
+  {
+    "youtube_video_id": "PZNC6k4e0Fc",
+    "topic": "Why Hanuman Ate the Sun Thinking It Was a Fruit",
+    "title": "Secrets of Hanuman: The Story Behind Why Hanuman Ate the Sun Thinking It Was a Fruit",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260911_170752",
+    "video_file_name": "video_short_20260911_170717.mp4"
   }
 ]
