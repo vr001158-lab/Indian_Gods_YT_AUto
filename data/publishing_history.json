@@ -324,5 +324,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260912_081626",
     "video_file_name": "video_short_20260912_081557.mp4"
+  },
+  {
+    "youtube_video_id": "6NLYva1wyoc",
+    "topic": "Why Yamraj Rides a Buffalo and Holds the Noose",
+    "title": "Secrets of Yama: The Story Behind Why Yamraj Rides a Buffalo and Holds the Noose",
+    "content_type": "long",
+    "experiment_tag": "",
+    "aspect_ratio": "16:9",
+    "resolution": "1920x1080",
+    "duration_seconds": 45.0,
+    "published_at": "20260912_110137",
+    "video_file_name": "video_long_20260912_110112.mp4"
   }
 ]
