@@ -348,5 +348,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260913_084116",
     "video_file_name": "video_short_20260913_084040.mp4"
+  },
+  {
+    "youtube_video_id": "_JsAEtIvcDw",
+    "topic": "Why Kubera Is the Treasurer of the Devas",
+    "title": "Secrets of Kubera: The Story Behind Why Kubera Is the Treasurer of the Devas",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260913_170350",
+    "video_file_name": "video_short_20260913_170310.mp4"
   }
 ]
