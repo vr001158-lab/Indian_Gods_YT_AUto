@@ -336,5 +336,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260912_110137",
     "video_file_name": "video_long_20260912_110112.mp4"
+  },
+  {
+    "youtube_video_id": "jp-wbQ6F1as",
+    "topic": "Why Lord Dattatreya Has Three Heads and Four Dogs",
+    "title": "Secrets of Dattatreya: The Story Behind Why Lord Dattatreya Has Three Heads and Four Dogs",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260913_084116",
+    "video_file_name": "video_short_20260913_084040.mp4"
   }
 ]
