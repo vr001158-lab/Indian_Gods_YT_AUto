@@ -372,5 +372,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260914_092606",
     "video_file_name": "video_short_20260914_092536.mp4"
+  },
+  {
+    "youtube_video_id": "ja5rj7JfXQ8",
+    "topic": "Why Ayodhya Is Called Rama's Birthplace",
+    "title": "Secrets of Rama: The Story Behind Why Ayodhya Is Called Rama's Birthplace",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 130.12,
+    "published_at": "20260914_102418",
+    "video_file_name": "video_short_20260914_102320.mp4"
   }
 ]
