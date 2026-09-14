@@ -360,5 +360,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260913_170350",
     "video_file_name": "video_short_20260913_170310.mp4"
+  },
+  {
+    "youtube_video_id": "_69Zb7pcAQM",
+    "topic": "Why Hanuman Crossed the Ocean",
+    "title": "Secrets of Hanuman: The Story Behind Why Hanuman Crossed the Ocean",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260914_092606",
+    "video_file_name": "video_short_20260914_092536.mp4"
   }
 ]
