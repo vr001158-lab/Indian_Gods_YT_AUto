@@ -396,5 +396,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260915_090712",
     "video_file_name": "video_short_20260915_090645.mp4"
+  },
+  {
+    "youtube_video_id": "8YXM4jMa9IE",
+    "topic": "Why Saraswati Holds the Veena and Sacred Book",
+    "title": "Secrets of Saraswati: The Story Behind Why Saraswati Holds the Veena and Sacred Book",
+    "content_type": "long",
+    "experiment_tag": "",
+    "aspect_ratio": "16:9",
+    "resolution": "1920x1080",
+    "duration_seconds": 45.0,
+    "published_at": "20260915_115741",
+    "video_file_name": "video_long_20260915_115711.mp4"
   }
 ]
