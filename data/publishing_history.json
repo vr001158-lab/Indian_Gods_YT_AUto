@@ -408,5 +408,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260915_115741",
     "video_file_name": "video_long_20260915_115711.mp4"
+  },
+  {
+    "youtube_video_id": "Pc6geR4pPpU",
+    "topic": "Why Surya Dev Rides a Chariot of Seven Horses",
+    "title": "Secrets of Surya: The Story Behind Why Surya Dev Rides a Chariot of Seven Horses",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260916_085934",
+    "video_file_name": "video_short_20260916_085858.mp4"
   }
 ]
