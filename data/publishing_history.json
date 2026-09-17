@@ -420,5 +420,17 @@
     "duration_seconds": 45.0,
     "published_at": "20260916_085934",
     "video_file_name": "video_short_20260916_085858.mp4"
+  },
+  {
+    "youtube_video_id": "zzFdRAMSYp0",
+    "topic": "Why Goddess Durga Has Ten Arms",
+    "title": "Secrets of Durga: The Story Behind Why Goddess Durga Has Ten Arms",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20260917_090418",
+    "video_file_name": "video_short_20260917_090335.mp4"
   }
 ]
