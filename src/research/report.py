@@ -367,6 +367,530 @@ SUGGESTED_TOPICS = [
             "fury — symbolizing unmanifest consciousness restraining pure active power."
         ),
     },
+    # ── Expanded Fresh Devotional Topics (Phase 2L+) ─────────────────────────
+    {
+        "topic":           "The Cosmic Mystery of Nataraja Shiva Dance of Creation",
+        "category":        "Symbolism",
+        "deity":           "shiva",
+        "suggested_angle": (
+            "Ananda Tandava is not merely a dance — the drum, flame, and dwarf demon "
+            "encapsulate the five cosmic activities of creation, preservation, and dissolution."
+        ),
+    },
+    {
+        "topic":           "Why Lord Shiva Applies Sacred Ash Bhasma on His Entire Body",
+        "category":        "Traditions",
+        "deity":           "shiva",
+        "suggested_angle": (
+            "Vibhuti signifies the impermanence of mortal existence — Shiva teaches devotees "
+            "to burn ignorance and wear detachment as their greatest ornament."
+        ),
+    },
+    {
+        "topic":           "The Legend of Somnath The First Jyotirlinga and Chandra Penance",
+        "category":        "Historical/religious places",
+        "deity":           "shiva",
+        "suggested_angle": (
+            "Why the Moon God prayed at Prabhas Patan to cure Daksha's curse, establishing "
+            "the indestructible shrine of eternal devotion."
+        ),
+    },
+    {
+        "topic":           "Why Lord Shiva Holds the Damru and Creation of Sounds",
+        "category":        "Symbolism",
+        "deity":           "shiva",
+        "suggested_angle": (
+            "The hourglass beats of Shiva's damru birthed the Maheshwara Sutras — the primordial "
+            "sound frequencies that formed the foundation of sacred language."
+        ),
+    },
+    {
+        "topic":           "The Mystery of Kedarnath Temple Surviving Himalayan Flood",
+        "category":        "Historical/religious places",
+        "deity":           "shiva",
+        "suggested_angle": (
+            "How the divine Bhim Shila boulder sheltered Kedarnath during the deluge, revealing "
+            "the spiritual resilience anchored in ancient Himalayan devotion."
+        ),
+    },
+    {
+        "topic":           "Why Lord Shiva Manifested as Ardhanarishvara Half Man Half Woman",
+        "category":        "Stories of deities",
+        "deity":           "shiva",
+        "suggested_angle": (
+            "Prakriti and Purusha united in one divine form — demonstrating that creation "
+            "is impossible without complete equality of masculine and feminine energies."
+        ),
+    },
+    {
+        "topic":           "The Story of Markandeya How Shiva Defeated Death",
+        "category":        "Stories of deities",
+        "deity":           "shiva",
+        "suggested_angle": (
+            "Kalantaka Shiva emerging from the Lingam to save young Markandeya from Yama's noose, "
+            "showing that true devotion conquers mortal destiny."
+        ),
+    },
+    {
+        "topic":           "The Sacred Meaning of Crescent Moon on Lord Shiva Head",
+        "category":        "Symbolism",
+        "deity":           "shiva",
+        "suggested_angle": (
+            "Chandrashekhara adorned with the growing moon symbolizes control of the fluctuating mind "
+            "and cosmic time cycle held peacefully on the crown."
+        ),
+    },
+    {
+        "topic":           "The Story of Matsya Avatar How Vishnu Saved the Vedas",
+        "category":        "Hindu mythology",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "Vishnu's first incarnation as the golden horned fish guiding Manu's boat through the great cosmic deluge "
+            "to protect the seeds of creation."
+        ),
+    },
+    {
+        "topic":           "Why Lord Vishnu Manifested as Kurma the Giant Tortoise",
+        "category":        "Hindu mythology",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "The cosmic tortoise bearing the crushing weight of Mount Mandara teaches the virtue of unshakeable "
+            "patience when storms churn our lives."
+        ),
+    },
+    {
+        "topic":           "The Secret of Varaha Avatar Rescuing Mother Earth",
+        "category":        "Stories of deities",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "Why the boar incarnation dived into the primordial abyss to rescue Bhudevi from Hiranyaksha's grip, "
+            "restoring universal dharma."
+        ),
+    },
+    {
+        "topic":           "How Vamana Avatar Humbled King Mahabali in Three Steps",
+        "category":        "Hindu mythology",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "Trivikrama measuring earth and heavens in two strides and placing the third on Mahabali's head, "
+            "transforming ego into selfless surrender."
+        ),
+    },
+    {
+        "topic":           "The Miracle of Gajendra Moksha Why Vishnu Saved an Elephant",
+        "category":        "Stories of deities",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "The king of elephants calling out 'Narayana' in agony as Makara grips him, proving God rushes "
+            "without delay to true sincere surrender."
+        ),
+    },
+    {
+        "topic":           "The Legend of Mohini Avatar How Vishnu Tricked Asuras",
+        "category":        "Hindu mythology",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "The enchanting divine form that distributed the nectar of immortality to the devas, showing wisdom "
+            "protects righteousness when brute force fails."
+        ),
+    },
+    {
+        "topic":           "The Mystery of Vaikuntha The Supreme Abode of Narayana",
+        "category":        "Spiritual history",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "Vaikuntha is the realm free from anxiety, sorrow, and time — we explore the spiritual geography "
+            "described in the Bhagavata Purana."
+        ),
+    },
+    {
+        "topic":           "Why Krishna Stole Butter as Makhan Chor Hidden Lesson",
+        "category":        "Stories of deities",
+        "deity":           "krishna",
+        "suggested_angle": (
+            "Stealing butter is not childhood mischief — freshly churned butter represents the purified, tender heart "
+            "of the devotee that Krishna steals away with love."
+        ),
+    },
+    {
+        "topic":           "How Krishna Subdued Kaliya the Giant Water Serpent",
+        "category":        "Hindu mythology",
+        "deity":           "krishna",
+        "suggested_angle": (
+            "Dancing upon the multi-headed snake in Yamuna's waters teaches the neutralization of toxic thoughts "
+            "through joyous spiritual grace."
+        ),
+    },
+    {
+        "topic":           "The Deep Meaning of Krishna Vishwaroopam Cosmic Form",
+        "category":        "Spiritual history",
+        "deity":           "krishna",
+        "suggested_angle": (
+            "The revelation on Kurukshetra battlefield showing all galaxies, gods, and warriors entering Krishna's fiery mouth, "
+            "revealing the oneness of cosmic time."
+        ),
+    },
+    {
+        "topic":           "The Unbreakable Friendship of Krishna and Poor Brahmin Sudama",
+        "category":        "Stories of deities",
+        "deity":           "krishna",
+        "suggested_angle": (
+            "Sudama offering dry flattened rice and Krishna washing his dusty feet, establishing that pure devotion "
+            "outweighs all material riches."
+        ),
+    },
+    {
+        "topic":           "Why Lord Krishna Wears a Peacock Feather on His Crown",
+        "category":        "Symbolism",
+        "deity":           "krishna",
+        "suggested_angle": (
+            "The peacock offering its molted plumes in ecstasy to Krishna represents beauty unattached to vanity, "
+            "borne effortlessly by the divine."
+        ),
+    },
+    {
+        "topic":           "The Sacred Mystery of Raas Leela Pure Soul Devotion",
+        "category":        "Spiritual history",
+        "deity":           "krishna",
+        "suggested_angle": (
+            "Krishna multiplying himself to dance beside every Gopi in Vrindavan is the allegory of the Divine "
+            "communing with every individual soul simultaneously."
+        ),
+    },
+    {
+        "topic":           "How Lord Krishna Protected Draupadi in Royal Assembly",
+        "category":        "Stories of deities",
+        "deity":           "krishna",
+        "suggested_angle": (
+            "The miraculous endless stream of cloth when Draupadi raised both hands in total surrender, "
+            "demonstrating infallible protection for the helpless."
+        ),
+    },
+    {
+        "topic":           "The Sacred Story of Shabri Berries Pure Heart Devotion",
+        "category":        "Stories of deities",
+        "deity":           "rama",
+        "suggested_angle": (
+            "Rama gladly tasting half-eaten wild berries from an elderly tribal devotee teaches that love transcends "
+            "all ritual formalities."
+        ),
+    },
+    {
+        "topic":           "How Jatayu Fought Ravana to Protect Devi Sita",
+        "category":        "Hindu mythology",
+        "deity":           "rama",
+        "suggested_angle": (
+            "The noble vulture fighting to his dying breath against the demon king embodies the supreme duty "
+            "of standing for dharma even when outmatched."
+        ),
+    },
+    {
+        "topic":           "The Mystery of Floating Stones of Ram Setu Across Sea",
+        "category":        "Historical/religious places",
+        "deity":           "rama",
+        "suggested_angle": (
+            "Writing the sacred name of Rama on ocean rocks and building the divine bridge between Rameshwaram and Lanka, "
+            "where faith overrules gravity."
+        ),
+    },
+    {
+        "topic":           "How Kevat the Boatman Washed Rama Feet Before River Crossing",
+        "category":        "Stories of deities",
+        "deity":           "rama",
+        "suggested_angle": (
+            "The humble boatman requesting to wash Rama's feet fearing his dust might turn his wooden boat into a woman like Ahalya, "
+            "a masterclass in sweet devotion."
+        ),
+    },
+    {
+        "topic":           "Why Lord Rama Accepted Fourteen Years Exile Without Hesitation",
+        "category":        "Spiritual history",
+        "deity":           "rama",
+        "suggested_angle": (
+            "Maryada Purushottama smiling serenely when informed of his exile, demonstrating that upholding a father's pledge "
+            "is far greater than earthly sovereignty."
+        ),
+    },
+    {
+        "topic":           "The Lesson of Golden Deer Why Illusion Traps the Mind",
+        "category":        "Stories of deities",
+        "deity":           "rama",
+        "suggested_angle": (
+            "Maricha's deceitful sparkling form pulling Rama away warns how worldly attractions lure spiritual seekers "
+            "out of their protected boundaries."
+        ),
+    },
+    {
+        "topic":           "How Hanuman Carried Dronagiri Mountain for Sanjeevani Herb",
+        "category":        "Hindu mythology",
+        "deity":           "hanuman",
+        "suggested_angle": (
+            "Unable to recognize the life-giving herb in darkness, Hanuman lifted the entire mountain on his palm, "
+            "proving devotion solves problems with limitless courage."
+        ),
+    },
+    {
+        "topic":           "Why Hanuman Tore His Chest to Reveal Rama and Sita Inside",
+        "category":        "Symbolism",
+        "deity":           "hanuman",
+        "suggested_angle": (
+            "When gifted a priceless pearl necklace, Hanuman cracked pearls with his teeth looking for Rama, "
+            "then ripped open his chest to show they live in his heart."
+        ),
+    },
+    {
+        "topic":           "The Mystery of Panchamukhi Hanuman Five Faces and Weapons",
+        "category":        "Symbolism",
+        "deity":           "hanuman",
+        "suggested_angle": (
+            "The five faces (Monkey, Lion, Eagle, Boar, Horse) extinguish five lamps at once to slay Ahiravana in Patala, "
+            "symbolizing total protection in five directions."
+        ),
+    },
+    {
+        "topic":           "How Hanuman Set Golden Lanka on Fire with Burning Tail",
+        "category":        "Hindu mythology",
+        "deity":           "hanuman",
+        "suggested_angle": (
+            "Ravana lighting cloth on Hanuman's tail turned into the fiery demise of Lanka's pride, showing pride "
+            "always generates the spark of its own undoing."
+        ),
+    },
+    {
+        "topic":           "The Humility of Hanuman Writing Ramayana on Mountain Rocks",
+        "category":        "Stories of deities",
+        "deity":           "hanuman",
+        "suggested_angle": (
+            "Hanuman carving the Hanumad Ramayana on rocks with his claws and discarding it into the sea so Valmiki's work "
+            "would be celebrated without competition."
+        ),
+    },
+    {
+        "topic":           "Why Hanuman Forgotten Powers Were Awakened by Jambavan",
+        "category":        "Hindu mythology",
+        "deity":           "hanuman",
+        "suggested_angle": (
+            "Cursed as a child to forget his strength until reminded by wise elders, teaching that every soul holds divine "
+            "strength waiting for a spiritual catalyst."
+        ),
+    },
+    {
+        "topic":           "Why Lord Ganesha Is Always Worshipped First in Every Ritual",
+        "category":        "Traditions",
+        "deity":           "ganesha",
+        "suggested_angle": (
+            "The divine boon granting Ganesha Prathama Pujya status ensures that wisdom and obstacle-clearing precede "
+            "all earthly and spiritual endeavors."
+        ),
+    },
+    {
+        "topic":           "The Story of Lord Ganesha and Kubera Endless Feast",
+        "category":        "Stories of deities",
+        "deity":           "ganesha",
+        "suggested_angle": (
+            "Ganesha eating all the food in Kubera's golden palace and demanding more, teaching the wealthy treasurer "
+            "that pride cannot satisfy divine truth."
+        ),
+    },
+    {
+        "topic":           "Why Ganesha Loves Modak Sweet and Durva Grass Blades",
+        "category":        "Traditions",
+        "deity":           "ganesha",
+        "suggested_angle": (
+            "The Anandam sweet representing spiritual bliss and the humble 21 blades of Durva grass cooling the heat of worldly desires, "
+            "symbolizing inner peace."
+        ),
+    },
+    {
+        "topic":           "The Legend of Chandra Curse Why Ganesha Punished the Moon",
+        "category":        "Hindu mythology",
+        "deity":           "ganesha",
+        "suggested_angle": (
+            "Chandra laughing at Ganesha stumbling on Chaturthi led to the curse that vanity causes waxing and waning, "
+            "warning against arrogance."
+        ),
+    },
+    {
+        "topic":           "How Ganesha Won the Race of the Universe Circling Parents",
+        "category":        "Stories of deities",
+        "deity":           "ganesha",
+        "suggested_angle": (
+            "While Kartikeya flew on his peacock around the globe, Ganesha circled Shiva and Parvati, teaching that honoring "
+            "parents encompasses the entire universe."
+        ),
+    },
+    {
+        "topic":           "Why Tirupati Balaji Laddu Prasadam Has Miraculous Secret",
+        "category":        "Traditions",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "The 300-year culinary tradition of the Tirupati Potu kitchen producing blessed laddus with cardamom and pure ghee, "
+            "a divine token of Venkateswara grace."
+        ),
+    },
+    {
+        "topic":           "The Divine Marriage of Srinivasa and Goddess Padmavathi",
+        "category":        "Stories of deities",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "The celestial wedding at Narayanavanam fulfilling Sage Bhrigu's quest, and why Lord Venkateswara settled eternally "
+            "on the Seven Hills."
+        ),
+    },
+    {
+        "topic":           "The Secret Behind Continuous Moisture on Tirumala Balaji Idol",
+        "category":        "Historical/religious places",
+        "deity":           "vishnu",
+        "suggested_angle": (
+            "The sanctum mystery of the stone deity maintaining living body temperature and radiating cool mist amidst burning lamps, "
+            "a wonder of Tirumala."
+        ),
+    },
+    {
+        "topic":           "The Miracle of Manikandan Bringing Tigress Milk to Palace",
+        "category":        "Stories of deities",
+        "deity":           "ayyappa",
+        "suggested_angle": (
+            "Young Manikandan riding fearlessly on a fierce tigress back to the kingdom, fulfilling his mission and proving his divine "
+            "descent as Lord Ayyappa."
+        ),
+    },
+    {
+        "topic":           "The Spiritual Meaning of 18 Sacred Gold Steps at Sabarimala",
+        "category":        "Symbolism",
+        "deity":           "ayyappa",
+        "suggested_angle": (
+            "The Pathinettam Padi climbing toward the sanctum represents conquering five senses, eight raggas, three gunas, and ignorance."
+        ),
+    },
+    {
+        "topic":           "The Mystery of Makara Jyothi Celestial Light at Sabarimala",
+        "category":        "Historical/religious places",
+        "deity":           "ayyappa",
+        "suggested_angle": (
+            "The divine star Sirius Makara Sankranti alignment over Ponrambalamedu where lakhs of pilgrims cry Swamiye Saranam Ayyappa in ecstasy."
+        ),
+    },
+    {
+        "topic":           "Why Sabarimala Pilgrims Observe 41 Days of Strict Vratam",
+        "category":        "Traditions",
+        "deity":           "ayyappa",
+        "suggested_angle": (
+            "The Mandalam penance of wearing black, walking barefoot, and seeing every fellow pilgrim as God itself, "
+            "dissolving social distinctions."
+        ),
+    },
+    {
+        "topic":           "Why Lord Murugan Holds the Invincible Vel Spear of Wisdom",
+        "category":        "Symbolism",
+        "deity":           "kartikeya",
+        "suggested_angle": (
+            "The sharp spear bestowed by Goddess Parvati represents Jnana Shakti — broad, deep, and sharp wisdom that slays the demon of ignorance."
+        ),
+    },
+    {
+        "topic":           "The Fierce Battle of Soorasamharam and Triumph of Murugan",
+        "category":        "Hindu mythology",
+        "deity":           "kartikeya",
+        "suggested_angle": (
+            "Murugan splitting the giant mango tree demon Soorapadman into a loyal peacock vahana and cock flag, turning darkness into devotion."
+        ),
+    },
+    {
+        "topic":           "Why Kartikeya Renounced All Possessions and Settled at Palani",
+        "category":        "Historical/religious places",
+        "deity":           "kartikeya",
+        "suggested_angle": (
+            "Dandaayudhapani standing with staff and loincloth atop Palani hill, reminding humanity that the fruit of supreme wisdom "
+            "lies beyond material titles."
+        ),
+    },
+    {
+        "topic":           "The Eight Divine Forms of Ashta Lakshmi and Their Secrets",
+        "category":        "Symbolism",
+        "deity":           "lakshmi",
+        "suggested_angle": (
+            "Wealth is not just currency — Adi, Dhanya, Dhairya, Gaja, Santana, Vijaya, Vidya, and Dhana Lakshmi embody "
+            "holistic universal prosperity."
+        ),
+    },
+    {
+        "topic":           "How Goddess Durga Slain Mahishasura in Nine Sacred Nights",
+        "category":        "Stories of deities",
+        "deity":           "durga",
+        "suggested_angle": (
+            "Formed by the combined radiance of all Devas to eliminate the shapeshifting buffalo demon, celebrating the triumph "
+            "of light over cosmic chaos."
+        ),
+    },
+    {
+        "topic":           "Why Goddess Saraswati Wears Pure White Attire and Veena",
+        "category":        "Symbolism",
+        "deity":           "saraswati",
+        "suggested_angle": (
+            "The spotless white sari represents unblemished pure intellect, while tuning the veena strings symbolizes disciplining the mind's thoughts."
+        ),
+    },
+    {
+        "topic":           "The Story of Sati Sacrifice and Creation of 51 Shakti Peethas",
+        "category":        "Historical/religious places",
+        "deity":           "parvati",
+        "suggested_angle": (
+            "Sati giving up her body at Daksha's Yajna and Vishnu's Sudarshana Chakra consecrating her limbs across the Indian subcontinent "
+            "as sacred power centers."
+        ),
+    },
+    {
+        "topic":           "Why Goddess Annapurna Fed Shiva in Varanasi",
+        "category":        "Stories of deities",
+        "deity":           "parvati",
+        "suggested_angle": (
+            "When Shiva declared food is an illusion, nature dried up until Shiva begged Annapurna for alms, recognizing physical sustenance "
+            "as divine maternal grace."
+        ),
+    },
+    {
+        "topic":           "Why Gayatri Mantra Is Known as Mother of All Vedic Chants",
+        "category":        "Traditions",
+        "deity":           "traditions",
+        "suggested_angle": (
+            "The 24 syllables praying to Savitur to illuminate the intellect, acting as an ancient sonic shield of spiritual clarity."
+        ),
+    },
+    {
+        "topic":           "The Spiritual Science Behind Pradakshina Clockwise Temple Walks",
+        "category":        "Traditions",
+        "deity":           "traditions",
+        "suggested_angle": (
+            "Circumambulating the sanctum clockwise keeps the central deity at the right shoulder, aligning inner energy with the earth's natural magnetic vortex."
+        ),
+    },
+    {
+        "topic":           "Why We Break Coconuts Before Starting Any Auspicious Work",
+        "category":        "Traditions",
+        "deity":           "traditions",
+        "suggested_angle": (
+            "Shattering the tough fibrous outer shell to offer sweet water and white kernel symbolizes breaking the ego "
+            "to reveal inner purity to the divine."
+        ),
+    },
+    {
+        "topic":           "The Hidden Sacred Geometry Behind Mystical Sri Yantra",
+        "category":        "Symbolism",
+        "deity":           "traditions",
+        "suggested_angle": (
+            "Nine interlocking triangles forming 43 smaller triangles in the Bindu, mapping the cosmic creation from unmanifest oneness "
+            "to manifest reality."
+        ),
+    },
+    {
+        "topic":           "Why Number 108 Holds Cosmic Significance in Hindu Dharma",
+        "category":        "Traditions",
+        "deity":           "traditions",
+        "suggested_angle": (
+            "The exact mathematical ratio of distance between Sun, Earth, and Moon with celestial diameters, encoded in japa malas and sacred chants."
+        ),
+    },
 ]
 
 
@@ -409,12 +933,14 @@ def analyze_content_gap(scores: dict, data_source: str) -> str:
 def select_topics_to_scan(
     seeds: list | None = None,
     limit: int | None = None,
-    history_file: str | Path = HISTORY_FILE,
+    history_file: str | Path | None = None,
 ) -> list:
     """
     Filter published topics/titles and near-duplicate fingerprints against publishing_history,
     deduplicate among seeds, then apply limit.
     """
+    if history_file is None:
+        history_file = HISTORY_FILE
     raw_seeds = seeds if seeds is not None else SUGGESTED_TOPICS
     published_strings = _load_published_topics(history_file)
     published_prints = [_fingerprint(p) for p in published_strings if p]
@@ -425,7 +951,7 @@ def select_topics_to_scan(
         if top_str in published_strings:
             continue
         fp = _fingerprint(top_str)
-        if any(len(fp & pub_fp) >= 2 for pub_fp in published_prints):
+        if any(len(fp & pub_fp) >= 3 for pub_fp in published_prints):
             continue
         fresh_seeds.append(item)
 
@@ -435,6 +961,12 @@ def select_topics_to_scan(
         print(
             f"ℹ️  Skipping {skipped} seed topic(s) already published or near-duplicate in publishing_history.json "
             f"({len(unique)} fresh unpublished remaining).",
+            file=sys.stderr,
+        )
+    if not unique:
+        print(
+            "⚠️  WARNING: All suggested seed topics have been published or match previous videos! "
+            "Please expand SUGGESTED_TOPICS with fresh topics.",
             file=sys.stderr,
         )
     if limit is not None:
@@ -453,7 +985,7 @@ def run_research_pipeline(
     limit: int = None,
     max_search_calls: int = 10,
     cache_ttl_hours: int = 24,
-    history_file: str | Path = HISTORY_FILE,
+    history_file: str | Path | None = None,
 ) -> list:
     """
     Runs the full research pipeline: dedup → exclude published → collect → score → persist.
@@ -470,6 +1002,8 @@ def run_research_pipeline(
     -------
     Sorted list of candidate dicts, best score first.
     """
+    if history_file is None:
+        history_file = HISTORY_FILE
     collector = ResearchCollector(
         api_key=api_key,
         max_search_calls=max_search_calls,

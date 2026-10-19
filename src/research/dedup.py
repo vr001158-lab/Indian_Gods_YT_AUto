@@ -9,7 +9,9 @@ _STOP_WORDS = {
     "the", "a", "an", "of", "in", "on", "at", "and", "or", "is", "was",
     "are", "were", "why", "how", "what", "who", "when", "lord", "goddess",
     "god", "story", "stories", "tale", "legend", "reason", "secret",
-    "hidden", "untold", "meaning", "mystery", "mysteries",
+    "hidden", "untold", "meaning", "mystery", "mysteries", "behind",
+    "his", "her", "their", "its", "has", "have", "had", "with", "from",
+    "for", "by", "to", "as", "into", "about", "all", "this", "that",
 }
 
 

@@ -199,11 +199,15 @@ class TestUnverifiedFestivalDate(unittest.TestCase):
         self.assertEqual(score_verified["relevance_score"],   90)
 
     def test_unverified_flag_propagates_to_candidate(self):
-        candidates = report_mod.run_research_pipeline(api_key=None, limit=1)
-        c = candidates[0]
-        # All built-in festivals have verified=False
-        self.assertFalse(c["festival_verified"],
-                         "Default festivals must carry verified=False")
+        with tempfile.TemporaryDirectory() as td:
+            empty_hist = Path(td) / "publishing_history.json"
+            empty_hist.write_text("[]", encoding="utf-8")
+            candidates = report_mod.run_research_pipeline(api_key=None, limit=1, history_file=empty_hist)
+            self.assertGreater(len(candidates), 0, "Expected at least 1 candidate in isolated research run")
+            c = candidates[0]
+            # All built-in festivals have verified=False
+            self.assertFalse(c["festival_verified"],
+                             "Default festivals must carry verified=False")
 
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -350,11 +354,16 @@ class TestCandidateSchemaAndPipeline(unittest.TestCase):
         collector_mod.CACHE_FILE = self.tmp / "cache.json"
         self.orig_output = report_mod.OUTPUT_DIR
         report_mod.OUTPUT_DIR = self.tmp
+        self.orig_history = report_mod.HISTORY_FILE
+        self.tmp_history = self.tmp / "publishing_history.json"
+        self.tmp_history.write_text("[]", encoding="utf-8")
+        report_mod.HISTORY_FILE = self.tmp_history
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
         collector_mod.CACHE_FILE = self.orig_cache
         report_mod.OUTPUT_DIR    = self.orig_output
+        report_mod.HISTORY_FILE  = self.orig_history
 
     def test_full_pipeline_offline(self):
         candidates = report_mod.run_research_pipeline(api_key=None, limit=2)
