@@ -480,5 +480,17 @@
     "duration_seconds": 45.0,
     "published_at": "20261021_090214",
     "video_file_name": "video_short_20261021_090138.mp4"
+  },
+  {
+    "youtube_video_id": "bJJx8uaDe1g",
+    "topic": "Why Lord Shiva Holds the Damru and Creation of Sounds",
+    "title": "Secrets of Shiva: The Story Behind Why Lord Shiva Holds the Damru and Creation of Sounds",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20261021_181249",
+    "video_file_name": "video_short_20261021_181220.mp4"
   }
 ]
