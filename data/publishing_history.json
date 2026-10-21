@@ -468,5 +468,17 @@
     "duration_seconds": 45.0,
     "published_at": "20261020_115518",
     "video_file_name": "video_long_20261020_115452.mp4"
+  },
+  {
+    "youtube_video_id": "7a2RP8MJqNM",
+    "topic": "The Cosmic Mystery of Nataraja Shiva Dance of Creation",
+    "title": "Secrets of Shiva: The Story Behind The Cosmic Mystery of Nataraja Shiva Dance of Creation",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 45.0,
+    "published_at": "20261021_090214",
+    "video_file_name": "video_short_20261021_090138.mp4"
   }
 ]
