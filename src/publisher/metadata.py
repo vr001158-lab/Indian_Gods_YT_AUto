@@ -61,41 +61,92 @@ def build_video_metadata(qa: dict) -> dict:
     # Use script creative title; fall back to canonical topic.
     title = (script_title or topic)[:MAX_TITLE_LEN]
 
-    # ── Description ──────────────────────────────────────────────────────────
-    channel_tagline = (
-        "Divine Dharshanam Daily — Explore the stories, symbolism and wisdom "
-        "of Indian mythology.\n\n"
+    # ── Description & Language Localization ──────────────────────────────────
+    lang = (
+        qa.get("language_code")
+        or (script.get("language_code") if script else "")
+        or (brief.get("language_code") if brief else "")
     )
+
+    if lang == "te-IN":
+        channel_tagline = (
+            "దివ్య దర్శనం — భారతీయ పురాణాలు, భక్తి గాథలు మరియు ఆధ్యాత్మిక సత్యాలు.\n\n"
+        )
+        hashtag_shorts = " #Shorts #తెలుగుShorts" if content_type == "short" else ""
+        disclaimer = (
+            f"#IndianMythology #భారతీయపురాణాలు #భక్తి #దివ్యదర్శనం #తెలుగుభక్తి{hashtag_shorts}\n\n"
+            "ఈ వీడియో ఆధ్యాత్మిక మరియు విద్యా ప్రయోజనాల కోసం రూపొందించబడింది."
+        )
+        base_tags = [
+            "Indian mythology",
+            "Hindu gods",
+            "తెలుగు భక్తి",
+            "భారతీయ పురాణాలు",
+            "దేవుళ్ళు",
+            "దివ్య దర్శనం",
+            "సనాతన ధర్మం",
+            "ఆధ్యాత్మికం",
+            "పురాణ గాథలు",
+        ]
+        default_lang = "te"
+    elif lang == "hi-IN":
+        channel_tagline = (
+            "दिव्य दर्शनम् — सनातन धर्म, भारतीय पौराणिक कथाएँ और जीवन के आध्यात्मिक रहस्य।\n\n"
+        )
+        hashtag_shorts = " #Shorts #हिंदीShorts" if content_type == "short" else ""
+        disclaimer = (
+            f"#IndianMythology #सनातनधर्म #दिव्यदर्शनम् #पौराणिककथाएं #हिन्दूधर्म{hashtag_shorts}\n\n"
+            "यह वीडियो शैक्षणिक एवं आध्यात्मिक उद्देश्यों के लिए बनाया गया है।"
+        )
+        base_tags = [
+            "Indian mythology",
+            "Hindu gods",
+            "सनातन धर्म",
+            "भारतीय पौराणिक कथाएँ",
+            "हिन्दू देवी देवता",
+            "दिव्य दर्शनम्",
+            "भक्ति",
+            "अध्यात्म",
+            "धार्मिक कथाएँ",
+        ]
+        default_lang = "hi"
+    else:
+        channel_tagline = (
+            "Divine Dharshanam Daily — Explore the stories, symbolism and wisdom "
+            "of Indian mythology.\n\n"
+        )
+        hashtag_shorts = " #Shorts" if content_type == "short" else ""
+        disclaimer = (
+            f"#IndianMythology #HinduDharma #DivineStories{hashtag_shorts}\n\n"
+            "This video is created for educational and devotional purposes."
+        )
+        base_tags = [
+            "Indian mythology",
+            "Hindu gods",
+            "divine stories",
+            "Sanatan Dharma",
+            "devotional",
+            "spirituality",
+            "Hinduism",
+            "mythology explained",
+        ]
+        default_lang = "en"
+
     hook_block = f"{hook}\n\n" if hook else ""
     narration_excerpt = narration[:800] + "..." if len(narration) > 800 else narration
     narration_block = f"{narration_excerpt}\n\n" if narration_excerpt else ""
 
-    hashtag_shorts = " #Shorts" if content_type == "short" else ""
-    disclaimer = (
-        f"#IndianMythology #HinduDharma #DivineStories{hashtag_shorts}\n\n"
-        "This video is created for educational and devotional purposes."
-    )
     description = (
         channel_tagline + hook_block + narration_block + disclaimer
     )[:MAX_DESCRIPTION_LEN]
 
     # ── Tags ─────────────────────────────────────────────────────────────────
-    base_tags = [
-        "Indian mythology",
-        "Hindu gods",
-        "divine stories",
-        "Sanatan Dharma",
-        "devotional",
-        "spirituality",
-        "Hinduism",
-        "mythology explained",
-    ]
     if content_type == "short":
         base_tags.append("Shorts")
-    base_tags.append("Divine Dharshanam Daily")
 
     # Derive deity/topic-specific tags from content brief
-    keywords = brief.get("seo_keywords", [])
+    seo = brief.get("seo_metadata", {})
+    keywords = brief.get("seo_keywords") or seo.get("keywords", [])
     topic_words = [w.strip() for w in topic.replace(".", " ").split() if len(w.strip()) > 3]
     tags = list(dict.fromkeys(base_tags + keywords + topic_words))[:MAX_TAGS]
 
@@ -136,4 +187,7 @@ def build_video_metadata(qa: dict) -> dict:
         "video_file":     video_file,
         "thumbnail_file": thumbnail_file,
         "content_type":   content_type,
+        "language_code":  lang,
+        "default_language": default_lang,
+        "default_audio_language": default_lang,
     }

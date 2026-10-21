@@ -16,7 +16,9 @@ def upload_to_youtube(
     description: str,
     tags: list,
     privacy_status: str = "public",
-    category_id: str = "22"  # "22" represents "People & Blogs"
+    category_id: str = "22",  # "22" represents "People & Blogs"
+    default_language: str | None = None,
+    default_audio_language: str | None = None,
 ) -> str:
     """
     Uploads a video to YouTube using the official YouTube Data API v3.
@@ -40,15 +42,22 @@ def upload_to_youtube(
     print(f"   Title:    {sanitized_title}")
     print(f"   Privacy:  {privacy_status.upper()}")
     print(f"   Category: {category_id}")
+    if default_language:
+        print(f"   Language: {default_language} (Audio: {default_audio_language or default_language})")
 
     try:
+        snippet_dict = {
+            "title": sanitized_title,
+            "description": description,
+            "tags": tags,
+            "categoryId": category_id,
+        }
+        if default_language:
+            snippet_dict["defaultLanguage"] = default_language
+            snippet_dict["defaultAudioLanguage"] = default_audio_language or default_language
+
         body = {
-            "snippet": {
-                "title": sanitized_title,
-                "description": description,
-                "tags": tags,
-                "categoryId": category_id,
-            },
+            "snippet": snippet_dict,
             "status": {
                 "privacyStatus": privacy_status,
                 "selfDeclaredMadeForKids": False,

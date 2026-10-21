@@ -34,6 +34,32 @@ LANGUAGE_VOICE_CONFIG: dict[str, dict[str, str]] = {
     },
 }
 
+KOKORO_LANGUAGE_VOICE_CONFIG: dict[str, dict[str, str]] = {
+    "hi-IN": {
+        "provider": "kokoro",
+        "voice_name": "hf_indic_hindi",
+        "language_code": "hi-IN",
+    },
+    "te-IN": {
+        "provider": "kokoro",
+        "voice_name": "hf_indic_telugu",
+        "language_code": "te-IN",
+    },
+}
+
+PIPER_LANGUAGE_VOICE_CONFIG: dict[str, dict[str, str]] = {
+    "hi-IN": {
+        "provider": "piper",
+        "voice_name": "hi_IN-indic-medium",
+        "language_code": "hi-IN",
+    },
+    "te-IN": {
+        "provider": "piper",
+        "voice_name": "te_IN-indic-medium",
+        "language_code": "te-IN",
+    },
+}
+
 
 class GoogleChirpTTSProvider(VoiceProvider):
     """
@@ -199,18 +225,63 @@ class ElevenLabsProvider(VoiceProvider):
 
 
 class KokoroProvider(VoiceProvider):
-    """Kokoro placeholder — TEST ONLY. Routes to offline sine-wave stub."""
-    def __init__(self, voice_id: str = "default"):
-        super().__init__(provider_name="kokoro", voice_id=voice_id, real_tts=False, mode="test")
+    """
+    Kokoro Local TTS Voice Provider.
+    Real production fallback provider for Hindi and Telugu.
+    """
+    def __init__(self, voice_id: str = "default", mode: str = "production"):
+        super().__init__(
+            provider_name="kokoro",
+            voice_id=voice_id,
+            real_tts=(mode == "production"),
+            mode=mode,
+        )
 
-    def generate_speech(self, text: str, output_path: Path, language_code: str = "hi-IN", voice_config: dict[str, Any] | None = None) -> int:
+    def generate_speech(
+        self,
+        text: str,
+        output_path: Path,
+        language_code: str = "hi-IN",
+        voice_config: dict[str, Any] | None = None,
+    ) -> int:
+        if not text or not text.strip():
+            raise VoiceProviderError("Narration text is empty.")
+        if language_code not in ("hi-IN", "te-IN"):
+            raise VoiceProviderError(f"Unsupported language '{language_code}' for Kokoro. Only 'hi-IN' and 'te-IN' are supported.")
+        if self.mode == "production":
+            try:
+                import kokoro  # type: ignore
+            except ImportError:
+                raise VoiceProviderError("Kokoro TTS engine or model weights unavailable in current environment.")
         return _synthesize_speech(text, output_path)
 
 
 class PiperProvider(VoiceProvider):
-    """Piper placeholder — TEST ONLY. Routes to offline sine-wave stub."""
-    def __init__(self, voice_id: str = "default"):
-        super().__init__(provider_name="piper", voice_id=voice_id, real_tts=False, mode="test")
+    """
+    Piper Local TTS Voice Provider.
+    Real production fallback provider for Hindi and Telugu.
+    """
+    def __init__(self, voice_id: str = "default", mode: str = "production"):
+        super().__init__(
+            provider_name="piper",
+            voice_id=voice_id,
+            real_tts=(mode == "production"),
+            mode=mode,
+        )
 
-    def generate_speech(self, text: str, output_path: Path, language_code: str = "hi-IN", voice_config: dict[str, Any] | None = None) -> int:
+    def generate_speech(
+        self,
+        text: str,
+        output_path: Path,
+        language_code: str = "hi-IN",
+        voice_config: dict[str, Any] | None = None,
+    ) -> int:
+        if not text or not text.strip():
+            raise VoiceProviderError("Narration text is empty.")
+        if language_code not in ("hi-IN", "te-IN"):
+            raise VoiceProviderError(f"Unsupported language '{language_code}' for Piper. Only 'hi-IN' and 'te-IN' are supported.")
+        if self.mode == "production":
+            import shutil
+            if not shutil.which("piper"):
+                raise VoiceProviderError("Piper TTS executable unavailable in PATH.")
         return _synthesize_speech(text, output_path)

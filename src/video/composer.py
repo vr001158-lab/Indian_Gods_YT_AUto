@@ -28,6 +28,8 @@ class VideoComposer:
         bgm_volume: float = 0.15,
         bgm_db: float = -22.0,
         resolution: str = "1080x1920",
+        language_code: str = "hi-IN",
+        **kwargs,
     ) -> bool:
         """
         Synthesizes the scenes (images + audios) into an MP4 video.
@@ -53,6 +55,8 @@ class MockVideoComposer(VideoComposer):
         bgm_volume: float = 0.15,
         bgm_db: float = -22.0,
         resolution: str = "1080x1920",
+        language_code: str = "hi-IN",
+        **kwargs,
     ) -> bool:
         output_file.parent.mkdir(parents=True, exist_ok=True)
         summary = (
@@ -104,6 +108,8 @@ class FFmpegVideoComposer(VideoComposer):
         bgm_db: float = -22.0,
         fps: int = 25,
         resolution: str = "1080x1920",
+        language_code: str = "hi-IN",
+        **kwargs,
     ) -> list:
         """
         Constructs the exact FFmpeg command list.
@@ -172,6 +178,7 @@ class FFmpegVideoComposer(VideoComposer):
                 height=height,
                 motion_type=motion_type,
                 caption_text_file=caption_file_path,
+                language_code=language_code,
             )
             filter_parts.append(f"[{v_input_idx}:v]{v_filter}[v_scene_{i}]")
 
@@ -229,6 +236,8 @@ class FFmpegVideoComposer(VideoComposer):
         bgm_volume: float = 0.15,
         bgm_db: float = -22.0,
         resolution: str = "1080x1920",
+        language_code: str = "hi-IN",
+        **kwargs,
     ) -> bool:
         cmd = self.build_ffmpeg_command(
             scenes=scenes,
@@ -237,6 +246,7 @@ class FFmpegVideoComposer(VideoComposer):
             bgm_volume=bgm_volume,
             bgm_db=bgm_db,
             resolution=resolution,
+            language_code=language_code,
         )
 
         print(f"\n🚀 Launching FFmpeg composition render ({resolution})...", file=sys.stderr)

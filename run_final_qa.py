@@ -62,6 +62,8 @@ def _print_report(result, qa_file: Path) -> None:
     groups = [
         ("Decision Approval",      ["decision_approval"]),
         ("Provenance Consistency", ["provenance"]),
+        ("Language Consistency",   ["language_consistency"]),
+        ("Format Consistency",     ["format_consistency"]),
         ("Topic Consistency",      ["topic_consistency"]),
         ("File Integrity",         [k for k in result.checks if k.startswith("file_integrity.")]),
         ("Audio",                  ["audio"]),
@@ -122,6 +124,8 @@ def main() -> int:
         action="store_true",
         help="Bypass strict video production checks for mock/text video files (only for tests)",
     )
+    parser.add_argument("--language", "--language-code", dest="language_code", default=None, help="Expected language code (hi-IN or te-IN)")
+    parser.add_argument("--format", default="narrated", help="Expected format (old or narrated)")
     args = parser.parse_args()
 
     # Build kwargs for artifact overrides (only if explicitly provided)
@@ -141,7 +145,13 @@ def main() -> int:
     if args.thumbnail_meta:
         overrides["thumbnail_meta_file"] = args.thumbnail_meta
 
-    gate   = FinalQAGate(base_dir=".", allow_mock=args.allow_mock, **overrides)
+    gate   = FinalQAGate(
+        base_dir=".",
+        allow_mock=args.allow_mock,
+        language_code=args.language_code,
+        format=args.format,
+        **overrides
+    )
     result = gate.run()
 
     qa_file = result.save(Path(args.output_dir))

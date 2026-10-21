@@ -71,7 +71,7 @@ def _deduplicate_validated(candidates: list) -> list:
     MIN_OVERLAP = 2
 
     def _fp(topic: str) -> frozenset:
-        words = re.sub(r"[^a-z0-9\s]", "", topic.lower()).split()
+        words = [w.lower() for w in re.findall(r"\w+", topic, flags=re.UNICODE)]
         return frozenset(w for w in words if w not in _STOP_WORDS)
 
     seen = []

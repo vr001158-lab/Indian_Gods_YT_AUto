@@ -19,9 +19,9 @@ def _fingerprint(topic: str) -> frozenset:
     """
     Lowercases, strips punctuation, removes stop words, and returns a frozenset
     of the remaining content words. Two topics with the same fingerprint are
-    considered duplicates regardless of phrasing.
+    considered duplicates regardless of phrasing. Supports Unicode (Telugu/Devanagari).
     """
-    words = re.sub(r"[^a-z0-9\s]", "", topic.lower()).split()
+    words = [w.lower() for w in re.findall(r"\w+", topic, flags=re.UNICODE)]
     return frozenset(w for w in words if w not in _STOP_WORDS)
 
 

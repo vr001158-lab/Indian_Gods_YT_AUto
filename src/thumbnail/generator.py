@@ -19,6 +19,8 @@ class ThumbnailGenerator:
         output_path: Path,
         background_image_path: Path = None,
         theme: dict = DEVOTIONAL_GOLD_THEME,
+        language_code: str = "hi-IN",
+        **kwargs,
     ) -> Path:
         """
         Synthesizes a 1280x720 YouTube thumbnail and returns its path.
@@ -38,6 +40,8 @@ class MockThumbnailGenerator(ThumbnailGenerator):
         output_path: Path,
         background_image_path: Path = None,
         theme: dict = DEVOTIONAL_GOLD_THEME,
+        language_code: str = "hi-IN",
+        **kwargs,
     ) -> Path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         # Create a simple 1280x720 solid-color image
@@ -53,18 +57,36 @@ class PILThumbnailGenerator(ThumbnailGenerator):
     """
     Production Generator using PIL (Pillow) to design 1280x720 thumbnails.
     Draws backgrounds, renders multi-line titles with shadows, overlays branding tags.
+    Fully supports Indic fonts for Telugu and Hindi.
     """
 
-    def _get_font(self, font_name: str, size: int) -> ImageFont:
-        """Helper to safely load system fonts or fall back cleanly."""
+    def _get_font(self, font_name: str, size: int, language_code: str = "hi-IN") -> ImageFont:
+        """Helper to safely load Indic system fonts or fall back cleanly."""
+        from src.video.effects import resolve_caption_font
         try:
-            # Try popular fonts depending on OS
-            if sys.platform == "win32":
-                return ImageFont.truetype("arial.ttf", size)
-            else:
-                return ImageFont.truetype("LiberationSans-Bold.ttf", size)
+            resolved = resolve_caption_font(language_code, raise_on_missing=False)
+            if resolved and Path(resolved).exists():
+                return ImageFont.truetype(resolved, size)
         except Exception:
-            return ImageFont.load_default()
+            pass
+
+        try:
+            if sys.platform == "win32":
+                for wf in ("C:/Windows/Fonts/Nirmala.ttc", "C:/Windows/Fonts/nirmala.ttf", "arial.ttf"):
+                    if Path(wf).exists() or wf == "arial.ttf":
+                        try:
+                            return ImageFont.truetype(wf, size)
+                        except Exception:
+                            continue
+            else:
+                for lf in ("LiberationSans-Bold.ttf", "DejaVuSans.ttf"):
+                    try:
+                        return ImageFont.truetype(lf, size)
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        return ImageFont.load_default()
 
     def generate_thumbnail(
         self,
@@ -72,9 +94,12 @@ class PILThumbnailGenerator(ThumbnailGenerator):
         subtitle: str,
         output_path: Path,
         background_image_path: Path = None,
-        theme: dict = DEVOTIONAL_GOLD_THEME,
+        theme: dict = None,
+        language_code: str = "hi-IN",
     ) -> Path:
         output_path.parent.mkdir(parents=True, exist_ok=True)
+        from src.thumbnail.templates import get_thumbnail_theme, DEVOTIONAL_GOLD_THEME
+        active_theme = theme or get_thumbnail_theme(language_code=language_code)
 
         # ── 1. Background Setup ───────────────────────────────────────────────
         if background_image_path and background_image_path.exists():
@@ -90,22 +115,22 @@ class PILThumbnailGenerator(ThumbnailGenerator):
                 bottom = (height + 720) / 2
                 img = bg.crop((left, top, right, bottom))
             except Exception:
-                img = Image.new("RGB", (1280, 720), color=theme["bg_color"])
+                img = Image.new("RGB", (1280, 720), color=active_theme["bg_color"])
         else:
             # Create dark gradient fallback background
-            img = Image.new("RGB", (1280, 720), color=theme["bg_color"])
+            img = Image.new("RGB", (1280, 720), color=active_theme["bg_color"])
 
         draw = ImageDraw.Draw(img)
 
         # ── 2. Branding Header Overlay ────────────────────────────────────────
-        brand_font = self._get_font("arial.ttf", theme["branding_size"])
-        brand_text = theme["branding_text"]
+        brand_font = self._get_font("arial.ttf", active_theme["branding_size"], language_code=language_code)
+        brand_text = active_theme.get("branding_text", "DIVINE DHARSHANAM DAILY")
         # Draw branding background block
         draw.rectangle([(50, 40), (450, 80)], fill=(0, 0, 0, 128))
-        draw.text((60, 48), brand_text, fill=theme["accent_color"], font=brand_font)
+        draw.text((60, 48), brand_text, fill=active_theme["accent_color"], font=brand_font)
 
         # ── 3. Multi-line Title Placement ─────────────────────────────────────
-        title_font = self._get_font("arial.ttf", theme["title_size"])
+        title_font = self._get_font("arial.ttf", active_theme["title_size"], language_code=language_code)
         
         # Simple word wrap logic
         words = title.split()
@@ -124,19 +149,19 @@ class PILThumbnailGenerator(ThumbnailGenerator):
         y_cursor = 180
         for line in lines[:3]:  # Max 3 lines of title text
             # Draw shadow
-            draw.text((63, y_cursor + 3), line, fill=theme["shadow_color"], font=title_font)
+            draw.text((63, y_cursor + 3), line, fill=active_theme["shadow_color"], font=title_font)
             # Draw primary text
-            draw.text((60, y_cursor), line, fill=theme["text_color"], font=title_font)
+            draw.text((60, y_cursor), line, fill=active_theme["text_color"], font=title_font)
             y_cursor += 70
 
         # ── 4. Subtitle Hooks ─────────────────────────────────────────────────
         if subtitle:
-            sub_font = self._get_font("arial.ttf", theme["subtitle_size"])
+            sub_font = self._get_font("arial.ttf", active_theme["subtitle_size"], language_code=language_code)
             y_cursor += 20
             # Draw shadow
-            draw.text((62, y_cursor + 2), subtitle, fill=theme["shadow_color"], font=sub_font)
+            draw.text((62, y_cursor + 2), subtitle, fill=active_theme["shadow_color"], font=sub_font)
             # Draw text
-            draw.text((60, y_cursor), subtitle, fill=theme["accent_color"], font=sub_font)
+            draw.text((60, y_cursor), subtitle, fill=active_theme["accent_color"], font=sub_font)
 
         # Save resulting image
         img.save(output_path, format="PNG")
@@ -156,5 +181,7 @@ class FluxThumbnailGenerator(ThumbnailGenerator):
         output_path: Path,
         background_image_path: Path = None,
         theme: dict = DEVOTIONAL_GOLD_THEME,
+        language_code: str = "hi-IN",
+        **kwargs,
     ) -> Path:
         raise NotImplementedError("Flux AI Thumbnail generator is not locally implemented.")

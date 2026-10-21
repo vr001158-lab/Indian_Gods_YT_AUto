@@ -462,6 +462,8 @@ def compose_video_pipeline(
 
     bgm_db = -4.0 if is_old_format else -22.0
 
+    lang = audio_map.get("language_code") or (audio_map.get("approval_metadata") or {}).get("language_code") or "hi-IN"
+
     composer = COMPOSERS[composer_type]()
     success = composer.compose_video(
         scenes=scenes,
@@ -470,6 +472,7 @@ def compose_video_pipeline(
         bgm_volume=bgm_volume,
         bgm_db=bgm_db,
         resolution=resolution,
+        language_code=lang,
     )
 
     if not success:

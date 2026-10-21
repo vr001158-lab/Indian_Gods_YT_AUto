@@ -96,6 +96,7 @@ def print_brief(brief: dict):
 def main():
     input_file = None
     save_output = True
+    language_code = None
 
     # ── CLI parsing ───────────────────────────────────────────────────────────
     args = sys.argv[1:]
@@ -104,12 +105,15 @@ def main():
         if args[i] == "--input" and i + 1 < len(args):
             input_file = Path(args[i + 1])
             i += 2
+        elif args[i] in ("--language", "-l") and i + 1 < len(args):
+            language_code = args[i + 1]
+            i += 2
         elif args[i] == "--no-save":
             save_output = False
             i += 1
         else:
             print(f"❌ Unknown argument: {args[i]}", file=sys.stderr)
-            print("Usage: python run_content_brief.py [--input FILE] [--no-save]", file=sys.stderr)
+            print("Usage: python run_content_brief.py [--input FILE] [--language hi-IN|te-IN] [--no-save]", file=sys.stderr)
             sys.exit(1)
 
     # ── Locate decision file ──────────────────────────────────────────────────
@@ -128,13 +132,13 @@ def main():
     # ── Process & Generate ────────────────────────────────────────────────────
     try:
         if save_output:
-            out_file = brief_generator.process_decision_file(input_file, BRIEF_DIR)
+            out_file = brief_generator.process_decision_file(input_file, BRIEF_DIR, language_code=language_code)
             print(f"📂 Content brief saved to: {out_file}", file=sys.stderr)
             # Load and print
             brief = json.loads(out_file.read_text(encoding="utf-8"))
         else:
             decision = json.loads(input_file.read_text(encoding="utf-8"))
-            brief = brief_generator.generate_content_brief(decision)
+            brief = brief_generator.generate_content_brief(decision, language_code=language_code)
             print("🔬 [DRY RUN] Skipping file persistence.", file=sys.stderr)
         
         print_brief(brief)

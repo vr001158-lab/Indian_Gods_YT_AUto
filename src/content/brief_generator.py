@@ -286,26 +286,39 @@ def _generate_fallback_brief(topic: str, deity: str, category: str, suggested_an
     }
 
 
-def generate_content_brief(decision: dict) -> dict:
+def generate_content_brief(decision: dict, language_code: str | None = None) -> dict:
     """
-    Converts a validated decision JSON into a detailed content blueprint.
-
-    Raises ValueError if input does not pass the safety gates.
+    Transforms a validated topic decision into a production-ready content brief.
+    Supports Hindi ('hi-IN') and Telugu ('te-IN') generation via Google Gemini API
+    with robust offline multilingual fallbacks.
     """
+    # Fail-closed validation on incoming decision
     ok, error_msg = validate_decision_input(decision)
     if not ok:
         raise ValueError(f"❌ Safety Gate Rejection: {error_msg}")
 
-    topic = decision["selected_topic"]
-    deity = decision.get("deity", "").lower()
-    category = decision["category"]
-    suggested_angle = decision["suggested_angle"]
+    import os
+    lang = (
+        language_code
+        or decision.get("language_code")
+        or (decision.get("approval_metadata") or {}).get("language_code")
+        or os.environ.get("LANGUAGE_CODE")
+    )
 
-    # Retrieve pre-built or generate fallback brief
-    if deity in _DEITY_BLUEPRINTS and is_blueprint_topic_matching(topic, deity):
-        brief_data = dict(_DEITY_BLUEPRINTS[deity])
+    if lang in ("hi-IN", "te-IN"):
+        from src.content.gemini_provider import generate_brief_with_gemini
+        brief_data = generate_brief_with_gemini(decision, language_code=lang, allow_fallback=True)
     else:
-        brief_data = dict(_generate_fallback_brief(topic, deity, category, suggested_angle))
+        topic = decision["selected_topic"]
+        deity = decision.get("deity", "").lower()
+        category = decision["category"]
+        suggested_angle = decision["suggested_angle"]
+
+        # Retrieve pre-built or generate fallback brief
+        if deity in _DEITY_BLUEPRINTS and is_blueprint_topic_matching(topic, deity):
+            brief_data = dict(_DEITY_BLUEPRINTS[deity])
+        else:
+            brief_data = dict(_generate_fallback_brief(topic, deity, category, suggested_angle))
 
     # Inject approval metadata for downstream safety gating in script generator
     brief_data["approval_metadata"] = {
@@ -316,6 +329,9 @@ def generate_content_brief(decision: dict) -> dict:
         "data_source": decision["data_source"],
         "category": decision["category"]
     }
+    if lang:
+        brief_data["approval_metadata"]["language_code"] = lang
+        brief_data["language_code"] = lang
     if decision.get("format"):
         brief_data["format"] = decision["format"]
     if decision.get("content_type"):
@@ -329,7 +345,11 @@ def generate_content_brief(decision: dict) -> dict:
     return brief_data
 
 
-def process_decision_file(decision_path: Path, output_dir: Path = Path("data/content_briefs")) -> Path:
+def process_decision_file(
+    decision_path: Path,
+    output_dir: Path = Path("data/content_briefs"),
+    language_code: str | None = None,
+) -> Path:
     """
     Orchestrates the conversion of a decision file into a content brief file.
     """
@@ -341,7 +361,7 @@ def process_decision_file(decision_path: Path, output_dir: Path = Path("data/con
     except Exception as e:
         raise ValueError(f"Failed to parse decision JSON file: {e}")
 
-    brief = generate_content_brief(decision)
+    brief = generate_content_brief(decision, language_code=language_code)
 
     # Persist brief
     import time

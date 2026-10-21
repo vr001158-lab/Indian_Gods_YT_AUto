@@ -135,13 +135,15 @@ def publish_video(
 
     try:
         video_id = _yt_uploader.upload_to_youtube(
-            creds          = creds,
-            video_path     = vp,
-            title          = title,
-            description    = description,
-            tags           = tags,
-            privacy_status = REQUIRED_PRIVACY,
-            category_id    = category_id,
+            creds                  = creds,
+            video_path             = vp,
+            title                  = title,
+            description            = description,
+            tags                   = tags,
+            privacy_status         = REQUIRED_PRIVACY,
+            category_id            = category_id,
+            default_language       = qa.get("default_language") or ("hi" if (qa.get("language_code") or "").startswith("hi") else ("te" if (qa.get("language_code") or "").startswith("te") else None)),
+            default_audio_language = qa.get("default_audio_language") or ("hi" if (qa.get("language_code") or "").startswith("hi") else ("te" if (qa.get("language_code") or "").startswith("te") else None)),
         )
     except Exception as exc:
         raise PublishError(f"YouTube video upload failed: {exc}") from exc

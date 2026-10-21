@@ -28,6 +28,8 @@ from src.voice.providers import (
     VoiceProviderError,
     LANGUAGE_VOICE_CONFIG,
     EDGE_LANGUAGE_VOICE_CONFIG,
+    KOKORO_LANGUAGE_VOICE_CONFIG,
+    PIPER_LANGUAGE_VOICE_CONFIG,
 )
 
 # ---------------------------------------------------------------------------
@@ -83,18 +85,31 @@ def _make_silent_wav_bytes(duration_seconds: int, sample_rate: int = 24000) -> b
 
 
 def _resolve_language(script: dict) -> str:
-    return script.get("language_code") or "hi-IN"
+    lang = script.get("language_code") or (script.get("approval_metadata") or {}).get("language_code") or "hi-IN"
+    if lang.lower().startswith("en"):
+        raise ValueError(f"English language '{lang}' is not permitted in voice generator. Only Indic languages ('hi-IN', 'te-IN') are supported.")
+    return lang
 
 
 def _resolve_voice_config(script: dict, language_code: str, provider_name: str) -> dict:
     """
     Resolve the voice config for the active provider and language.
-    Edge TTS always uses its own internal voice map (not the script's chirp config).
+    Edge TTS, Kokoro, and Piper each use their respective language voice configurations.
     """
     if provider_name == "edge_neural_tts":
         return EDGE_LANGUAGE_VOICE_CONFIG.get(
             language_code,
             EDGE_LANGUAGE_VOICE_CONFIG["hi-IN"],
+        )
+    if provider_name == "kokoro":
+        return KOKORO_LANGUAGE_VOICE_CONFIG.get(
+            language_code,
+            {"provider": "kokoro", "voice_name": "hf_indic_hindi", "language_code": language_code},
+        )
+    if provider_name == "piper":
+        return PIPER_LANGUAGE_VOICE_CONFIG.get(
+            language_code,
+            {"provider": "piper", "voice_name": "hi_IN-indic-medium", "language_code": language_code},
         )
     if isinstance(script.get("voice_config"), dict):
         return script["voice_config"]
@@ -138,30 +153,63 @@ def _validate_production_audio(path: Path, *, allow_mock: bool) -> dict:
         raise VoiceProviderError(f"Generated audio failed validation: {exc}") from exc
 
 
+def _get_fallback_candidates(primary_name: str) -> list[str]:
+    """
+    Returns ordered fallback provider candidates that come strictly after primary_name
+    in PRODUCTION_FALLBACK_CHAIN, or the entire chain if primary_name is not in it.
+    Prevents circular / recursive fallback loops.
+    """
+    if primary_name in PRODUCTION_FALLBACK_CHAIN:
+        idx = PRODUCTION_FALLBACK_CHAIN.index(primary_name)
+        return PRODUCTION_FALLBACK_CHAIN[idx + 1 :]
+    return [p for p in PRODUCTION_FALLBACK_CHAIN if p != primary_name]
+
+
 def _try_fallback_chain(
     text: str,
     output_path: Path,
     language_code: str,
     voice_config: dict,
     primary_name: str,
+    primary_error: Exception | str | None = None,
+    mode: str = "production",
 ) -> tuple[str, int]:
     """
     Attempt synthesis through the production fallback chain.
     Returns (provider_name_used, duration_seconds).
     Raises VoiceProviderError if ALL providers in the chain fail.
-    Never silently produces mock/fake audio.
+    Never silently produces mock/fake audio in production.
     """
+    candidates = _get_fallback_candidates(primary_name)
     errors = []
-    for name in PRODUCTION_FALLBACK_CHAIN:
+    if primary_error:
+        errors.append(f"{primary_name}: {primary_error}")
+
+    if not candidates:
+        raise VoiceProviderError(
+            f"Voice provider '{primary_name}' failed and no further fallback providers are available in chain.\n"
+            + "\n".join(errors)
+        )
+
+    for name in candidates:
         if name not in PROVIDERS:
             continue
-        provider = PROVIDERS[name](voice_id="default")
-        # Only attempt providers that are real_tts=True
-        if not provider.real_tts:
-            continue
+        provider_cls = PROVIDERS[name]
         try:
-            vc = EDGE_LANGUAGE_VOICE_CONFIG.get(language_code, EDGE_LANGUAGE_VOICE_CONFIG["hi-IN"]) \
-                if name == "edge_neural_tts" else voice_config
+            provider = provider_cls(voice_id="default")
+            if hasattr(provider, "mode"):
+                provider.mode = mode
+            if hasattr(provider, "real_tts"):
+                provider.real_tts = (mode == "production")
+        except TypeError:
+            provider = provider_cls(voice_id="default")
+
+        # Only attempt providers that are real_tts=True in production
+        if mode == "production" and not getattr(provider, "real_tts", True):
+            continue
+
+        vc = _resolve_voice_config({}, language_code, name)
+        try:
             duration = provider.generate_speech(
                 text, output_path,
                 language_code=language_code,
@@ -339,7 +387,14 @@ def generate_voice_mapping(
             f"(must be one of {list(PROVIDERS.keys())})"
         )
 
-    provider = PROVIDERS[provider_name](voice_id=voice_id)
+    try:
+        provider = PROVIDERS[provider_name](voice_id=voice_id, mode=mode)
+    except TypeError:
+        provider = PROVIDERS[provider_name](voice_id=voice_id)
+    if hasattr(provider, "mode"):
+        provider.mode = mode
+    if hasattr(provider, "real_tts"):
+        provider.real_tts = (mode == "production")
     _enforce_provider_metadata(provider, mode)
 
     language_code = _resolve_language(script)
@@ -372,14 +427,9 @@ def generate_voice_mapping(
                 )
                 used_provider = provider_name
             except VoiceProviderError as primary_exc:
-                # Primary failed — try fallback chain (all real_tts=True only)
-                if provider_name == PRODUCTION_FALLBACK_CHAIN[0]:
-                    # Already starting from top of chain
-                    used_provider, duration = _try_fallback_chain(
-                        text, scene_file, language_code, voice_config, provider_name
-                    )
-                else:
-                    raise
+                used_provider, duration = _try_fallback_chain(
+                    text, scene_file, language_code, voice_config, provider_name, primary_exc, mode=mode
+                )
         else:
             duration = provider.generate_speech(
                 text, scene_file,
@@ -397,6 +447,7 @@ def generate_voice_mapping(
             "voice_text": text,
             "audio_file": str(scene_file.absolute()).replace("\\", "/"),
             "duration_seconds": duration,
+            "provider": used_provider,
         })
 
     full_audio_file = run_audio_dir / "full_narration.mp3"
@@ -407,13 +458,11 @@ def generate_voice_mapping(
                 language_code=language_code,
                 voice_config=voice_config,
             )
-        except VoiceProviderError:
-            if provider_name == PRODUCTION_FALLBACK_CHAIN[0]:
-                _try_fallback_chain(
-                    script["narration"], full_audio_file, language_code, voice_config, provider_name
-                )
-            else:
-                raise
+            full_used_provider = provider_name
+        except VoiceProviderError as primary_exc:
+            full_used_provider, _ = _try_fallback_chain(
+                script["narration"], full_audio_file, language_code, voice_config, provider_name, primary_exc, mode=mode
+            )
         full_audio_qa = _validate_production_audio(full_audio_file, allow_mock=allow_mock)
     else:
         provider.generate_speech(
@@ -422,13 +471,17 @@ def generate_voice_mapping(
             voice_config=voice_config,
         )
         full_audio_qa = None
+        full_used_provider = provider_name
 
     run_id = script.get("run_id") or f"run_{timestamp}"
     audio_map = {
         "run_id": run_id,
         "script_title": script["title"],
         "total_duration_seconds": total_duration,
-        "provider": provider.provider_name,
+        "provider": used_provider,
+        "provider_used": used_provider,
+        "fallback_used": (used_provider != provider_name),
+        "primary_provider_configured": provider_name,
         "voice_name": voice_name,
         "language_code": language_code,
         "real_tts": provider.real_tts,

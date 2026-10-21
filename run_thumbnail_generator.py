@@ -56,6 +56,7 @@ def main():
     provider_name = "pil"
     bg_image = None
     save_output = True
+    language_code = None
 
     # ── CLI parsing ───────────────────────────────────────────────────────────
     args = sys.argv[1:]
@@ -63,6 +64,9 @@ def main():
     while i < len(args):
         if args[i] == "--input" and i + 1 < len(args):
             input_file = Path(args[i + 1])
+            i += 2
+        elif args[i] in ("--language", "-l") and i + 1 < len(args):
+            language_code = args[i + 1].strip()
             i += 2
         elif args[i] == "--provider" and i + 1 < len(args):
             provider_name = args[i + 1].lower()
@@ -75,7 +79,7 @@ def main():
             i += 1
         else:
             print(f"❌ Unknown argument: {args[i]}", file=sys.stderr)
-            print("Usage: python run_thumbnail_generator.py [--input FILE] [--provider NAME] [--bg FILE] [--no-save]", file=sys.stderr)
+            print("Usage: python run_thumbnail_generator.py [--input FILE] [--language hi-IN|te-IN] [--provider NAME] [--bg FILE] [--no-save]", file=sys.stderr)
             sys.exit(1)
 
     # ── Auto-locate decision file ─────────────────────────────────────────────
@@ -118,6 +122,17 @@ def main():
     print(f"\nDecision:\n{title}")
     print(f"\nSource:\n{decision['data_source']}")
     print(f"\nConfidence:\n{decision['confidence']}")
+    resolved_lang = (
+        language_code
+        or decision.get("language_code")
+        or (decision.get("approval_metadata") or {}).get("language_code")
+        or os.environ.get("LANGUAGE_CODE", "hi-IN")
+    )
+    if resolved_lang == "te-IN":
+        subtitle = "దివ్య దర్శనం"
+    elif resolved_lang == "hi-IN":
+        subtitle = "दिव्य दर्शनम्"
+
     print("\n\nGenerating thumbnail...")
 
     # ── Generate Thumbnail ────────────────────────────────────────────────────
@@ -132,6 +147,7 @@ def main():
             subtitle=subtitle,
             output_path=out_img,
             background_image_path=bg_image,
+            language_code=resolved_lang,
         )
 
         # ── Analyze Thumbnail ─────────────────────────────────────────────────
@@ -144,6 +160,7 @@ def main():
         metadata = {
             "title":           title,
             "topic":           title,
+            "language_code":   resolved_lang,
             "provider":        provider_name,
             "resolution":      "1280x720",
             "format":          "png",
@@ -153,6 +170,7 @@ def main():
             "approval_metadata": {
                 "approved_for_generation": decision["approved_for_generation"],
                 "selected_topic": decision["selected_topic"],
+                "language_code": resolved_lang,
                 "score": decision["score"],
                 "confidence": decision["confidence"],
                 "data_source": decision["data_source"],

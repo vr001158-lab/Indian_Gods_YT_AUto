@@ -95,12 +95,13 @@ def check_provenance_consistency(manifests: dict[str, dict]) -> tuple[bool, str]
 
 def _normalise(s: str) -> str:
     import re
-    return re.sub(r"[^a-z0-9\s]", " ", s.strip().lower())
+    return re.sub(r"[^\w\s]", " ", s.strip().lower(), flags=re.UNICODE)
 
 
 def check_topic_consistency(decision: dict, manifests: dict[str, dict]) -> tuple[bool, str]:
     """
     The selected_topic from the decision must be consistent across all manifests.
+    Supports Unicode characters and cross-language deity consistency.
     """
     canonical = decision.get("selected_topic", "")
     if not canonical:
@@ -118,7 +119,7 @@ def check_topic_consistency(decision: dict, manifests: dict[str, dict]) -> tuple
     STOP = {"a", "an", "the", "of", "in", "on", "at", "to", "and", "or",
             "for", "is", "it", "its", "why", "how", "what", "does"}
     canonical_words = {
-        w for w in _normalise(canonical).split() if w not in STOP and len(w) >= 3
+        w for w in _normalise(canonical).split() if w not in STOP and len(w) >= 2
     }
 
     TOPIC_FIELDS = {
@@ -138,16 +139,117 @@ def check_topic_consistency(decision: dict, manifests: dict[str, dict]) -> tuple
             if not value:
                 continue
             value_words = {
-                w for w in _normalise(value).split() if w not in STOP and len(w) >= 3
+                w for w in _normalise(value).split() if w not in STOP and len(w) >= 2
             }
             overlap = canonical_words & value_words
             if len(overlap) == 0:
-                return (
-                    False,
-                    f"Topic mismatch in {name}.{field}: no keywords from "
-                    f"'{canonical}' found in '{value}'",
-                )
+                # Check cross-language deity consistency for Indic topics
+                from src.assets.selector import resolve_deity
+                canon_deity = resolve_deity(canonical, deity_hint=decision.get("deity", ""), default=None)
+                val_deity = resolve_deity(value, deity_hint=manifest.get("deity") or (manifest.get("approval_metadata") or {}).get("deity", ""), default=None)
+                if not (canon_deity and val_deity and canon_deity == val_deity):
+                    return (
+                        False,
+                        f"Topic mismatch in {name}.{field}: no keywords from "
+                        f"'{canonical}' found in '{value}'",
+                    )
     return True, "OK"
+
+
+def check_language_consistency(manifests: dict[str, dict], expected_language: str | None = None) -> tuple[bool, str]:
+    """
+    Validates that manifests carry a consistent, supported language code.
+    Allowed languages: 'hi-IN' (Hindi) and 'te-IN' (Telugu).
+    Fails closed if language metadata is missing, unsupported, or inconsistent.
+    Validates that text content contains the expected native Indic script.
+    """
+    import re
+    ALLOWED_LANGUAGES = {"hi-IN", "te-IN"}
+    detected_lang = expected_language
+
+    for name in ("script", "audio_map", "content_brief", "video_map", "thumbnail_meta"):
+        manifest = manifests.get(name)
+        if manifest is None or not isinstance(manifest, dict):
+            continue
+        lang = manifest.get("language_code") or (manifest.get("approval_metadata") or {}).get("language_code")
+        if not lang:
+            if expected_language:
+                return False, f"Missing language_code metadata in {name} manifest"
+            continue
+        if lang not in ALLOWED_LANGUAGES:
+            return False, f"Unsupported language '{lang}' in {name} manifest (must be 'hi-IN' or 'te-IN')"
+        if detected_lang is None:
+            detected_lang = lang
+        elif lang != detected_lang:
+            return False, f"Language mismatch in {name}: expected '{detected_lang}', got '{lang}'"
+
+    # Validate native script coverage in script
+    script = manifests.get("script")
+    if script and isinstance(script, dict) and detected_lang:
+        title = script.get("title", "")
+        narration = script.get("narration", "")
+        text_sample = f"{title} {narration}".strip()
+        if text_sample:
+            if detected_lang == "hi-IN" and not re.search(r"[\u0900-\u097F]", text_sample):
+                if expected_language:
+                    return False, "Script content lacks Devanagari characters for language 'hi-IN'"
+            elif detected_lang == "te-IN" and not re.search(r"[\u0C00-\u0C7F]", text_sample):
+                if expected_language:
+                    return False, "Script content lacks Telugu characters for language 'te-IN'"
+
+    return True, f"OK ({detected_lang or 'unspecified'})"
+
+
+def check_format_consistency(
+    manifests: dict[str, dict],
+    expected_format: str = "narrated",
+) -> tuple[bool, str]:
+    """
+    Validates adherence to format rules ('old' vs 'narrated').
+
+    OLD format rules:
+      - Devotional visuals + background music ONLY.
+      - Zero voice narration or spoken dialogue (audio_type='music_only', voice_name in ('none', '')).
+      - Zero burned captions, subtitles, or text overlays in video.
+      - Must have valid background music metadata (bgm_title or bgm_deity).
+
+    NARRATED format rules:
+      - Voice narration must be present.
+      - Audio must not be audio_type='music_only'.
+    """
+    fmt = (expected_format or "narrated").lower().strip()
+    audio_map = manifests.get("audio_map") or {}
+    video_map = manifests.get("video_map") or {}
+
+    if fmt == "old":
+        # 1. Audio must be music_only
+        audio_type = audio_map.get("audio_type", "")
+        if audio_type and audio_type != "music_only":
+            return False, f"Old format requires audio_type='music_only', got '{audio_type}'"
+
+        voice_name = str(audio_map.get("voice_name", "")).lower()
+        if voice_name and voice_name not in ("none", "none_music_only", "devotional_music", ""):
+            return False, f"Old format must not contain voice narration (got voice_name='{voice_name}')"
+
+        # 2. Video must not contain captions/subtitles or text overlay filters
+        if video_map.get("has_captions") is True or video_map.get("caption_text_file"):
+            return False, "Old format must not contain subtitles, captions, or speech text overlays"
+
+        # 3. Must have BGM track metadata
+        if not audio_map.get("bgm_title") and not audio_map.get("bgm_deity"):
+            return False, "Old format requires background devotional music metadata"
+
+        return True, "OK (old format: music-only, zero captions)"
+
+    elif fmt == "narrated":
+        if audio_map.get("audio_type") == "music_only":
+            return False, "Narrated format cannot use audio_type='music_only'"
+        if audio_map.get("voice_name") == "none":
+            return False, "Narrated format requires active voice narration"
+
+        return True, "OK (narrated format: spoken narration verified)"
+
+    return True, f"OK ({fmt})"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

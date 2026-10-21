@@ -321,9 +321,11 @@ def _generate_fallback_script(brief: dict) -> dict:
     }
 
 
-def generate_script(brief: dict) -> dict:
+def generate_script(brief: dict, language_code: str | None = None) -> dict:
     """
     Converts a content brief JSON into a structured production script.
+    Supports Hindi ('hi-IN') and Telugu ('te-IN') generation via Google Gemini API
+    with robust offline multilingual fallbacks.
     Fails closed if the content brief is invalid or lacks approved metadata.
     """
     ok, error_msg = validate_brief_input(brief)
@@ -334,22 +336,38 @@ def generate_script(brief: dict) -> dict:
     topic = meta["selected_topic"]
     deity = meta.get("deity", "").lower()
 
-    from src.content.brief_generator import is_blueprint_topic_matching
+    import os
+    lang = (
+        language_code
+        or brief.get("language_code")
+        or meta.get("language_code")
+        or os.environ.get("LANGUAGE_CODE")
+    )
 
-    if (
-        deity in _DEITY_SCRIPTS
-        and is_blueprint_topic_matching(topic, deity)
-        and brief["primary_title"] == _DEITY_SCRIPTS[deity]["title"]
-    ):
-        script = _DEITY_SCRIPTS[deity]
+    if lang in ("hi-IN", "te-IN"):
+        from src.content.gemini_provider import generate_script_with_gemini
+        ct = (brief.get("content_type") or "short").lower()
+        script = generate_script_with_gemini(brief, language_code=lang, content_type=ct, allow_fallback=True)
     else:
-        script = _generate_fallback_script(brief)
+        from src.content.brief_generator import is_blueprint_topic_matching
+
+        if (
+            deity in _DEITY_SCRIPTS
+            and is_blueprint_topic_matching(topic, deity)
+            and brief["primary_title"] == _DEITY_SCRIPTS[deity]["title"]
+        ):
+            script = _DEITY_SCRIPTS[deity]
+        else:
+            script = _generate_fallback_script(brief)
 
     # Copy script to avoid modifying global dictionary, then inject approval_metadata & run_id
     script_data = dict(script)
     timestamp = time.strftime("%Y%m%d_%H%M%S")
     script_data["run_id"] = f"run_{timestamp}"
-    script_data["approval_metadata"] = brief["approval_metadata"]
+    script_data["approval_metadata"] = dict(brief["approval_metadata"])
+    if lang:
+        script_data["approval_metadata"]["language_code"] = lang
+        script_data["language_code"] = lang
     if brief.get("format"):
         script_data["format"] = brief["format"]
     if brief.get("content_type"):
@@ -401,13 +419,17 @@ def generate_script(brief: dict) -> dict:
     if canonical_topic and script_title:
         import re
         STOP = {"a", "an", "the", "of", "in", "on", "at", "to", "and", "or", "for", "is", "it", "its", "why", "how", "what", "does"}
-        canon_words = {w for w in re.sub(r"[^a-z0-9\s]", " ", canonical_topic.lower()).split() if w not in STOP and len(w) >= 3}
-        title_words = {w for w in re.sub(r"[^a-z0-9\s]", " ", script_title.lower()).split() if w not in STOP and len(w) >= 3}
+        canon_words = {w for w in re.sub(r"[^\w\s]", " ", canonical_topic.lower(), flags=re.UNICODE).split() if w not in STOP and len(w) >= 2}
+        title_words = {w for w in re.sub(r"[^\w\s]", " ", script_title.lower(), flags=re.UNICODE).split() if w not in STOP and len(w) >= 2}
         overlap = canon_words & title_words
         if len(overlap) == 0:
-            raise ValueError(
-                f"❌ Early Safety Gate Rejection: Script title '{script_title}' has no keyword overlap with selected topic '{canonical_topic}'"
-            )
+            from src.assets.selector import resolve_deity
+            c_deity = resolve_deity(canonical_topic, deity_hint=meta.get("deity", ""), default=None)
+            t_deity = resolve_deity(script_title, deity_hint=meta.get("deity", ""), default=None)
+            if not (c_deity and t_deity and c_deity == t_deity):
+                raise ValueError(
+                    f"❌ Early Safety Gate Rejection: Script title '{script_title}' has no keyword or deity connection with selected topic '{canonical_topic}'"
+                )
 
     # Validate output schema
     ok_out, err_out = validate_script_output(script_data, content_type=script_data.get("content_type", "short"))
@@ -417,7 +439,11 @@ def generate_script(brief: dict) -> dict:
     return script_data
 
 
-def process_brief_file(brief_path: Path, output_dir: Path = Path("data/scripts")) -> Path:
+def process_brief_file(
+    brief_path: Path,
+    output_dir: Path = Path("data/scripts"),
+    language_code: str | None = None,
+) -> Path:
     """
     Orchestrates the conversion of a content brief file into a production script.
     """
@@ -429,7 +455,7 @@ def process_brief_file(brief_path: Path, output_dir: Path = Path("data/scripts")
     except Exception as e:
         raise ValueError(f"Failed to parse content brief JSON: {e}")
 
-    script = generate_script(brief)
+    script = generate_script(brief, language_code=language_code)
 
     # Persist script
     timestamp = time.strftime("%Y%m%d_%H%M%S")

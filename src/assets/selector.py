@@ -8,27 +8,74 @@ from pathlib import Path
 from typing import Any, Sequence
 
 DEITY_ALIASES: dict[str, list[str]] = {
-    "lord_shiva": ["shiva", "mahadev", "bholenath", "snake", "vasuki", "trishul", "kailash", "somnath", "mahakal", "shivling", "nataraja", "arunachalam", "kedarnath"],
-    "lord_vishnu": ["vishnu", "narayana", "dashavatar", "viku"],
-    "krishna": ["krishna", "gopala", "kanha", "govinda", "isckon", "flute", "butter"],
-    "ganesha": ["ganesha", "ganesh", "vinayaka", "vighnaharta", "gajanana", "broken tusk", "morya"],
-    "hanuman": ["hanuman", "bajrangbali", "maruti", "anjaneya", "sanjeevani", "chala"],
-    "lakshmi_devi": ["lakshmi", "laxmi", "sri", "wealth"],
-    "narasimha": ["narasimha", "narasingh", "prahlada", "lion"],
-    "ram": ["ram", "rama", "ramachandra", "ayodhya", "sita", "bow"],
-    "parvathi": ["parvathi", "parvati", "gauri", "shakti", "durga"],
-    "subramanya": ["subramanya", "murugan", "kartikeya", "skanda", "vel"],
-    "ayyappa": ["ayyappa", "sabarimala", "manikanta"],
-    "7Kondala_Swami": ["7kondala", "venkateswara", "balaji", "tirupati", "govinda", "7kondala_swami"],
+    "lord_shiva": [
+        "shiva", "mahadev", "bholenath", "snake", "vasuki", "trishul", "kailash", "somnath", "mahakal", "shivling", "nataraja", "arunachalam", "kedarnath",
+        "शिव", "महादेव", "भोलेनाथ", "वासुकी", "कैलाश", "सोमनाथ", "नीलकंठ", "శివ", "శివుడు", "మహాదేవుడు", "వాసుకి", "కైలాస", "నీలకంఠ", "నటరాజ"
+    ],
+    "lord_vishnu": [
+        "vishnu", "narayana", "dashavatar", "viku",
+        "विष्णु", "नारायण", "दशावतार", "విష్ణు", "విష్ణువు", "నారాయణ", "దశావతార"
+    ],
+    "krishna": [
+        "krishna", "gopala", "kanha", "govinda", "isckon", "flute", "butter",
+        "कृष्ण", "गोपाल", "कान्हा", "गोविन्द", "కృష్ణ", "కృష్ణుడు", "గోపాల", "గోవింద"
+    ],
+    "ganesha": [
+        "ganesha", "ganesh", "vinayaka", "vighnaharta", "gajanana", "broken tusk", "morya",
+        "गणेश", "गणपति", "विनायक", "गजानन", "एकदंत", "గణపతి", "వినాయక", "వినాయకుడు", "గణేశ", "ఏకదంత"
+    ],
+    "hanuman": [
+        "hanuman", "bajrangbali", "maruti", "anjaneya", "sanjeevani", "chala",
+        "हनुमान", "बजरंगबली", "मारुति", "आंजनेय", "హనుమాన్", "హనుమంతుడు", "ఆంజనేయ", "బజరంగబలి"
+    ],
+    "lakshmi_devi": [
+        "lakshmi", "laxmi", "sri", "wealth",
+        "लक्ष्मी", "महालक्ष्मी", "లక్ష్మి", "లక్ష్మీ", "మహాలక్ష్మి"
+    ],
+    "narasimha": [
+        "narasimha", "narasingh", "prahlada", "lion",
+        "नरसिंह", "प्रह्लाद", "నరసింహ", "నరసింహ స్వామి", "ప్రహ్లాద"
+    ],
+    "ram": [
+        "ram", "rama", "ramachandra", "ayodhya", "sita", "bow",
+        "राम", "श्रीराम", "रामचन्द्र", "अयोध्या", "సీత", "రాముడు", "శ్రీరామ", "అయోధ్య"
+    ],
+    "parvathi": [
+        "parvathi", "parvati", "gauri", "shakti", "durga",
+        "पार्वती", "गौरी", "शक्ति", "दुर्गा", "పార్వతి", "గౌరి", "శక్తి", "దుర్గ"
+    ],
+    "subramanya": [
+        "subramanya", "murugan", "kartikeya", "skanda", "vel",
+        "सुब्रह्मण्य", "कार्तिकेय", "स्कन्द", "మురుగన్", "సుబ్రహ్మణ్య", "కార్తికేయ"
+    ],
+    "ayyappa": [
+        "ayyappa", "sabarimala", "manikanta",
+        "अय्यप्पा", "सबरीमाला", "मणिकंठ", "అయ్యప్ప", "శబరిమల", "మణికంఠ"
+    ],
+    "7Kondala_Swami": [
+        "7kondala", "venkateswara", "balaji", "tirupati", "govinda", "7kondala_swami",
+        "वेंकटेश्वर", "बालाजी", "तिरुपति", "వేంకటేశ్వర", "శ్రీవారి", "బాలాజీ", "తిరుపతి", "ఏడుకొండల"
+    ],
 }
 
 
-def resolve_deity(topic: str) -> str:
+def resolve_deity(topic: str, deity_hint: str = "", default: str | None = "lord_shiva") -> str | None:
     """
     Detect deity from canonical topic or content brief text.
     Returns deity key matching assets/gods/<deity>/ folder name.
-    Defaults to "lord_shiva" if undetermined.
+    Defaults to `default` ("lord_shiva") if undetermined.
     """
+    if deity_hint:
+        hint_lower = deity_hint.strip().lower()
+        # Direct folder name match
+        for key in DEITY_ALIASES:
+            if hint_lower == key.lower():
+                return key
+        # Alias match on hint
+        for key, aliases in DEITY_ALIASES.items():
+            if hint_lower in [a.lower() for a in aliases]:
+                return key
+
     normalised = topic.lower()
     for deity_key, aliases in DEITY_ALIASES.items():
         for alias in aliases:
@@ -36,7 +83,7 @@ def resolve_deity(topic: str) -> str:
                 return deity_key
             if alias in normalised:
                 return deity_key
-    return "lord_shiva"
+    return default
 
 
 def _score_semantic_match(asset_path: str, keywords: Sequence[str]) -> int:

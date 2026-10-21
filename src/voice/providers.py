@@ -36,23 +36,25 @@ def _get_audio_duration(path: Path) -> int:
         return 5
 
 
-def _synthesize_speech(text: str, output_path: Path) -> int:
+def _synthesize_speech(text: str, output_path: Path, language_code: str = "hi-IN") -> int:
     """
     Synthesize *text* into a real MP3 file at *output_path*.
 
     Priority order:
-      1. gTTS  (Google TTS, Indian English accent)
+      1. gTTS  (Google TTS in Hindi 'hi' or Telugu 'te')
       2. pyttsx3 / Windows SAPI5
       3. FFmpeg sine-wave  (last resort — valid audio but not speech)
 
     Returns the actual audio duration in whole seconds measured by ffprobe.
     """
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    lang_map = {"hi-IN": "hi", "te-IN": "te"}
+    gtts_lang = lang_map.get(language_code, "te" if "te" in language_code.lower() else "hi")
 
-    # --- attempt 1: gTTS ---
+    # --- attempt 1: gTTS (Indic Hindi/Telugu) ---
     try:
         from gtts import gTTS  # type: ignore
-        tts = gTTS(text=text, lang="en", tld="co.in", slow=False)
+        tts = gTTS(text=text, lang=gtts_lang, slow=False)
         tts.save(str(output_path))
         if output_path.exists() and output_path.stat().st_size > 1000:
             return _get_audio_duration(output_path)

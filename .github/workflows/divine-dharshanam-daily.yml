@@ -2,14 +2,14 @@ name: Divine Dharshanam Daily — Production Automated Pipeline
 
 on:
   schedule:
-    # 1. Daily Primary Short (OLD format devotional): 04:00 UTC (09:30 AM IST) - Every day (Mon-Sun)
-    - cron: '0 4 * * *'
-    # 2. Second Short (OLD format devotional): 13:30 UTC (07:00 PM IST) - Wed, Fri, Sun only
-    - cron: '30 13 * * 0,3,5'
-    # 3. Long Video (OLD format 16:9): 06:30 UTC (12:00 PM IST) - Tuesday & Saturday only
-    - cron: '30 6 * * 2,6'
-    # 4. Narrated Experiment (Short with overlay text): 05:00 UTC (10:30 AM IST) - Monday & Thursday only
-    - cron: '0 5 * * 1,4'
+    # 1. Morning Daily Production (Hindi hi-IN): 06:00 AM IST = 00:30 UTC - Every day
+    - cron: '30 0 * * *'
+    # 2. Evening Daily Production (Telugu te-IN): 06:00 PM IST = 12:30 UTC - Every day
+    - cron: '30 12 * * *'
+    # 3. Weekly Long Video (Hindi hi-IN): 12:00 PM IST = 06:30 UTC - Tuesday only
+    - cron: '30 6 * * 2'
+    # 4. Weekly Long Video (Telugu te-IN): 12:00 PM IST = 06:30 UTC - Saturday only
+    - cron: '30 6 * * 6'
   workflow_dispatch:
     inputs:
       content_type:
@@ -23,24 +23,23 @@ on:
       format:
         description: 'Production Format (old: devotional visual | narrated: narrated with captions)'
         required: true
-        default: 'old'
+        default: 'narrated'
         type: choice
         options:
-          - old
           - narrated
+          - old
       language_code:
-        description: 'Target Language (hi-IN | te-IN | ta-IN)'
+        description: 'Target Language (hi-IN: Hindi | te-IN: Telugu)'
         required: true
         default: 'hi-IN'
         type: choice
         options:
           - hi-IN
           - te-IN
-          - ta-IN
       dry_run:
         description: 'Dry Run Mode (stop before YouTube upload)'
         required: true
-        default: false
+        default: true
         type: boolean
 
 concurrency:
@@ -128,6 +127,9 @@ jobs:
       - name: Execute Canonical Production Pipeline
         env:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          LANGUAGE_CODE_INPUT: ${{ inputs.language_code }}
           CONTENT_TYPE_INPUT: ${{ inputs.content_type }}
           FORMAT_INPUT: ${{ inputs.format }}
           DRY_RUN_INPUT: ${{ inputs.dry_run }}
@@ -135,29 +137,34 @@ jobs:
         run: |
           CT="${CONTENT_TYPE_INPUT:-short}"
           FMT="${FORMAT_INPUT:-old}"
+          LANG="${LANGUAGE_CODE_INPUT:-hi-IN}"
           EXP_TAG=""
           if [ "${{ github.event_name }}" = "schedule" ]; then
             case "$SCHEDULE_CRON" in
-              "0 4 * * *")
-                CT="short"
-                FMT="old"
-                ;;
-              "30 13 * * 0,3,5")
-                CT="short"
-                FMT="old"
-                ;;
-              "30 6 * * 2,6")
-                CT="long"
-                FMT="old"
-                ;;
-              "0 5 * * 1,4")
+              "30 0 * * *")
                 CT="short"
                 FMT="narrated"
-                EXP_TAG="--experiment-tag narrated_experiment"
+                LANG="hi-IN"
+                ;;
+              "30 12 * * *")
+                CT="short"
+                FMT="narrated"
+                LANG="te-IN"
+                ;;
+              "30 6 * * 2")
+                CT="long"
+                FMT="narrated"
+                LANG="hi-IN"
+                ;;
+              "30 6 * * 6")
+                CT="long"
+                FMT="narrated"
+                LANG="te-IN"
                 ;;
               *)
                 CT="short"
-                FMT="old"
+                FMT="narrated"
+                LANG="hi-IN"
                 ;;
             esac
           fi
@@ -165,8 +172,8 @@ jobs:
           if [ "$DRY_RUN_INPUT" = "true" ]; then
             DRY="--dry-run"
           fi
-          echo "🚀 Executing pipeline with content-type=$CT format=$FMT $EXP_TAG $DRY"
-          python run_pipeline.py --content-type "$CT" --format "$FMT" $EXP_TAG $DRY
+          echo "🚀 Executing pipeline with content-type=$CT format=$FMT language=$LANG $EXP_TAG $DRY"
+          python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT" $EXP_TAG $DRY
 
       - name: Persist Lightweight Publishing History State
         if: always()

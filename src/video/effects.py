@@ -55,9 +55,134 @@ def get_fade_in_out_filter(duration_seconds: int, fade_duration: float = 0.5) ->
     return f"{fade_in},{fade_out}"
 
 
+def resolve_caption_font(
+    language_code: str = "hi-IN",
+    explicit_font_path: str | None = None,
+    raise_on_missing: bool = True,
+) -> str:
+    """
+    Finds and verifies an appropriate Indic-compatible font across Windows, Linux, and macOS.
+    Supports Hindi (Devanagari) and Telugu glyphs with clean verification and explicit overrides.
+
+    Resolution order:
+      1. explicit_font_path argument (if provided)
+      2. Environment variable overrides (INDIC_FONT_PATH, HINDI_FONT_PATH, TELUGU_FONT_PATH)
+      3. Operating system font locations (Windows, Linux, macOS)
+      4. Safe Unicode fallback (DejaVuSans, FreeSans)
+
+    Raises
+    ------
+    FileNotFoundError: If an explicitly configured font path does not exist.
+    ValueError: If an unsupported language code is provided.
+    RuntimeError: If no suitable font file exists on the system and raise_on_missing is True.
+    """
+    import os
+    from pathlib import Path
+
+    lang = (language_code or "hi-IN").strip()
+    if lang not in ("hi-IN", "te-IN", "en", "en-US", "en-IN"):
+        raise ValueError(f"Unsupported language code '{language_code}' for Indic font resolution.")
+
+    # 1. Explicit font path parameter
+    if explicit_font_path:
+        p = Path(explicit_font_path)
+        if p.exists() and p.is_file():
+            return str(p.resolve()).replace("\\", "/")
+        raise FileNotFoundError(f"Explicitly specified font path does not exist: {explicit_font_path}")
+
+    # 2. Environment variable overrides
+    env_override = os.environ.get("INDIC_FONT_PATH")
+    if not env_override:
+        if lang == "hi-IN":
+            env_override = os.environ.get("HINDI_FONT_PATH")
+        elif lang == "te-IN":
+            env_override = os.environ.get("TELUGU_FONT_PATH")
+
+    if env_override:
+        p = Path(env_override)
+        if p.exists() and p.is_file():
+            return str(p.resolve()).replace("\\", "/")
+        raise FileNotFoundError(f"Configured font environment variable path does not exist: {env_override}")
+
+    # 3. System font candidates (platform-specific)
+    candidates: list[str] = []
+
+    # Windows standard fonts
+    if os.name == "nt":
+        candidates.extend([
+            "C:/Windows/Fonts/Nirmala.ttc",
+            "C:/Windows/Fonts/nirmala.ttf",
+            "C:/Windows/Fonts/NirmalaB.ttf",
+        ])
+        if lang == "te-IN":
+            candidates.extend([
+                "C:/Windows/Fonts/gautami.ttf",
+                "C:/Windows/Fonts/gautamib.ttf",
+            ])
+        elif lang == "hi-IN":
+            candidates.extend([
+                "C:/Windows/Fonts/mangal.ttf",
+                "C:/Windows/Fonts/mangalb.ttf",
+                "C:/Windows/Fonts/aparaj.ttf",
+            ])
+        candidates.extend([
+            "C:/Windows/Fonts/arial.ttf",
+            "C:/Windows/Fonts/segoeui.ttf",
+        ])
+
+    # Linux (GitHub Actions / Ubuntu) font candidates
+    if lang == "te-IN":
+        candidates.extend([
+            "/usr/share/fonts/truetype/noto/NotoSansTelugu-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansTelugu-Bold.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSansTelugu-Regular.otf",
+            "/usr/share/fonts/truetype/lohit-telugu/Lohit-Telugu.ttf",
+            "/usr/share/fonts/truetype/fonts-telu/Pothana2000.ttf",
+            "/usr/share/fonts/truetype/Gidugu.ttf",
+        ])
+    elif lang == "hi-IN":
+        candidates.extend([
+            "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Bold.ttf",
+            "/usr/share/fonts/opentype/noto/NotoSansDevanagari-Regular.otf",
+            "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf",
+            "/usr/share/fonts/truetype/Gargi.ttf",
+            "/usr/share/fonts/truetype/nakula/nakula.ttf",
+        ])
+
+    # Generic Linux fallbacks
+    candidates.extend([
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    ])
+
+    # macOS candidates
+    candidates.extend([
+        "/System/Library/Fonts/KohinoorBangla.ttc",
+        "/System/Library/Fonts/Supplemental/Nirmala.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+    ])
+
+    for cf in candidates:
+        candidate_path = Path(cf)
+        if candidate_path.exists() and candidate_path.is_file():
+            return str(candidate_path.resolve()).replace("\\", "/")
+
+    if raise_on_missing:
+        raise RuntimeError(
+            f"No suitable Indic font found on system for '{lang}'. "
+            f"Please install fonts-noto-core / fonts-deva / fonts-telu or set HINDI_FONT_PATH / TELUGU_FONT_PATH."
+        )
+
+    # Safe return only if raise_on_missing is False
+    return "C:/Windows/Fonts/Nirmala.ttc" if os.name == "nt" else "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf"
+
+
 def get_caption_filter(
     caption_text_file: str,
-    font_path: str = "C:/Windows/Fonts/Nirmala.ttc",
+    font_path: str | None = None,
+    language_code: str = "hi-IN",
     fontsize: int = 42,
     y_position_ratio: float = 0.72,
 ) -> str:
@@ -65,7 +190,8 @@ def get_caption_filter(
     Returns an FFmpeg drawtext filter string for burning captions from a textfile into the video stream.
     Formats text inside YouTube Shorts safe area with a high-contrast dark background box.
     """
-    escaped_font_path = font_path.replace("\\", "/").replace(":", "\\:")
+    target_font = resolve_caption_font(language_code=language_code, explicit_font_path=font_path)
+    escaped_font_path = target_font.replace("\\", "/").replace(":", "\\:")
     escaped_text_path = caption_text_file.replace("\\", "/").replace(":", "\\:")
     return (
         f"drawtext=fontfile='{escaped_font_path}':"
@@ -85,6 +211,7 @@ def get_video_filtergraph_for_scene(
     height: int = 1920,
     motion_type: str = "zoom_in",
     caption_text_file: str | None = None,
+    language_code: str = "hi-IN",
 ) -> str:
     """
     Combines scale, SAR normalization, Ken Burns, fades, and optional captions into a single FFmpeg filter chain for a scene.
@@ -105,7 +232,7 @@ def get_video_filtergraph_for_scene(
 
     # 4. Add captions if provided
     if caption_text_file:
-        caption_filter = get_caption_filter(caption_text_file)
+        caption_filter = get_caption_filter(caption_text_file, language_code=language_code)
         filter_chain += f",{caption_filter}"
 
     return filter_chain

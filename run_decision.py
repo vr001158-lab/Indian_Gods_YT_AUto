@@ -49,6 +49,7 @@ def main():
     min_score   = DEFAULT_MIN_SCORE
     save_output = True
     format_type = "narrated"
+    language_code = None
 
     # ── CLI parsing ───────────────────────────────────────────────────────────
     args = sys.argv[1:]
@@ -67,12 +68,15 @@ def main():
         elif args[i] == "--format" and i + 1 < len(args):
             format_type = args[i + 1].lower().strip()
             i += 2
+        elif args[i] in ("--language", "-l") and i + 1 < len(args):
+            language_code = args[i + 1]
+            i += 2
         elif args[i] == "--no-save":
             save_output = False
             i += 1
         else:
             print(f"❌ Unknown argument: {args[i]}", file=sys.stderr)
-            print("Usage: python run_decision.py [--input FILE] [--min-score N] [--format narrated|old] [--no-save]", file=sys.stderr)
+            print("Usage: python run_decision.py [--input FILE] [--min-score N] [--format narrated|old] [--language hi-IN|te-IN] [--no-save]", file=sys.stderr)
             sys.exit(1)
 
     # ── Locate research file ──────────────────────────────────────────────────
@@ -106,6 +110,7 @@ def main():
         min_score=min_score,
         save=save_output,
         format=format_type,
+        language_code=language_code,
     )
 
     # ── Print report ──────────────────────────────────────────────────────────

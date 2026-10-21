@@ -14,14 +14,33 @@ from src.pipeline.logger import PipelineLogger
 class PipelineRunner:
     """End-to-end Pipeline Orchestrator executing stages from Research to Upload Prep."""
 
-    def __init__(self, state: PipelineState = None, dry_run: bool = False, content_type: str = "short", format: str = "narrated", experiment_tag: str | None = None):
+    def __init__(
+        self,
+        state: PipelineState = None,
+        dry_run: bool = False,
+        content_type: str = "short",
+        format: str = "narrated",
+        experiment_tag: str | None = None,
+        language_code: str | None = None,
+    ):
         self.format = (format or getattr(state, "format", "narrated")).lower()
         self.experiment_tag = experiment_tag or getattr(state, "experiment_tag", None)
-        self.state = state or PipelineState(format=self.format, experiment_tag=self.experiment_tag)
+        self.language_code = (
+            language_code
+            or getattr(state, "language_code", None)
+            or os.environ.get("LANGUAGE_CODE", "hi-IN")
+        )
+        self.state = state or PipelineState(
+            format=self.format,
+            experiment_tag=self.experiment_tag,
+            language_code=self.language_code,
+        )
         if hasattr(self.state, "format"):
             self.state.format = self.format
         if hasattr(self.state, "experiment_tag") and self.experiment_tag:
             self.state.experiment_tag = self.experiment_tag
+        if hasattr(self.state, "language_code"):
+            self.state.language_code = self.language_code
         self.dry_run = dry_run
         self.content_type = content_type
 
@@ -96,7 +115,12 @@ class PipelineRunner:
             raise ValueError(f"Missing or invalid research input file: {research_file}")
 
         start_time = time.time()
-        cmd = [sys.executable, "run_decision.py", "--input", str(research_file), "--format", self.format]
+        cmd = [
+            sys.executable, "run_decision.py",
+            "--input", str(research_file),
+            "--format", self.format,
+            "--language", self.language_code,
+        ]
         self._execute_cmd(cmd, stage)
         out_file = self._find_latest_file(Path("data/decision"), "decision_*.json", min_mtime=start_time - 2)
         decision_data = json.loads(out_file.read_text(encoding="utf-8"))
@@ -126,7 +150,11 @@ class PipelineRunner:
             raise ValueError(f"Missing or invalid decision input file: {decision_file}")
 
         start_time = time.time()
-        cmd = [sys.executable, "run_content_brief.py", "--input", str(decision_file)]
+        cmd = [
+            sys.executable, "run_content_brief.py",
+            "--input", str(decision_file),
+            "--language", self.language_code,
+        ]
         self._execute_cmd(cmd, stage)
 
         out_file = self._find_latest_file(Path("data/content_briefs"), "content_brief_*.json", min_mtime=start_time - 2)
@@ -148,7 +176,11 @@ class PipelineRunner:
             raise ValueError(f"Missing or invalid brief input file: {brief_file}")
 
         start_time = time.time()
-        cmd = [sys.executable, "run_script_generator.py", "--input", str(brief_file)]
+        cmd = [
+            sys.executable, "run_script_generator.py",
+            "--input", str(brief_file),
+            "--language", self.language_code,
+        ]
         self._execute_cmd(cmd, stage)
 
         out_file = self._find_latest_file(Path("data/scripts"), "script_*.json", min_mtime=start_time - 2)
@@ -179,6 +211,7 @@ class PipelineRunner:
             "--mode", mode,
             "--format", self.format,
             "--content-type", self.content_type,
+            "--language", self.language_code,
         ]
         self._execute_cmd(cmd, stage)
 
@@ -274,7 +307,12 @@ class PipelineRunner:
 
         start_time = time.time()
         provider = "mock" if self.dry_run else "pil"
-        cmd = [sys.executable, "run_thumbnail_generator.py", "--input", str(decision_file), "--provider", provider]
+        cmd = [
+            sys.executable, "run_thumbnail_generator.py",
+            "--input", str(decision_file),
+            "--provider", provider,
+            "--language", self.language_code,
+        ]
         self._execute_cmd(cmd, stage)
 
         out_file = self._find_latest_file(Path("data/thumbnails"), "thumbnail_metadata_*.json", min_mtime=start_time - 2)
@@ -309,6 +347,8 @@ class PipelineRunner:
             base_dir=".",
             allow_mock=self.dry_run,
             content_type=self.content_type,
+            language_code=self.language_code,
+            format=self.format,
             decision_file=str(decision_file),
             content_brief_file=str(brief_file),
             script_file=str(script_file),

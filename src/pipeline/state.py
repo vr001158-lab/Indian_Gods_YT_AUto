@@ -25,10 +25,17 @@ STAGES = [
 class PipelineState:
     """Manages tracking, persistence, and loading of pipeline state."""
 
-    def __init__(self, pipeline_id: str = None, format: str = "narrated", experiment_tag: str | None = None):
+    def __init__(
+        self,
+        pipeline_id: str = None,
+        format: str = "narrated",
+        experiment_tag: str | None = None,
+        language_code: str | None = None,
+    ):
         fmt_suffix = "OLD" if (format or "").lower() == "old" else "NARRATED"
         self.format = (format or "narrated").lower()
         self.experiment_tag = experiment_tag
+        self.language_code = language_code
         self.pipeline_id = pipeline_id or f"run_{time.strftime('%Y%m%d_%H%M%S')}_{fmt_suffix}"
         self.current_stage = "RESEARCH"
         self.completed_stages = []
@@ -76,6 +83,7 @@ class PipelineState:
         data = {
             "pipeline_id":      self.pipeline_id,
             "format":           self.format,
+            "language_code":    self.language_code,
             "experiment_tag":   self.experiment_tag,
             "current_stage":     self.current_stage,
             "completed_stages":  self.completed_stages,
@@ -96,7 +104,12 @@ class PipelineState:
 
         data = json.loads(file_path.read_text(encoding="utf-8"))
         
-        state = cls(pipeline_id=data["pipeline_id"], format=data.get("format", "narrated"), experiment_tag=data.get("experiment_tag"))
+        state = cls(
+            pipeline_id=data["pipeline_id"],
+            format=data.get("format", "narrated"),
+            experiment_tag=data.get("experiment_tag"),
+            language_code=data.get("language_code"),
+        )
         state.current_stage = data["current_stage"]
         state.completed_stages = data["completed_stages"]
         state.failed_stage = data.get("failed_stage")

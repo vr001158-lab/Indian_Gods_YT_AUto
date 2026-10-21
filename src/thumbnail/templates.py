@@ -23,3 +23,13 @@ DEVOTIONAL_SCHEME_RED = {
     "branding_size":     24,
     "branding_text":     "DIVINE DHARSHANAM DAILY",
 }
+
+
+def get_thumbnail_theme(language_code: str = "hi-IN", theme_name: str = "gold") -> dict:
+    """Returns a theme dictionary localized with native branding text."""
+    base = dict(DEVOTIONAL_GOLD_THEME if theme_name == "gold" else DEVOTIONAL_SCHEME_RED)
+    if language_code == "te-IN":
+        base["branding_text"] = "దివ్య దర్శనం"
+    elif language_code == "hi-IN":
+        base["branding_text"] = "दिव्य दर्शनम्"
+    return base

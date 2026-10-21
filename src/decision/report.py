@@ -33,6 +33,7 @@ def run_decision_pipeline(
     min_score:  int = 60,
     save:       bool = True,
     format:     str = "narrated",
+    language_code: str | None = None,
 ) -> dict:
     """
     Runs the full decision pipeline on a list of research candidates.
@@ -43,6 +44,7 @@ def run_decision_pipeline(
     min_score  : int   — minimum overall_score required (default 60)
     save       : bool  — if True, writes decision JSON to data/decision/
     format     : str   — content format ('narrated' or 'old')
+    language_code: str | None — 'hi-IN' or 'te-IN'
 
     Returns
     -------
@@ -65,6 +67,7 @@ def run_decision_pipeline(
         decision = {
             "approved_for_generation": True,
             "format":           (format or "narrated").lower(),
+            "language_code":    language_code,
             "selected_topic":   selected["topic"],
             "score":            selected["overall_score"],
             "confidence":       selected["confidence"],

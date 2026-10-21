@@ -26,7 +26,8 @@ def create_scene_asset_plan(
     This asset plan is reusable across Hindi, Telugu, and Tamil narration tracks.
     """
     topic = script.get("title") or script.get("approval_metadata", {}).get("selected_topic", "")
-    deity = resolve_deity(topic)
+    deity_hint = script.get("approval_metadata", {}).get("deity") or script.get("deity", "")
+    deity = resolve_deity(topic, deity_hint=deity_hint)
 
     manifest = load_asset_manifest(manifest_path=manifest_path, gods_dir=gods_dir)
     scene_scripts = script.get("scene_scripts", [])

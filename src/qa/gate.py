@@ -20,7 +20,9 @@ from .artifacts import PipelineArtifacts, discover_artifacts
 from .checks import (
     check_audio_map,
     check_decision_approval,
+    check_format_consistency,
     check_json_file,
+    check_language_consistency,
     check_media_file,
     check_provenance_consistency,
     check_scene_sync,
@@ -53,6 +55,7 @@ class QAResult:
         self.data_source:     str      = ""
         self.approved_at:     str      = ""
         self.content_type:    str      = DEFAULT_CONTENT_TYPE
+        self.language_code:   str      = ""
         self.experiment_tag:  str      = ""
         self.aspect_ratio:    str      = ""
         self.resolution:      str      = ""
@@ -79,6 +82,7 @@ class QAResult:
             "confidence":              self.confidence,
             "data_source":             self.data_source,
             "content_type":            self.content_type,
+            "language_code":           self.language_code,
             "experiment_tag":          self.experiment_tag,
             "aspect_ratio":            self.aspect_ratio,
             "resolution":              self.resolution,
@@ -130,11 +134,16 @@ class FinalQAGate:
         base_dir: str | Path | None = None,
         allow_mock: bool = False,
         content_type: str = DEFAULT_CONTENT_TYPE,
+        language: str | None = None,
+        language_code: str | None = None,
+        format: str = "narrated",
         **artifact_overrides,
     ) -> None:
         self._base_dir         = Path(base_dir) if base_dir else None
         self._allow_mock       = allow_mock
         self._content_type     = content_type
+        self._language         = language_code or language
+        self._format           = (format or "narrated").lower()
         self._artifact_kwargs  = artifact_overrides
 
     # ── Public entry point ───────────────────────────────────────────────────
@@ -190,6 +199,16 @@ class FinalQAGate:
         # ── Step 4: Provenance consistency across manifests ───────────────
         ok, detail = check_provenance_consistency(arts.all_manifests)
         result.record("provenance", ok, detail)
+
+        # ── Step 4b: Language consistency across manifests ───────────────
+        expected_lang = self._language or (arts.decision.get("language_code") if arts.decision else None)
+        ok, detail = check_language_consistency(arts.all_manifests, expected_language=expected_lang)
+        result.record("language_consistency", ok, detail)
+
+        # ── Step 4c: Format consistency ('old' vs 'narrated') ───────────────
+        expected_fmt = self._format or (arts.decision.get("format") if arts.decision else "narrated")
+        ok, detail = check_format_consistency(arts.all_manifests, expected_format=expected_fmt)
+        result.record("format_consistency", ok, detail)
 
         # ── Step 5: Topic consistency ─────────────────────────────────────
         ok, detail = check_topic_consistency(arts.decision, {
@@ -248,6 +267,11 @@ class FinalQAGate:
 
         # ── Step 11b: Populate format & experiment metadata ────────────────
         result.content_type = self._content_type
+        result.language_code = (
+            self._language
+            or (decision.get("language_code", "") if decision else "")
+            or (arts.script.get("language_code", "") if arts.script else "")
+        )
         if arts.script and isinstance(arts.script, dict):
             result.experiment_tag = arts.script.get("experiment_tag", "")
         elif decision and isinstance(decision, dict):

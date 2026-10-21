@@ -33,6 +33,7 @@ def main():
     content_type = "short"
     format_type = "narrated"
     experiment_tag = None
+    language_code = os.environ.get("LANGUAGE_CODE", "hi-IN")
 
     # ── CLI parsing ───────────────────────────────────────────────────────────
     args = sys.argv[1:]
@@ -44,6 +45,12 @@ def main():
         elif args[i] == "--dry-run":
             dry_run = True
             i += 1
+        elif args[i] in ("--language", "-l") and i + 1 < len(args):
+            language_code = args[i + 1].strip()
+            if language_code not in ("hi-IN", "te-IN"):
+                print(f"❌ Invalid language: '{language_code}'. Must be 'hi-IN' (Hindi) or 'te-IN' (Telugu)", file=sys.stderr)
+                sys.exit(1)
+            i += 2
         elif args[i] == "--content-type" and i + 1 < len(args):
             content_type = args[i + 1].lower().strip()
             if content_type not in ("short", "long"):
@@ -61,7 +68,7 @@ def main():
             i += 2
         else:
             print(f"❌ Unknown argument: {args[i]}", file=sys.stderr)
-            print("Usage: python run_pipeline.py [--content-type short|long] [--format narrated|old] [--experiment-tag TAG] [--resume PIPELINE_ID] [--dry-run]", file=sys.stderr)
+            print("Usage: python run_pipeline.py [--language hi-IN|te-IN] [--content-type short|long] [--format narrated|old] [--experiment-tag TAG] [--resume PIPELINE_ID] [--dry-run]", file=sys.stderr)
             sys.exit(1)
 
     # ── Initialize State ──────────────────────────────────────────────────────
@@ -70,19 +77,27 @@ def main():
             PipelineLogger.info(f"Loading state file for resumption of: {resume_id}...")
             state = PipelineState.load(resume_id)
             format_type = getattr(state, "format", format_type)
+            language_code = getattr(state, "language_code", language_code)
             if experiment_tag:
                 state.experiment_tag = experiment_tag
             PipelineLogger.info(f"Resuming from current stage: {state.current_stage}")
         else:
-            state = PipelineState(format=format_type, experiment_tag=experiment_tag)
-            PipelineLogger.info(f"Initialized new pipeline run: {state.pipeline_id} ({content_type.upper()}, {format_type.upper()})")
+            state = PipelineState(format=format_type, experiment_tag=experiment_tag, language_code=language_code)
+            PipelineLogger.info(f"Initialized new pipeline run: {state.pipeline_id} ({language_code}, {content_type.upper()}, {format_type.upper()})")
     except FileNotFoundError as e:
         PipelineLogger.error(str(e))
         sys.exit(1)
 
     # ── Execute Orchestrator ──────────────────────────────────────────────────
     try:
-        runner = PipelineRunner(state=state, dry_run=dry_run, content_type=content_type, format=format_type, experiment_tag=experiment_tag)
+        runner = PipelineRunner(
+            state=state,
+            dry_run=dry_run,
+            content_type=content_type,
+            format=format_type,
+            experiment_tag=experiment_tag,
+            language_code=language_code,
+        )
         runner.execute_pipeline()
     except Exception as e:
         PipelineLogger.error(f"Pipeline run stopped with error: {e}")
