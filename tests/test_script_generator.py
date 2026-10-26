@@ -361,6 +361,270 @@ class TestScriptCLI(unittest.TestCase):
             generate_script(brief)
         self.assertIn("Early Safety Gate Rejection", str(ctx.exception))
 
+    def test_vamana_mahabali_hindi_title_accepted(self):
+        """Regression test: semantically relevant Hindi title for Vamana/Mahabali passes early safety gate."""
+        brief = _make_brief(deity="vishnu")
+        brief["approval_metadata"]["selected_topic"] = "How Vamana Avatar Humbled King Mahabali in Three Steps"
+        brief["approval_metadata"]["language_code"] = "hi-IN"
+        brief["primary_title"] = "वामन अवतार और महाबली: तीन पगों की दिव्य कथा"
+
+        mock_hindi_script = {
+            "title": "वामन अवतार और महाबली: तीन पगों की दिव्य कथा",
+            "duration_seconds": 45,
+            "narration": "भगवान वामन ने राजा महाबली के अहंकार को तीन पग भूमि में शांत किया। यह कथा हमें सत्य और समर्पण सिखाती है।",
+            "scene_scripts": [
+                {
+                    "scene": 1,
+                    "duration_seconds": 45,
+                    "visual_reference": "वामन अवतार राजा महाबली के समक्ष तीन पग भूमि मांगते हुए",
+                    "voice_text": "भगवान वामन ने राजा महाबली के अहंकार को तीन पग भूमि में शांत किया। यह कथा हमें सत्य और समर्पण सिखाती है।",
+                    "emotion": "दिव्य और शांत",
+                }
+            ],
+            "retention_hooks": ["वामन अवतार का रहस्य"],
+            "shorts_scripts": [{"title": "लघु कथा 1", "hook": "क्या आप जानते हैं?", "body": "भगवान वामन और राजा महाबली की दिव्य कथा।"}],
+            "language_code": "hi-IN",
+            "generation_source": "gemini",
+        }
+
+        with patch("src.content.gemini_provider.generate_script_with_gemini", return_value=mock_hindi_script):
+            script = generate_script(brief, language_code="hi-IN")
+        self.assertIn("वामन", script["title"])
+        self.assertEqual(script["approval_metadata"]["selected_topic"], "How Vamana Avatar Humbled King Mahabali in Three Steps")
+
+    def test_vamana_mahabali_telugu_title_accepted(self):
+        """Regression test: semantically relevant Telugu title for Vamana/Mahabali passes early safety gate."""
+        brief = _make_brief(deity="vishnu")
+        brief["approval_metadata"]["selected_topic"] = "How Vamana Avatar Humbled King Mahabali in Three Steps"
+        brief["approval_metadata"]["language_code"] = "te-IN"
+        brief["primary_title"] = "వామన అవతారం మరియు మహాబలి: మూడు అడుగుల దివ్య కథ"
+
+        mock_telugu_script = {
+            "title": "వామన అవతారం మరియు మహాబలి: మూడు అడుగుల దివ్య కథ",
+            "duration_seconds": 45,
+            "narration": "వామన అవతారంలో శ్రీమహావిష్ణువు బలి చక్రవర్తి అహంకారాన్ని మూడు అడుగుల భూమితో అణచివేసిన దివ్య చరిత్ర.",
+            "scene_scripts": [
+                {
+                    "scene": 1,
+                    "duration_seconds": 45,
+                    "visual_reference": "వామన అవతార దృశ్యం",
+                    "voice_text": "వామన అవతారంలో శ్రీమహావిష్ణువు బలి చక్రవర్తి అహంకారాన్ని మూడు అడుగుల భూమితో అణచివేసిన దివ్య చరిత్ర.",
+                    "emotion": "భక్తిరసం",
+                }
+            ],
+            "retention_hooks": ["వామన అవతార రహస్యం"],
+            "shorts_scripts": [{"title": "లఘు కథ 1", "hook": "మీకు తెలుసా?", "body": "వామన అవతారం మరియు మహాబలి కథ."}],
+            "language_code": "te-IN",
+            "generation_source": "gemini",
+        }
+
+        with patch("src.content.gemini_provider.generate_script_with_gemini", return_value=mock_telugu_script):
+            script = generate_script(brief, language_code="te-IN")
+        self.assertIn("వామన", script["title"])
+        self.assertEqual(script["approval_metadata"]["selected_topic"], "How Vamana Avatar Humbled King Mahabali in Three Steps")
+
+    def test_vamana_mahabali_unrelated_hindi_title_rejected(self):
+        """Negative test: unrelated Hindi Shiva title for Vamana topic is rejected by early safety gate."""
+        brief = _make_brief(deity="vishnu")
+        brief["approval_metadata"]["selected_topic"] = "How Vamana Avatar Humbled King Mahabali in Three Steps"
+        brief["approval_metadata"]["language_code"] = "hi-IN"
+        brief["primary_title"] = "भगवान शिव और नाग वासुकि की कथा"
+
+        mock_unrelated_hindi = {
+            "title": "भगवान शिव और नाग वासुकि की कथा",
+            "duration_seconds": 45,
+            "narration": "भगवान शिव के गले में वासुकि नाग सुशोభित है।",
+            "scene_scripts": [
+                {
+                    "scene": 1,
+                    "duration_seconds": 45,
+                    "visual_reference": "भगवान शिव कैलाश पर",
+                    "voice_text": "भगवान शिव के गले में वासुकि नाग सुशोभित है।",
+                    "emotion": "शांत",
+                }
+            ],
+            "retention_hooks": ["शिव का रहस्य"],
+            "shorts_scripts": [{"title": "लघु कथा 1", "hook": "क्या आप जानते हैं?", "body": "भगवान शिव और नाग वासुकि की कथा।"}],
+            "language_code": "hi-IN",
+            "generation_source": "gemini",
+        }
+
+        with patch("src.content.gemini_provider.generate_script_with_gemini", return_value=mock_unrelated_hindi):
+            with self.assertRaises(ValueError) as ctx:
+                generate_script(brief, language_code="hi-IN")
+        self.assertIn("Early Safety Gate Rejection", str(ctx.exception))
+
+    def test_vamana_mahabali_unrelated_telugu_title_rejected(self):
+        """Negative test: unrelated Telugu Ganesha title for Vamana topic is rejected by early safety gate."""
+        brief = _make_brief(deity="vishnu")
+        brief["approval_metadata"]["selected_topic"] = "How Vamana Avatar Humbled King Mahabali in Three Steps"
+        brief["approval_metadata"]["language_code"] = "te-IN"
+        brief["primary_title"] = "వినాయకుని ఏకదంత రహస్యం మరియు మహాభారత రచన"
+
+        mock_unrelated_telugu = {
+            "title": "వినాయకుని ఏకదంత రహస్యం మరియు మహాభారత రచన",
+            "duration_seconds": 45,
+            "narration": "వినాయకుడు తన దంతాన్ని విరిచి మహాభారతం రచించిన దివ్య కథ.",
+            "scene_scripts": [
+                {
+                    "scene": 1,
+                    "duration_seconds": 45,
+                    "visual_reference": "వినాయకుడు",
+                    "voice_text": "వినాయకుడు తన దంతాన్ని విరిచి మహాభారతం రచించిన దివ్య కథ.",
+                    "emotion": "భక్తి",
+                }
+            ],
+            "retention_hooks": ["వినాయకుని రహస్యం"],
+            "shorts_scripts": [{"title": "లఘు కథ 1", "hook": "మీకు తెలుసా?", "body": "వినాయకుని దివ్య లీలలు మరియు కథ."}],
+            "language_code": "te-IN",
+            "generation_source": "gemini",
+        }
+
+        with patch("src.content.gemini_provider.generate_script_with_gemini", return_value=mock_unrelated_telugu):
+            with self.assertRaises(ValueError) as ctx:
+                generate_script(brief, language_code="te-IN")
+        self.assertIn("Early Safety Gate Rejection", str(ctx.exception))
+
+    def test_multilingual_semantic_alignment_helper_positive_and_negative(self):
+        """Directly test cross-lingual semantic alignment logic across positive and negative cases."""
+        from src.script.generator import check_title_topic_semantic_alignment
+
+        # Positive Hindi Shiva
+        ok, reason = check_title_topic_semantic_alignment(
+            "Why Lord Shiva Wears a Snake Around His Neck",
+            "भगवान शिव और नाग वासुकि: अहंकार पर विजय की कथा"
+        )
+        self.assertTrue(ok)
+        self.assertTrue("subject" in reason.lower() or "concept" in reason.lower())
+
+        # Positive Telugu Ganesha
+        ok, reason = check_title_topic_semantic_alignment(
+            "Why Lord Ganesha Has One Broken Tusk",
+            "గణపతి ఏకదంత రహస్యం మరియు దివ్య లీలలు"
+        )
+        self.assertTrue(ok)
+        self.assertTrue("subject" in reason.lower() or "concept" in reason.lower())
+
+        # Positive Hindi Aarti & Temple (matches specific subject 'aarti' and 'bell')
+        ok, reason = check_title_topic_semantic_alignment(
+            "Why We Perform Aarti and Ring Bells in Temples",
+            "मंदिर में आरती और घंटी बजाने का आध्यात्मिक रहस्य"
+        )
+        self.assertTrue(ok)
+
+        # Negative: Aarti topic with Shiva title
+        ok, reason = check_title_topic_semantic_alignment(
+            "Why We Perform Aarti and Ring Bells in Temples",
+            "भगवान शिव और नाग वासुकि की कथा"
+        )
+        self.assertFalse(ok)
+        self.assertTrue("no keyword" in reason or "rejected" in reason.lower())
+
+        # Negative: Vamana topic with arbitrary unrelated Hindi string
+        ok, reason = check_title_topic_semantic_alignment(
+            "How Vamana Avatar Humbled King Mahabali in Three Steps",
+            "सुंदर सुबह की ताज़ा हवा और शांति"
+        )
+        self.assertFalse(ok)
+        self.assertIn("no keyword or deity connection", reason)
+
+        # Regression Negative: Sharing broad concept 'avatar' between unrelated topics must reject
+        ok, reason = check_title_topic_semantic_alignment(
+            "Why Kalki Avatar Will Restore Cosmic Dharma",
+            "भगवान शिव का रुद्र अवतार और संहार"
+        )
+        self.assertFalse(ok)
+        self.assertTrue("shares only broad generic concept" in reason or "conflicting" in reason.lower())
+
+        # Regression Negative: Sharing broad concept 'three' (तीन) between unrelated topics must reject
+        ok, reason = check_title_topic_semantic_alignment(
+            "Three Hidden Lessons from Lord Shiva's Cosmic Dance",
+            "भगवान गणेश के तीन दिव्य रहस्य"
+        )
+        self.assertFalse(ok)
+        self.assertTrue("shares only broad generic concept" in reason or "conflicting" in reason.lower())
+
+        # Regression Negative: Sharing broad concept 'temple' (मंदिर) between unrelated topics must reject
+        ok, reason = check_title_topic_semantic_alignment(
+            "Why We Perform Aarti and Ring Bells in Temples",
+            "भगवान शिव और नाग वासुकि की कथा: सोमनाथ मंदिर का इतिहास"
+        )
+        self.assertFalse(ok)
+        self.assertTrue("shares only broad generic concept" in reason or "conflicting" in reason.lower())
+
+        # Regression Negative: Pure broad generic concepts alone with no deity or specific subject must reject
+        ok, reason = check_title_topic_semantic_alignment(
+            "Three Sacred Life Lessons from Ancient Indian Dharma",
+            "सनातन धर्म में तीन दिव्य रहस्यों की कथा"
+        )
+        self.assertFalse(ok)
+        self.assertIn("shares only broad generic concept", reason)
+
+        # Regression Negative: Conflicting story subjects under same deity (Matsya Avatar vs Kalki Avatar) must reject
+        ok, reason = check_title_topic_semantic_alignment(
+            "How Matsya Avatar Saved Manu from the Great Deluge",
+            "भगवान विष्णु के कल्कि अवतार का रहस्य"
+        )
+        self.assertFalse(ok)
+        self.assertIn("conflicting story subjects", reason.lower())
+
+    def test_unrelated_topic_sharing_broad_concept_fails_early_safety_gate(self):
+        """Regression test: LLM returning a title that shares only a broad concept (e.g. 'avatar') fails safety gate."""
+        brief = _make_brief(deity="vishnu")
+        brief["approval_metadata"]["selected_topic"] = "Why Kalki Avatar Will Restore Cosmic Dharma"
+        brief["approval_metadata"]["language_code"] = "hi-IN"
+        brief["primary_title"] = "भगवान शिव का रुद्र अवतार और संहार"
+
+        mock_unrelated_script = {
+            "title": "भगवान शिव का रुद्र अवतार और संहार",
+            "duration_seconds": 45,
+            "narration": "भगवान शिव का रुद्र अवतार सृष्टि के कल्याण के लिए हुआ।",
+            "scene_scripts": [
+                {
+                    "scene": 1,
+                    "duration_seconds": 45,
+                    "visual_reference": "भगवान शिव",
+                    "voice_text": "भगवान शिव का रुद्र अवतार सृष्टि के कल्याण के लिए हुआ।",
+                    "emotion": "शांत",
+                }
+            ],
+            "retention_hooks": ["रुद्र अवतार"],
+            "shorts_scripts": [{"title": "लघु कथा 1", "hook": "क्या आप जानते हैं?", "body": "भगवान शिव का रुद्र अवतार।"}],
+            "language_code": "hi-IN",
+            "generation_source": "gemini",
+        }
+
+        with patch("src.content.gemini_provider.generate_script_with_gemini", return_value=mock_unrelated_script):
+            with self.assertRaises(ValueError) as ctx:
+                generate_script(brief, language_code="hi-IN")
+        self.assertIn("Early Safety Gate Rejection", str(ctx.exception))
+        self.assertTrue("broad generic concept" in str(ctx.exception) or "conflicting" in str(ctx.exception).lower())
+
+    def test_deity_aliases_do_not_classify_mahabali_as_vishnu_and_avatars_not_interchangeable(self):
+        """Verifies Mahabali is not treated as Vishnu and different Vishnu avatars are not interchangeable."""
+        from src.assets.selector import resolve_deity
+        from src.script.generator import check_title_topic_semantic_alignment
+
+        # Mahabali alone is not Lord Vishnu
+        self.assertIsNone(resolve_deity("King Mahabali's Sacrifice", default=None))
+        self.assertIsNone(resolve_deity("महाबली की कथा", default=None))
+
+        # Different avatars under Vishnu cannot be swapped
+        ok, reason = check_title_topic_semantic_alignment(
+            "How Vamana Avatar Humbled King Mahabali in Three Steps",
+            "भगवान विष्णु का वराह अवतार और हिरण्याक्ष वध"
+        )
+        self.assertFalse(ok)
+        self.assertIn("conflicting story subjects", reason.lower())
+
+        # Valid Vamana-Mahabali cross-language match continues to pass
+        ok, reason = check_title_topic_semantic_alignment(
+            "How Vamana Avatar Humbled King Mahabali in Three Steps",
+            "वामन अवतार और महाबली: तीन पगों की दिव्य कथा"
+        )
+        self.assertTrue(ok)
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 class TestIndicLanguageScriptIntegrityRegression(unittest.TestCase):

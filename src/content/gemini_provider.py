@@ -19,8 +19,12 @@ from src.script.schemas import validate_script_output
 
 logger = logging.getLogger("gemini_provider")
 
-DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
-FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-3.5-flash-lite", "gemini-2.5-flash"]
+DEFAULT_MODEL = (os.environ.get("GEMINI_MODEL") or "").strip() or "gemini-2.5-flash-lite"
+FALLBACK_MODELS = [
+    "gemini-2.5-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+]
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 REQUEST_TIMEOUT_SECONDS = 30
 MAX_RETRIES = 2
@@ -108,8 +112,10 @@ def call_gemini_api(
             "GEMINI_API_KEY is not set or empty. Please set GEMINI_API_KEY in environment or GitHub secrets."
         )
 
-    target_model = model or DEFAULT_MODEL
-    candidate_models = [target_model] + [m for m in FALLBACK_MODELS if m != target_model]
+    raw_target = (model or (os.environ.get("GEMINI_MODEL") or "").strip() or DEFAULT_MODEL).strip()
+    target_model = raw_target if raw_target else "gemini-2.5-flash-lite"
+    raw_candidates = [target_model] + [m for m in FALLBACK_MODELS if m != target_model]
+    candidate_models = [m.strip() for m in raw_candidates if m and m.strip()]
 
     last_error: Exception | None = None
     rate_limited = False
@@ -165,10 +171,17 @@ def call_gemini_api(
                     time.sleep(1.0 * attempt)
                     continue
 
-                # Model not found / deprecated
+                # Model not found / unavailable
                 if resp.status_code == 404:
-                    logger.warning("Gemini model %s not found (HTTP 404), trying next model...", candidate)
-                    last_error = GeminiModelNotFoundError(f"Gemini model '{candidate}' not found (HTTP 404).")
+                    safe_msg = _redact_key(resp.text, key)
+                    logger.warning(
+                        "Gemini model '%s' returned HTTP 404 (not found or inaccessible): %s. Trying next candidate model...",
+                        candidate,
+                        safe_msg,
+                    )
+                    last_error = GeminiModelNotFoundError(
+                        f"Gemini model '{candidate}' not found (HTTP 404): {safe_msg}"
+                    )
                     break
 
                 # Transient server errors
@@ -682,6 +695,71 @@ Output must be ONLY valid JSON matching this schema:
     # Multilingual offline fallback
     if language_code not in ("hi-IN", "te-IN"):
         raise GeminiProviderError(f"Unsupported language code '{language_code}'. Only 'hi-IN' and 'te-IN' are supported.")
+
+    brief_title = (brief.get("primary_title") or (brief.get("title_options") or [""])[0] or "").strip()
+    struct = brief.get("script_structure") or {}
+    visuals = brief.get("visual_plan") or []
+
+    # If the brief has native Indic title and structured text, synthesize a topic-aligned fallback
+    if brief_title and validate_indic_script(brief_title, language_code) and (struct.get("act_1_opening") or visuals):
+        opening = struct.get("act_1_opening", "")
+        explanation = struct.get("act_2_explanation", "")
+        message = struct.get("act_3_message", "")
+        narration = " ".join([p for p in (opening, explanation, message) if p]).strip() or brief.get("hook", brief_title)
+
+        scenes = []
+        if visuals:
+            for i, v in enumerate(visuals, start=1):
+                desc = v.get("description", brief_title)
+                v_text = opening if i == 1 else explanation if i == 2 else message if i == 3 else desc
+                scenes.append({
+                    "scene": i,
+                    "duration_seconds": v.get("duration_seconds", 15),
+                    "visual_reference": desc,
+                    "voice_text": v_text or narration,
+                    "emotion": "भक्तिपूर्ण और शांत" if language_code == "hi-IN" else "భక్తిరసం",
+                })
+        else:
+            scenes = [{
+                "scene": 1,
+                "duration_seconds": 45,
+                "visual_reference": brief_title,
+                "voice_text": narration,
+                "emotion": "भक्तिपूर्ण और शांत" if language_code == "hi-IN" else "భక్తిరసం",
+            }]
+
+        total_dur = sum(s["duration_seconds"] for s in scenes)
+        if ct == "short" and (total_dur < 35 or total_dur >= 60):
+            per_scene = max(10, 45 // len(scenes))
+            for s in scenes:
+                s["duration_seconds"] = per_scene
+            total_dur = sum(s["duration_seconds"] for s in scenes)
+
+        hooks = brief.get("shorts_hooks") or [brief.get("hook", brief_title)]
+        shorts_scripts = []
+        for i in range(3):
+            hk = hooks[i] if i < len(hooks) else f"{brief_title} - {i+1}"
+            shorts_scripts.append({
+                "title": f"{brief_title[:30]}",
+                "hook": hk,
+                "body": f"{hk} {narration[:150]}",
+            })
+
+        fallback_script = {
+            "title": brief_title,
+            "duration_seconds": total_dur,
+            "narration": narration,
+            "scene_scripts": scenes,
+            "retention_hooks": [
+                f"{brief_title} का आध्यात्मिक रहस्य" if language_code == "hi-IN" else f"{brief_title} ఆధ్యాత్మిక రహస్యం",
+                f"{brief_title} का गूढ़ अर्थ" if language_code == "hi-IN" else f"{brief_title} విశేష తత్వం",
+            ],
+            "shorts_scripts": shorts_scripts,
+            "language_code": language_code,
+            "generation_source": "template_fallback",
+        }
+        logger.warning("Script synthesized from brief Indic content via offline fallback (%s)", language_code)
+        return fallback_script
 
     template = _OFFLINE_SCRIPTS.get(language_code)
     if not template:

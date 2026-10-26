@@ -157,6 +157,84 @@ class TestGeminiProviderAndSecurity(unittest.TestCase):
             call_gemini_api("Test prompt", api_key="dummy_key")
         self.assertIn("no candidates", str(ctx.exception))
 
+    @patch("src.content.gemini_provider.requests.post")
+    def test_call_gemini_api_handles_empty_env_model_gracefully(self, mock_post):
+        """Verifies that an empty GEMINI_MODEL env var falls back to default and avoids empty URL."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": '{"result": "ok"}'}]}}]
+        }
+        mock_post.return_value = mock_resp
+
+        with patch.dict("os.environ", {"GEMINI_MODEL": "", "GEMINI_API_KEY": "test_key"}):
+            result = call_gemini_api("Test prompt")
+            self.assertEqual(result, '{"result": "ok"}')
+            args, _ = mock_post.call_args
+            call_url = args[0]
+            # Ensure the model in URL is never empty (not ".../models/:generateContent")
+            self.assertNotIn("/models/:generateContent", call_url)
+            self.assertIn("/models/gemini-", call_url)
+
+    @patch("src.content.gemini_provider.requests.post")
+    def test_call_gemini_api_fallback_ordering_on_404(self, mock_post):
+        """Verifies fallback ordering: 404 on gemini-2.5-flash-lite transitions cleanly to gemini-3.5-flash-lite."""
+        resp_404 = MagicMock()
+        resp_404.status_code = 404
+        resp_404.text = "Model gemini-2.5-flash-lite not found or not enabled for project"
+
+        resp_200 = MagicMock()
+        resp_200.status_code = 200
+        resp_200.json.return_value = {
+            "candidates": [{"content": {"parts": [{"text": '{"fallback": "success"}'}]}}]
+        }
+
+        mock_post.side_effect = [resp_404, resp_200]
+
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "test_key", "GEMINI_MODEL": "gemini-2.5-flash-lite"}):
+            result = call_gemini_api("Test prompt")
+            self.assertEqual(result, '{"fallback": "success"}')
+            self.assertEqual(mock_post.call_count, 2)
+            first_url = mock_post.call_args_list[0][0][0]
+            second_url = mock_post.call_args_list[1][0][0]
+            self.assertIn("models/gemini-2.5-flash-lite:", first_url)
+            self.assertIn("models/gemini-3.5-flash-lite:", second_url)
+
+    @patch("src.content.gemini_provider.requests.post")
+    def test_call_gemini_api_auth_error_fails_closed_without_candidate_cycling(self, mock_post):
+        """Verifies HTTP 401/403 fails immediately with GeminiAuthError without cycling fallback models."""
+        resp_401 = MagicMock()
+        resp_401.status_code = 401
+        resp_401.text = "API_KEY_INVALID"
+        mock_post.return_value = resp_401
+
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "invalid_key"}):
+            with self.assertRaises(GeminiAuthError) as ctx:
+                call_gemini_api("Test prompt")
+            self.assertIn("authentication failed", str(ctx.exception))
+            # Must not cycle through candidate models when authentication is invalid
+            self.assertEqual(mock_post.call_count, 1)
+
+    @patch("src.content.gemini_provider.requests.post")
+    def test_call_gemini_api_full_candidate_sequence_on_404(self, mock_post):
+        """Verifies full sequence: 404 on each candidate exhausts the list in order without using 2.0-flash."""
+        resp_404 = MagicMock()
+        resp_404.status_code = 404
+        resp_404.text = "Model not found or access restricted"
+        mock_post.return_value = resp_404
+
+        with patch.dict("os.environ", {"GEMINI_API_KEY": "test_key", "GEMINI_MODEL": "gemini-2.5-flash-lite"}):
+            with self.assertRaises(GeminiProviderError) as ctx:
+                call_gemini_api("Test prompt")
+            self.assertIn("HTTP 404", str(ctx.exception))
+            self.assertEqual(mock_post.call_count, 3)
+            urls = [call[0][0] for call in mock_post.call_args_list]
+            self.assertIn("models/gemini-2.5-flash-lite:", urls[0])
+            self.assertIn("models/gemini-3.5-flash-lite:", urls[1])
+            self.assertIn("models/gemini-3.5-flash:", urls[2])
+            for u in urls:
+                self.assertNotIn("gemini-2.0-flash", u)
+
     def test_call_gemini_api_no_key_raises(self):
         with patch.dict("os.environ", {}, clear=True):
             with self.assertRaises(GeminiProviderError) as ctx:

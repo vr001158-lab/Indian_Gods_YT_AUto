@@ -5,6 +5,7 @@
 import json
 import re
 import time
+import unicodedata
 from pathlib import Path
 from src.script.schemas import validate_brief_input, validate_script_output
 
@@ -461,6 +462,163 @@ def _generate_fallback_script(brief: dict, language_code: str | None = None) -> 
     }
 
 
+# Specific subjects: Deities, Avatars, Mythological Figures, Exclusive Items/Weapons, Distinct Rituals
+SPECIFIC_SUBJECT_GROUPS: list[set[str]] = [
+    # Vishnu, Vamana, Mahabali, and Avatars
+    {"vamana", "वामन", "వామన"},
+    {"mahabali", "bali", "महाबली", "बली", "మహాబలి", "బలి"},
+    {"trivikrama", "त्रिविक्रम", "త్రివిక్రమ"},
+    {"vishnu", "narayana", "narayan", "dashavatar", "विष्णु", "नारायण", "दशावतार", "విష్ణు", "విష్ణువు", "నారాయణ", "దశావతార"},
+    {"varaha", "boar", "वराह", "వరాహ"},
+    {"bhudevi", "earth", "भूदेवी", "భూదేవి"},
+    {"narasimha", "narasingh", "नरसिंह", "నరసింహ", "నరసింహస్వామి"},
+    {"prahlada", "prahalad", "प्रह्लाद", "ప్రహ్లాద"},
+    {"matsya", "fish", "मत्स्य", "మత్స్య"},
+    {"kurma", "tortoise", "कूर्म", "కూర్మ"},
+    {"parashurama", "परशुराम", "పరశురామ"},
+    {"kalki", "कल्कि", "కల్కి"},
+    {"gajendra", "makara", "गजेंद्र", "మకర", "గజేంద్ర", "మోక్షం"},
+    {"mohini", "मोहिनी", "మోహిని"},
+    {"vaikuntha", "वैकुंठ", "వైకుంఠ"},
+
+    # Shiva, Vasuki, and Attributes
+    {"shiva", "shiv", "mahadev", "bholenath", "rudra", "mahakal", "शिव", "महादेव", "भोलेनाथ", "रुद्र", "महाकाल", "శివ", "శివుడు", "మహాదేవుడు"},
+    {"vasuki", "snake", "serpent", "cobra", "naga", "नाग", "सर्प", "वासुकी", "వాసుకి", "సర్పం", "పాము"},
+    {"halahala", "poison", "हलाहल", "विष", "హాలాహలం", "విషం", "నీలకంఠ", "नीलकंठ", "neelkanth"},
+    {"rudraksha", "रुद्राक्ष", "రుద్రాక్ష"},
+    {"trishul", "त्रिशूल", "త్రిశూలం"},
+    {"kailash", "कैलाश", "కైలాస"},
+    {"nataraja", "नटराज", "నటరాజ"},
+    {"somnath", "सोमनाथ", "సోమనాథ్"},
+    {"kedarnath", "केदारनाथ", "కేదార్‌నాథ్"},
+    {"damru", "डमरू", "డమరుకం"},
+    {"ganga", "ganges", "गंगा", "గంగ"},
+
+    # Ganesha
+    {"ganesha", "ganesh", "vinayaka", "ganapati", "gajanana", "morya", "गणेश", "गणपति", "विनायक", "गजानन", "గణపతి", "వినాయక", "వినాయకుడు", "గణేశ"},
+    {"tusk", "broken tusk", "ekdanta", "ekadanta", "एकदंत", "दंत", "ఏకదంత", "దంతం"},
+    {"modak", "मोदक", "మోదకం"},
+    {"mushak", "mouse", "मूषक", "మూషిక"},
+
+    # Hanuman
+    {"hanuman", "bajrangbali", "maruti", "anjaneya", "sanjeevani", "हनुमान", "बजरंगबली", "मारुति", "आंजनेय", "సంజీవని", "హనుమాన్", "హనుమంతుడు", "ఆంజనేయ", "సంజీవని"},
+
+    # Krishna & Rama
+    {"krishna", "gopala", "kanha", "govinda", "flute", "कृष्ण", "गोपाल", "कान्हा", "बांसुरी", "కృష్ణ", "కృష్ణుడు", "గోపాల", "గోవింద", "మురళి"},
+    {"ram", "rama", "ramachandra", "ayodhya", "sita", "राम", "श्रीराम", "अयोध्या", "सीता", "రామ", "రాముడు", "శ్రీరామ", "అయోధ్య", "సీత"},
+
+    # Devi / Goddesses
+    {"lakshmi", "laxmi", "mahalakshmi", "wealth", "लक्ष्मी", "महालक्ष्मी", "లక్ష్మి", "లక్ష్మీ", "మహాలక్ష్మి"},
+    {"parvati", "parvathi", "gauri", "durga", "shakti", "kali", "पार्वती", "गौरी", "दुर्गा", "शक्ति", "काली", "పార్వతి", "గౌరి", "దుర్గ", "శక్తి", "కాళి"},
+    {"saraswati", "सरस्वती", "సరస్వతి"},
+
+    # South Indian Deities
+    {"subramanya", "murugan", "kartikeya", "skanda", "vel", "सुब्रह्मण्य", "कार्तिकेय", "మురుగన్", "సుబ్రహ్మణ్య", "కార్తికేయ"},
+    {"ayyappa", "sabarimala", "manikanta", "अय्यप्पा", "सबरीमाला", "మణికంఠ", "అయ్యప్ప", "శబరిమల"},
+    {"venkateswara", "balaji", "tirupati", "7kondala", "वेंकटेश्वर", "बालाजी", "तिरुपति", "వేంకటేశ్వర", "బాలాజీ", "తిరుపతి", "ఏడుకొండల"},
+
+    # Sacred Practices & Ritual Items (Specific)
+    {"aarti", "arti", "आरती", "హారతి"},
+    {"bell", "bells", "घंटी", "గంట"},
+]
+
+# Broad / Generic shared concepts that may appear across any deity or devotional story.
+# A match in this list ALONE is NOT sufficient to pass the early safety gate.
+GENERIC_CONCEPT_GROUPS: list[set[str]] = [
+    {"avatar", "avatars", "incarnation", "अवतार", "अवतारा", "అవతార", "అవతారం", "అవతారాలు"},
+    {"three", "तीन", "మూడు"},
+    {"seven", "सात", "ఏడు"},
+    {"nine", "नौ", "తొమ్మిది"},
+    {"ten", "दस", "పది"},
+    {"steps", "strides", "pagon", "pag", "पग", "पगों", "कदम", "అడుగులు", "అడుగుల", "పాదాలు"},
+    {"temple", "temples", "mandir", "मंदिर", "గుడి", "దేవాలయం"},
+    {"dharma", "धर्म", "ధర్మం"},
+    {"story", "tale", "katha", "history", "कथा", "कहानी", "इतिहास", "కథ", "చరిత్ర"},
+    {"secret", "secrets", "mystery", "mysteries", "रहस्य", "రహస్యం", "రహస్యాలు"},
+    {"lesson", "lessons", "teaching", "teachings", "शिक्षा", "పాఠం"},
+    {"samudra", "ocean", "समुद्र", "సముద్ర"},
+    {"manthan", "churning", "मंथन", "మథనం"},
+]
+
+
+def check_title_topic_semantic_alignment(
+    canonical_topic: str,
+    script_title: str,
+    deity_hint: str = "",
+) -> tuple[bool, str]:
+    """
+    Validates that a generated script title is semantically aligned with the selected topic.
+    Supports English, Hindi (Devanagari), and Telugu cross-lingual validation while
+    strictly preserving safety gate enforcement (unrelated titles are rejected).
+    """
+    STOP = {"a", "an", "the", "of", "in", "on", "at", "to", "and", "or", "for", "is", "it", "its", "why", "how", "what", "does"}
+
+    def _tokenize(text: str) -> set[str]:
+        # Preserve Unicode letters (L), combining marks (M), and numbers (N) while stripping punctuation/symbols
+        cleaned = "".join(
+            ch if not unicodedata.category(ch).startswith(("P", "S", "Z", "C")) else " "
+            for ch in text
+        )
+        return {w for w in cleaned.lower().split() if w not in STOP and len(w) >= 2}
+
+    canon_words = _tokenize(canonical_topic)
+    title_words = _tokenize(script_title)
+
+    # All generic words collected from generic concept groups
+    all_generic_words = set().union(*GENERIC_CONCEPT_GROUPS) | STOP
+
+    # 1. Direct lexical token overlap (must contain at least one specific, non-generic word)
+    direct_overlap = canon_words & title_words
+    specific_direct_overlap = {w for w in direct_overlap if w not in all_generic_words}
+    if len(specific_direct_overlap) > 0:
+        return True, f"Direct specific keyword overlap: {specific_direct_overlap}"
+
+    canon_text = canonical_topic.lower()
+    title_text = script_title.lower()
+
+    # 2. Specific subject / entity group overlap
+    canon_subjects = [g for g in SPECIFIC_SUBJECT_GROUPS if any(kw in canon_words or (" " in kw and kw in canon_text) for kw in g)]
+    title_subjects = [g for g in SPECIFIC_SUBJECT_GROUPS if any(kw in title_words or (" " in kw and kw in title_text) for kw in g)]
+    matched_specific = [g for g in canon_subjects if g in title_subjects]
+
+    if len(matched_specific) > 0:
+        return True, f"Specific subject/entity matched across {len(matched_specific)} group(s)"
+
+    # If canonical topic and title both specify different, non-overlapping specific subjects,
+    # reject immediately even if they map to the same high-level deity.
+    if len(canon_subjects) > 0 and len(title_subjects) > 0 and len(matched_specific) == 0:
+        sample_c = sorted(list(canon_subjects[0]))[0]
+        sample_t = sorted(list(title_subjects[0]))[0]
+        return False, (
+            f"Rejected: Conflicting story subjects — canonical topic is about '{sample_c}', "
+            f"but script title is about '{sample_t}'."
+        )
+
+    # 3. Known deity resolution alignment (only when neither has conflicting specific subjects)
+    from src.assets.selector import resolve_deity
+    c_deity = resolve_deity(canonical_topic, deity_hint="", default=None)
+    t_deity = resolve_deity(script_title, deity_hint="", default=None)
+    if c_deity and t_deity and c_deity == t_deity:
+        return True, f"Deity connection matched: '{c_deity}'"
+
+    # 4. Check if only broad generic concepts matched without specific entity/deity alignment
+    matched_generic: list[set[str]] = []
+    for group in GENERIC_CONCEPT_GROUPS:
+        has_canon = any(kw in canon_words or (" " in kw and kw in canon_text) for kw in group)
+        has_title = any(kw in title_words or (" " in kw and kw in title_text) for kw in group)
+        if has_canon and has_title:
+            matched_generic.append(group)
+
+    if len(matched_generic) > 0:
+        sample_concepts = [sorted(list(g))[0] for g in matched_generic]
+        return False, (
+            f"Rejected: Script title '{script_title}' shares only broad generic concept(s) {sample_concepts} "
+            f"with topic '{canonical_topic}', but lacks a specific deity or story subject match."
+        )
+
+    return False, f"Script title '{script_title}' has no keyword or deity connection with selected topic '{canonical_topic}'"
+
+
 def generate_script(brief: dict, language_code: str | None = None) -> dict:
     """
     Converts a content brief JSON into a structured production script.
@@ -572,19 +730,13 @@ def generate_script(brief: dict, language_code: str | None = None) -> dict:
     canonical_topic = meta.get("selected_topic", "")
     script_title = script_data.get("title", "")
     if canonical_topic and script_title:
-        import re
-        STOP = {"a", "an", "the", "of", "in", "on", "at", "to", "and", "or", "for", "is", "it", "its", "why", "how", "what", "does"}
-        canon_words = {w for w in re.sub(r"[^\w\s]", " ", canonical_topic.lower(), flags=re.UNICODE).split() if w not in STOP and len(w) >= 2}
-        title_words = {w for w in re.sub(r"[^\w\s]", " ", script_title.lower(), flags=re.UNICODE).split() if w not in STOP and len(w) >= 2}
-        overlap = canon_words & title_words
-        if len(overlap) == 0:
-            from src.assets.selector import resolve_deity
-            c_deity = resolve_deity(canonical_topic, deity_hint=meta.get("deity", ""), default=None)
-            t_deity = resolve_deity(script_title, deity_hint=meta.get("deity", ""), default=None)
-            if not (c_deity and t_deity and c_deity == t_deity):
-                raise ValueError(
-                    f"❌ Early Safety Gate Rejection: Script title '{script_title}' has no keyword or deity connection with selected topic '{canonical_topic}'"
-                )
+        aligned, reason = check_title_topic_semantic_alignment(
+            canonical_topic=canonical_topic,
+            script_title=script_title,
+            deity_hint=meta.get("deity", ""),
+        )
+        if not aligned:
+            raise ValueError(f"❌ Early Safety Gate Rejection: {reason}")
 
     # Validate output schema
     ok_out, err_out = validate_script_output(script_data, content_type=script_data.get("content_type", "short"))
