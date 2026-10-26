@@ -3,6 +3,7 @@
 # Converts content briefs into production scripts.
 
 import json
+import re
 import time
 from pathlib import Path
 from src.script.schemas import validate_brief_input, validate_script_output
@@ -226,12 +227,151 @@ _DEITY_SCRIPTS = {
 }
 
 
-def _generate_fallback_script(brief: dict) -> dict:
+INDIC_SCRIPT_RANGES = {
+    "hi-IN": {
+        "name": "Devanagari (Hindi)",
+        "pattern": r"[\u0900-\u097F]",
+    },
+    "te-IN": {
+        "name": "Telugu",
+        "pattern": r"[\u0C00-\u0C7F]",
+    },
+}
+
+
+def validate_text_language_integrity(
+    text: str,
+    language_code: str,
+    field_name: str = "text",
+    min_indic_ratio: float = 0.50,
+) -> tuple[bool, str]:
+    """
+    Validates that a text string is genuinely in the specified Indic script.
+    - Ensures non-empty content.
+    - Requires native script characters for hi-IN (Devanagari) or te-IN (Telugu).
+    - Requires that native script characters constitute at least min_indic_ratio (default 50%)
+      of total alphabetic characters, safely tolerating legitimate proper names, numerals,
+      URLs, and loanwords while blocking predominantly English or generic templates.
+    - Safely passes non-Indic languages (e.g. en-US) without modification.
+    """
+    if language_code not in INDIC_SCRIPT_RANGES:
+        return True, ""
+
+    if not isinstance(text, str) or not text.strip():
+        return False, f"Field '{field_name}' for language '{language_code}' is empty or not a valid string."
+
+    config = INDIC_SCRIPT_RANGES[language_code]
+    script_name = config["name"]
+    pattern = config["pattern"]
+
+    indic_chars = len(re.findall(pattern, text))
+    latin_chars = len(re.findall(r"[a-zA-Z]", text))
+
+    if indic_chars == 0:
+        preview = text[:80].replace("\n", " ")
+        return (
+            False,
+            f"Field '{field_name}' contains zero native {script_name} characters for locale '{language_code}'. "
+            f"Got text preview: '{preview}'",
+        )
+
+    total_alpha = indic_chars + latin_chars
+    if total_alpha > 0:
+        ratio = indic_chars / total_alpha
+        if ratio < min_indic_ratio:
+            preview = text[:80].replace("\n", " ")
+            return (
+                False,
+                f"Field '{field_name}' is predominantly non-{script_name} ({ratio:.1%} native script, "
+                f"{indic_chars} Indic vs {latin_chars} Latin alphabetic characters). "
+                f"Requires >= {min_indic_ratio:.0%}. Got text preview: '{preview}'",
+            )
+
+    return True, ""
+
+
+def validate_script_language_integrity(
+    script: dict,
+    language_code: str | None,
+) -> tuple[bool, str]:
+    """
+    Validates complete script data structure for target Indic language integrity.
+    Examines:
+      1. Overall narration text
+      2. Every scene_scripts entry's voice_text
+      3. shorts_scripts (body, hook) if present
+      4. title
+    Fails closed on missing fields, corrupted scene data, or predominantly English text.
+    Non-Indic languages return (True, "").
+    """
+    if language_code not in INDIC_SCRIPT_RANGES:
+        return True, ""
+
+    if not isinstance(script, dict):
+        return False, "Script data is not a valid dictionary."
+
+    # 1. Validate Title
+    title = script.get("title")
+    if not isinstance(title, str) or not title.strip():
+        return False, f"Script title for language '{language_code}' is missing or empty."
+    if re.search(r"[a-zA-Z\u0900-\u097F\u0C00-\u0C7F]", title):
+        ok, err = validate_text_language_integrity(title, language_code, field_name="title", min_indic_ratio=0.35)
+        if not ok:
+            return False, err
+
+    # 2. Validate Narration
+    narration = script.get("narration")
+    ok, err = validate_text_language_integrity(narration, language_code, field_name="narration", min_indic_ratio=0.50)
+    if not ok:
+        return False, err
+
+    # 3. Validate Scene Scripts
+    scenes = script.get("scene_scripts")
+    if not isinstance(scenes, list) or len(scenes) == 0:
+        return False, f"Script has missing or empty 'scene_scripts' list for language '{language_code}'."
+
+    for i, scene in enumerate(scenes):
+        if not isinstance(scene, dict):
+            return False, f"scene_scripts[{i}] is not a dictionary."
+        voice_text = scene.get("voice_text")
+        ok, err = validate_text_language_integrity(
+            voice_text, language_code, field_name=f"scene_scripts[{i}].voice_text", min_indic_ratio=0.50
+        )
+        if not ok:
+            return False, err
+
+    # 4. Validate Shorts Scripts (if present)
+    shorts = script.get("shorts_scripts")
+    if isinstance(shorts, list) and len(shorts) > 0:
+        for i, short in enumerate(shorts):
+            if isinstance(short, dict):
+                body = short.get("body")
+                if body:
+                    ok, err = validate_text_language_integrity(
+                        body, language_code, field_name=f"shorts_scripts[{i}].body", min_indic_ratio=0.50
+                    )
+                    if not ok:
+                        return False, err
+
+    return True, ""
+
+
+def _generate_fallback_script(brief: dict, language_code: str | None = None) -> dict:
     """
     Generates a 5-8 minute detailed script dynamically from the custom content brief.
     All narration and scene voice texts are fully derived from the primary title, hook,
     audience, visual plan, and script structure in the brief.
+
+    For Indic languages (hi-IN, te-IN) this function MUST NOT be called — the Gemini
+    provider's offline Indic templates must be used instead.  If called with an Indic
+    language code, raises ValueError immediately so the caller can route correctly.
     """
+    if language_code in ("hi-IN", "te-IN"):
+        raise ValueError(
+            f"_generate_fallback_script called with Indic language '{language_code}'. "
+            "English fallback scripts are not permitted for Hindi or Telugu. "
+            "Use generate_script_with_gemini() (with allow_fallback=True) instead."
+        )
     title = brief["primary_title"]
     hook_text = brief["hook"]
     visual_scenes = brief["visual_plan"]
@@ -345,6 +485,8 @@ def generate_script(brief: dict, language_code: str | None = None) -> dict:
     )
 
     if lang in ("hi-IN", "te-IN"):
+        # Exclusively routed through Gemini provider (with Indic offline template fallback).
+        # Never fall through to the English _generate_fallback_script.
         from src.content.gemini_provider import generate_script_with_gemini
         ct = (brief.get("content_type") or "short").lower()
         script = generate_script_with_gemini(brief, language_code=lang, content_type=ct, allow_fallback=True)
@@ -358,7 +500,20 @@ def generate_script(brief: dict, language_code: str | None = None) -> dict:
         ):
             script = _DEITY_SCRIPTS[deity]
         else:
-            script = _generate_fallback_script(brief)
+            script = _generate_fallback_script(brief, language_code=lang)
+
+    # ── Language integrity guard ─────────────────────────────────────────────
+    # After generation, thoroughly verify the complete script data structure (narration,
+    # all scene voice texts, shorts scripts, and title) is genuinely in the expected
+    # Indic script and locale.
+    if lang in ("hi-IN", "te-IN"):
+        ok, integrity_err = validate_script_language_integrity(script, lang)
+        if not ok:
+            raise ValueError(
+                f"❌ Language Integrity Failure: {integrity_err} "
+                "This indicates the script contains invalid or predominantly non-native language content. "
+                "Failing closed to prevent publishing unapproved or corrupted narration."
+            )
 
     # Copy script to avoid modifying global dictionary, then inject approval_metadata & run_id
     script_data = dict(script)
