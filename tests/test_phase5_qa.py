@@ -1,6 +1,7 @@
 # tests/test_phase5_qa.py
 # Phase 5 Unit Tests — Audio Mastering, Captions, Visual Polish, QA
 
+import os
 import unittest
 import hashlib
 import json
@@ -39,11 +40,47 @@ class TestPhase5Pipeline(unittest.TestCase):
             self.assertIn("1080x1920", filter_str)
 
     def test_04_caption_filter_generation(self):
-        """Test caption drawtext filter string formulation."""
+        """Test caption drawtext filter string formulation across platforms."""
+        from src.video.effects import resolve_caption_font
+        expected_font = resolve_caption_font(language_code="hi-IN")
+        escaped_font = expected_font.replace("\\", "/").replace(":", "\\:")
+
         filter_str = get_caption_filter("data/videos/_captions_test/scene_1.txt")
         self.assertIn("drawtext=", filter_str)
-        self.assertIn("Nirmala.ttc", filter_str)
-        self.assertIn("box=1", filter_str)
+        self.assertIn(f"fontfile='{escaped_font}':", filter_str)
+        self.assertIn("textfile='data/videos/_captions_test/scene_1.txt':", filter_str)
+        self.assertIn("box=1:boxcolor=black@0.65:boxborderw=12:", filter_str)
+        self.assertIn("fontsize=42:", filter_str)
+        self.assertIn("x=(w-text_w)/2:y=h*0.72", filter_str)
+
+        # Platform-specific regression guard:
+        if os.name == "nt":
+            self.assertTrue(
+                any(f in filter_str for f in ["Nirmala", "mangal", "aparaj", "arial", "segoeui"]),
+                f"Windows filter string should contain a known Windows font: {filter_str}",
+            )
+        else:
+            self.assertTrue(
+                any(f in filter_str for f in ["NotoSans", "lohit", "Gargi", "nakula", "DejaVu", "FreeSans", "Liberation"]),
+                f"Linux filter string should contain a known Linux font: {filter_str}",
+            )
+
+    def test_04b_caption_filter_explicit_font(self):
+        """Test caption drawtext filter with explicit font path."""
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".ttf") as tmp:
+            custom_filter = get_caption_filter(
+                "data/videos/_captions_test/scene_1.txt",
+                font_path=tmp.name,
+                language_code="te-IN",
+                fontsize=36,
+                y_position_ratio=0.80,
+            )
+            escaped_tmp = Path(tmp.name).resolve().as_posix().replace(":", "\\:")
+            self.assertIn("drawtext=", custom_filter)
+            self.assertIn(f"fontfile='{escaped_tmp}':", custom_filter)
+            self.assertIn("fontsize=36:", custom_filter)
+            self.assertIn("x=(w-text_w)/2:y=h*0.8", custom_filter)
 
     def test_05_final_hindi_video_qa(self):
         """Validate rendered final Hindi video against production specifications."""
