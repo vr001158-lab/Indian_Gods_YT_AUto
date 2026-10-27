@@ -492,5 +492,17 @@
     "duration_seconds": 45.0,
     "published_at": "20261021_181249",
     "video_file_name": "video_short_20261021_181220.mp4"
+  },
+  {
+    "youtube_video_id": "--eajwbnoCo",
+    "topic": "How Vamana Avatar Humbled King Mahabali in Three Steps",
+    "title": "वामन अवतार: जब भगवान विष्णु ने तीन पग में नाप लिया पूरा ब्रह्मांड",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 43.632,
+    "published_at": "20261027_053018",
+    "video_file_name": "video_short_20261027_052934.mp4"
   }
 ]
