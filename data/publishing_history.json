@@ -552,5 +552,17 @@
     "duration_seconds": 37.0,
     "published_at": "20261029_062054",
     "video_file_name": "video_short_20261029_062025.mp4"
+  },
+  {
+    "youtube_video_id": "fIrCWbykCag",
+    "topic": "The Legend of Mohini Avatar How Vishnu Tricked Asuras",
+    "title": "మోహిని అవతార రహస్యం: అమృతం కోసం విష్ణువు పన్నిన అద్భుతమైన మాయాజాలం",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 30.6,
+    "published_at": "20261029_183850",
+    "video_file_name": "video_short_20261029_183819.mp4"
   }
 ]
