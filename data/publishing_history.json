@@ -564,5 +564,17 @@
     "duration_seconds": 30.6,
     "published_at": "20261029_183850",
     "video_file_name": "video_short_20261029_183819.mp4"
+  },
+  {
+    "youtube_video_id": "5VZBpE2ALws",
+    "topic": "Why Lord Krishna Wears a Peacock Feather on His Crown",
+    "title": "श्रीकृष्ण अपने मुकुट पर मोर पंख क्यों धारण करते हैं?",
+    "content_type": "short",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 29.0,
+    "published_at": "20261030_062005",
+    "video_file_name": "video_short_20261030_061950.mp4"
   }
 ]
