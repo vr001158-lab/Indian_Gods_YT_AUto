@@ -19,6 +19,7 @@ from src.voice.qa import perform_audio_qa, AudioValidationError
 from src.voice.providers import (
     AzureNeuralTTSProvider,
     EdgeTTSProvider,
+    PocketTTSProvider,
     ElevenLabsProvider,
     GTTSSpeechProvider,
     GoogleChirpTTSProvider,
@@ -28,6 +29,7 @@ from src.voice.providers import (
     VoiceProviderError,
     LANGUAGE_VOICE_CONFIG,
     EDGE_LANGUAGE_VOICE_CONFIG,
+    POCKET_TTS_LANGUAGE_VOICE_CONFIG,
     KOKORO_LANGUAGE_VOICE_CONFIG,
     PIPER_LANGUAGE_VOICE_CONFIG,
 )
@@ -39,8 +41,25 @@ from src.voice.providers import (
 # Primary production provider for Phase 3
 PRODUCTION_PROVIDER = "edge_neural_tts"
 
+# Primary production provider defaults per language
+# te-IN: Pocket TTS (prasadvittaldev/pocket-tts-telugu-female-syspin) with Edge TTS fallback
+# hi-IN, ta-IN: Edge Neural TTS with fallbacks
+DEFAULT_PRODUCTION_PROVIDERS = {
+    "te-IN": "pocket_tts",        # PRIMARY for Telugu
+    "hi-IN": "edge_neural_tts",   # PRIMARY for Hindi
+    "ta-IN": "edge_neural_tts",   # PRIMARY for Tamil
+}
+
+
+def get_default_provider_for_language(language_code: str, mode: str = "production") -> str:
+    """Resolve the default production voice provider for a specific language."""
+    if mode != "production":
+        return "mock"
+    return DEFAULT_PRODUCTION_PROVIDERS.get(language_code, PRODUCTION_PROVIDER)
+
 PROVIDERS = {
     "edge_neural_tts":   EdgeTTSProvider,       # PRIMARY — Microsoft Edge Neural TTS
+    "pocket_tts":        PocketTTSProvider,     # PRODUCTION — Pocket TTS Telugu Female (Syspin)
     "google_chirp3_hd":  GoogleChirpTTSProvider, # FUTURE PREMIUM — Google Chirp 3 HD
     "azure_neural":      AzureNeuralTTSProvider,
     "elevenlabs":        ElevenLabsProvider,
@@ -54,6 +73,7 @@ PROVIDERS = {
 # All providers in this chain must be real_tts=True / mode=production.
 PRODUCTION_FALLBACK_CHAIN = [
     "edge_neural_tts",
+    "pocket_tts",
     "kokoro",
     "piper",
 ]
@@ -94,12 +114,17 @@ def _resolve_language(script: dict) -> str:
 def _resolve_voice_config(script: dict, language_code: str, provider_name: str) -> dict:
     """
     Resolve the voice config for the active provider and language.
-    Edge TTS, Kokoro, and Piper each use their respective language voice configurations.
+    Edge TTS, Pocket TTS, Kokoro, and Piper each use their respective language voice configurations.
     """
     if provider_name == "edge_neural_tts":
         return EDGE_LANGUAGE_VOICE_CONFIG.get(
             language_code,
             EDGE_LANGUAGE_VOICE_CONFIG["hi-IN"],
+        )
+    if provider_name == "pocket_tts":
+        return POCKET_TTS_LANGUAGE_VOICE_CONFIG.get(
+            language_code,
+            POCKET_TTS_LANGUAGE_VOICE_CONFIG["te-IN"],
         )
     if provider_name == "kokoro":
         return KOKORO_LANGUAGE_VOICE_CONFIG.get(
@@ -157,8 +182,13 @@ def _get_fallback_candidates(primary_name: str) -> list[str]:
     """
     Returns ordered fallback provider candidates that come strictly after primary_name
     in PRODUCTION_FALLBACK_CHAIN, or the entire chain if primary_name is not in it.
+    If pocket_tts was chosen as primary, Edge TTS is tried first as fallback.
     Prevents circular / recursive fallback loops.
     """
+    if primary_name == "pocket_tts":
+        return ["edge_neural_tts"] + [
+            p for p in PRODUCTION_FALLBACK_CHAIN if p not in ("pocket_tts", "edge_neural_tts")
+        ]
     if primary_name in PRODUCTION_FALLBACK_CHAIN:
         idx = PRODUCTION_FALLBACK_CHAIN.index(primary_name)
         return PRODUCTION_FALLBACK_CHAIN[idx + 1 :]
@@ -378,7 +408,8 @@ def generate_voice_mapping(
     if mode not in ("production", "test"):
         raise ValueError("mode must be 'production' or 'test'")
 
-    provider_name = provider_name or (PRODUCTION_PROVIDER if mode == "production" else "mock")
+    language_code = _resolve_language(script)
+    provider_name = provider_name or get_default_provider_for_language(language_code, mode=mode)
     _enforce_production_provider(provider_name, mode)
 
     if provider_name not in PROVIDERS:
@@ -397,7 +428,6 @@ def generate_voice_mapping(
         provider.real_tts = (mode == "production")
     _enforce_provider_metadata(provider, mode)
 
-    language_code = _resolve_language(script)
     voice_config = _resolve_voice_config(script, language_code, provider_name)
     voice_name = voice_config.get("voice_name", "")
 

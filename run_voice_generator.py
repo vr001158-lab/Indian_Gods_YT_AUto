@@ -2,19 +2,20 @@
 run_voice_generator.py — Voice Generation Engine CLI (Phase 3)
 Converts approved production scripts into scene-synchronized audio mapping tracks.
 
-Primary production provider: edge_neural_tts (Microsoft Edge Neural TTS)
-  hi-IN → hi-IN-SwaraNeural
-  te-IN → te-IN-ShrutiNeural
-  ta-IN → ta-IN-PallaviNeural
+Primary production providers:
+  te-IN → pocket_tts (Pocket TTS Telugu Female, with Edge TTS fallback)
+  hi-IN → edge_neural_tts (Microsoft Edge Neural TTS, hi-IN-SwaraNeural)
+  ta-IN → edge_neural_tts (Microsoft Edge Neural TTS, ta-IN-PallaviNeural)
 
 Future premium provider: google_chirp3_hd (billing-gated, kept for future use)
 
 Usage:
-  python run_voice_generator.py                               # auto-picks latest script JSON
+  python run_voice_generator.py                               # auto-picks latest script JSON, resolves provider by language
   python run_voice_generator.py --input <file>               # explicit script file path
-  python run_voice_generator.py --provider edge_neural_tts   # production TTS (default)
+  python run_voice_generator.py --provider pocket_tts        # explicit Pocket TTS
+  python run_voice_generator.py --provider edge_neural_tts   # explicit Edge Neural TTS
   python run_voice_generator.py --provider mock --mode test   # unit-test style offline run
-  python run_voice_generator.py --language hi-IN             # override language (else from script)
+  python run_voice_generator.py --language te-IN             # override language (else from script)
   python run_voice_generator.py --no-save                    # skip writing audio map JSON to disk
 """
 
@@ -88,7 +89,7 @@ def print_audio_map(audio_map: dict):
 
 def main():
     input_file = None
-    provider_name = PRODUCTION_PROVIDER
+    provider_name = None
     voice_id = "default"
     language_code = None
     mode = "production"

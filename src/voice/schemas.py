@@ -30,9 +30,9 @@ REQUIRED_AUDIO_FIELDS = (
 )
 
 # Providers that are allowed in production mode.
-# Primary: edge_neural_tts, Fallbacks: kokoro, piper, Premium: google_chirp3_hd.
+# Primary: edge_neural_tts, Fallbacks: pocket_tts, kokoro, piper, Premium: google_chirp3_hd.
 # gTTS, pyttsx3, sine-wave, and mock are NEVER included here.
-PRODUCTION_PROVIDERS = {"edge_neural_tts", "google_chirp3_hd", "kokoro", "piper"}
+PRODUCTION_PROVIDERS = {"edge_neural_tts", "google_chirp3_hd", "pocket_tts", "kokoro", "piper"}
 
 # Providers that must NEVER be used in production (fail-safe explicit deny-list)
 NON_PRODUCTION_PROVIDERS = {"gtts", "pyttsx3", "sine_wave", "mock", "elevenlabs"}

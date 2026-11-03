@@ -14,6 +14,11 @@ from src.voice.providers.google_chirp import (
 )
 from src.voice.providers.azure_neural import AzureNeuralTTSProvider
 from src.voice.providers.edge_tts import EdgeTTSProvider, EDGE_LANGUAGE_VOICE_CONFIG
+from src.voice.providers.pocket_tts import (
+    PocketTTSProvider,
+    POCKET_TTS_CONFIG,
+    POCKET_TTS_LANGUAGE_VOICE_CONFIG,
+)
 from src.voice.providers.mock import MockVoiceProvider
 
 __all__ = [
@@ -22,6 +27,7 @@ __all__ = [
     "GoogleChirpTTSProvider",
     "AzureNeuralTTSProvider",
     "EdgeTTSProvider",
+    "PocketTTSProvider",
     "MockVoiceProvider",
     "ElevenLabsProvider",
     "GTTSSpeechProvider",
@@ -29,6 +35,8 @@ __all__ = [
     "PiperProvider",
     "LANGUAGE_VOICE_CONFIG",
     "EDGE_LANGUAGE_VOICE_CONFIG",
+    "POCKET_TTS_CONFIG",
+    "POCKET_TTS_LANGUAGE_VOICE_CONFIG",
     "KOKORO_LANGUAGE_VOICE_CONFIG",
     "PIPER_LANGUAGE_VOICE_CONFIG",
     "_get_audio_duration",

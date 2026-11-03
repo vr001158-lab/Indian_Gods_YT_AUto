@@ -7,5 +7,8 @@ Pillow>=10.0.0
 gTTS>=2.3.2
 pyttsx3>=2.90
 numpy>=1.26.0
+pocket-tts>=0.1.0
+soundfile>=0.12.1
+sentencepiece>=0.2.0
 
 

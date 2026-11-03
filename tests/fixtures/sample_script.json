@@ -1,0 +1,39 @@
+{
+  "title": "శ్రీ వేంకటేశ్వర స్వామి దివ్య లీల",
+  "duration_seconds": 30,
+  "language_code": "te-IN",
+  "narration": "నమస్కారం భక్తులారా. ఇది తిరుమల వేంకటేశ్వర స్వామి దివ్య దర్శనం.",
+  "retention_hooks": [
+    "తిరుమల రహస్యం"
+  ],
+  "shorts_scripts": [
+    {
+      "title": "లఘు కథ 1",
+      "hook": "మీకు తెలుసా?",
+      "body": "తిరుమల స్వామి దివ్య కథ."
+    }
+  ],
+  "scene_scripts": [
+    {
+      "scene": 1,
+      "duration_seconds": 15,
+      "visual_reference": "Tirumala gopuram",
+      "voice_text": "నమస్కారం భక్తులారా. ఇది తిరుమల వేంకటేశ్వర స్వామి దివ్య దర్శనం.",
+      "emotion": "Devotional"
+    },
+    {
+      "scene": 2,
+      "duration_seconds": 15,
+      "visual_reference": "Balaji idol",
+      "voice_text": "స్వామివారి దివ్య రూపం దర్శించుకోండి.",
+      "emotion": "Devotional"
+    }
+  ],
+  "approval_metadata": {
+    "approved_for_generation": true,
+    "data_source": "youtube_api",
+    "confidence": "high",
+    "selected_topic": "Tirumala Balaji Miracles",
+    "language_code": "te-IN"
+  }
+}

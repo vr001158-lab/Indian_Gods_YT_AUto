@@ -202,7 +202,10 @@ class PipelineRunner:
             raise ValueError(f"Missing or invalid script input file: {script_file}")
 
         start_time = time.time()
-        provider = "mock" if self.dry_run else "edge_neural_tts"
+        if self.dry_run:
+            provider = "mock"
+        else:
+            provider = "pocket_tts" if self.language_code == "te-IN" else "edge_neural_tts"
         mode = "test" if self.dry_run else "production"
         cmd = [
             sys.executable, "run_voice_generator.py",
