@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 
 # Windows-safe: reconfigure stdout/stderr to UTF-8 so that youtube_uploader's
@@ -142,10 +143,13 @@ def publish_video(
         raise PublishError(f"Pre-upload quota rejection: {quota_err}")
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    upload_privacy = os.environ.get("YOUTUBE_PRIVACY_STATUS", REQUIRED_PRIVACY).strip().lower()
+    if upload_privacy not in ("public", "unlisted", "private"):
+        upload_privacy = REQUIRED_PRIVACY
 
     # ── Step 1: Upload video ────────────────────────────────────────────────
-    # Privacy is set by REQUIRED_PRIVACY.
-    print(f"  Uploading to YouTube [{REQUIRED_PRIVACY.upper()}]...")
+    # Privacy is set by upload_privacy (defaults to REQUIRED_PRIVACY = 'public').
+    print(f"  Uploading to YouTube [{upload_privacy.upper()}]...")
     print(f"  File:  {vp.name} ({vp.stat().st_size / 1024 / 1024:.2f} MB)")
     print(f"  Title: {title[:80]}")
 
@@ -156,7 +160,7 @@ def publish_video(
             title                  = title,
             description            = description,
             tags                   = tags,
-            privacy_status         = REQUIRED_PRIVACY,
+            privacy_status         = upload_privacy,
             category_id            = category_id,
             default_language       = "te",
             default_audio_language = "te",
@@ -190,7 +194,7 @@ def publish_video(
         "video_id":           video_id,
         "youtube_url":        youtube_url,
         "selected_topic":     qa.get("selected_topic", ""),
-        "privacy_status":     REQUIRED_PRIVACY,
+        "privacy_status":     upload_privacy,
         "upload_timestamp":   ts,
         "thumbnail_uploaded": thumbnail_uploaded,
         "thumbnail_error":    thumbnail_error,

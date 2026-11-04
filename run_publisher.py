@@ -17,6 +17,7 @@
 #  - Privacy is ALWAYS "public" — cannot be changed via CLI
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -87,7 +88,10 @@ def main() -> int:
     print(f"Source   : {qa.get('data_source', '')}")
     print(f"Score    : {qa.get('score', '')}")
     print(f"Conf     : {qa.get('confidence', '')}")
-    print(f"Privacy  : {REQUIRED_PRIVACY.upper()} (enforced)")
+    active_privacy = os.environ.get("YOUTUBE_PRIVACY_STATUS", REQUIRED_PRIVACY).strip().lower()
+    if active_privacy not in ("public", "unlisted", "private"):
+        active_privacy = REQUIRED_PRIVACY
+    print(f"Privacy  : {active_privacy.upper()} (enforced)")
     print()
 
     # ── Step 2: Build metadata ───────────────────────────────────────────────

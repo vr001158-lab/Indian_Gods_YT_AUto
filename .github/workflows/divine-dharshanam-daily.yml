@@ -37,6 +37,15 @@ on:
         required: true
         default: true
         type: boolean
+      privacy_status:
+        description: 'YouTube Privacy Status (unlisted / private for test runs | public for production)'
+        required: true
+        default: 'unlisted'
+        type: choice
+        options:
+          - unlisted
+          - private
+          - public
 
 concurrency:
   group: divine-dharshanam-production
@@ -138,12 +147,19 @@ jobs:
           CONTENT_TYPE_INPUT: ${{ inputs.content_type }}
           FORMAT_INPUT: ${{ inputs.format }}
           DRY_RUN_INPUT: ${{ inputs.dry_run }}
+          PRIVACY_STATUS_INPUT: ${{ inputs.privacy_status }}
           SCHEDULE_CRON: ${{ github.event.schedule }}
         run: |
           CT="${CONTENT_TYPE_INPUT:-short}"
           FMT="narrated"
           LANG="te-IN"
           EXP_TAG=""
+          PRIVACY="public"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            PRIVACY="${PRIVACY_STATUS_INPUT:-unlisted}"
+          fi
+          export YOUTUBE_PRIVACY_STATUS="$PRIVACY"
+          echo "🔒 YouTube Privacy Status: $YOUTUBE_PRIVACY_STATUS"
           if [ "${{ github.event_name }}" = "schedule" ]; then
             case "$SCHEDULE_CRON" in
               "0 1 * * *")

@@ -472,6 +472,34 @@ class TestPublisherUpload(unittest.TestCase):
         self.assertTrue(am.get("approved_for_generation"))
         self.assertEqual(am.get("data_source"), "youtube_api")
 
+    # ── Test 15: Controlled test privacy override ────────────────────────
+    def test_15_controlled_test_privacy_override(self):
+        """Setting YOUTUBE_PRIVACY_STATUS overrides privacy status for controlled test uploads."""
+        import os
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            qa_file, mp4 = _make_qa(tmp)
+            qa = json.loads(qa_file.read_text(encoding="utf-8"))
+            meta = build_video_metadata(qa)
+
+            with patch("youtube_uploader.upload_to_youtube", return_value="UNLISTED_VID_123") as mock_up:
+                with patch.dict(os.environ, {"YOUTUBE_PRIVACY_STATUS": "unlisted"}):
+                    manifest = publish_video(
+                        creds          = self._mock_creds(),
+                        video_file     = mp4,
+                        title          = meta["title"],
+                        description    = meta["description"],
+                        tags           = meta["tags"],
+                        category_id    = meta["category_id"],
+                        thumbnail_file = None,
+                        qa             = qa,
+                        output_dir     = str(tmp / "publishing"),
+                    )
+                mock_up.assert_called_once()
+                self.assertEqual(mock_up.call_args.kwargs.get("privacy_status"), "unlisted")
+                self.assertEqual(manifest["privacy_status"], "unlisted")
+
 
 class TestPublisherMetadata(unittest.TestCase):
     """Tests 15–16: Metadata and CLI."""
