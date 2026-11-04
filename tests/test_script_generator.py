@@ -505,6 +505,14 @@ class TestScriptCLI(unittest.TestCase):
         self.assertTrue(ok)
         self.assertTrue("subject" in reason.lower() or "concept" in reason.lower())
 
+        # Positive Telugu Golden Deer / Maricha
+        ok, reason = check_title_topic_semantic_alignment(
+            "The Lesson of Golden Deer Why Illusion Traps the Mind",
+            "మాయా లేడి రహస్యం: భ్రమలలో చిక్కుకున్న మనసు"
+        )
+        self.assertTrue(ok)
+        self.assertTrue("subject" in reason.lower())
+
         # Positive Hindi Aarti & Temple (matches specific subject 'aarti' and 'bell')
         ok, reason = check_title_topic_semantic_alignment(
             "Why We Perform Aarti and Ring Bells in Temples",
