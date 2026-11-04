@@ -522,12 +522,34 @@ SPECIFIC_SUBJECT_GROUPS: list[set[str]] = [
 
     # South Indian Deities
     {"subramanya", "murugan", "kartikeya", "skanda", "vel", "सुब्रह्मण्य", "कार्तिकेय", "మురుగన్", "సుబ్రహ్మణ్య", "కార్తికేయ"},
-    {"ayyappa", "sabarimala", "manikanta", "अय्यप्पा", "सबरीमाला", "మణికంఠ", "అయ్యప్ప", "శబరిమల"},
-    {"venkateswara", "balaji", "tirupati", "7kondala", "वेंकटेश्वर", "बालाजी", "तिरुपति", "వేంకటేశ్వర", "బాలాజీ", "తిరుపతి", "ఏడుకొండల"},
+    {"ayyappa", "sabarimala", "manikanta", "manikandan", "tigress", "tiger", "अय्यप्पा", "सबरीमाला", "मणिकंठ", "మణికంఠ", "అయ్యప్ప", "శబరిమల", "పులి", "పులిపాలు"},
+    {"venkateswara", "balaji", "tirupati", "7kondala", "srinivasa", "padmavathi", "padmavati", "वेंकटेश्वर", "बालाजी", "तिरुपति", "श्रीनिवास", "पद्मावती", "వేంకటేశ్వర", "బాలాజీ", "తిరుపతి", "ఏడుకొండల", "శ్రీనివాస", "శ్రీనివాసుడు", "పద్మావతి", "పద్మావతీ"},
+
+    # Other Vedic & Mythological Deities
+    {"brahma", "creator", "ब्रह्मा", "బ్రహ్మ", "బ్రహ్మదేవుడు"},
+    {"surya", "suryadev", "sun", "chariot", "horses", "सूर्य", "సూర్య", "సూర్యుడు", "సూర్యదేవుడు"},
+    {"yamraj", "yama", "yamadharma", "यमराज", "यम", "యమ", "యముడు", "యమధర్మరాజు"},
+    {"dhanvantari", "amrita", "nectar", "धन्वंतरि", "अमृत", "ధన్వంతరి", "అమృతం"},
+    {"kubera", "kuber", "treasurer", "कुबेर", "కుబేర", "కుబేరుడు"},
+    {"kalabhairava", "bhairava", "kashi", "कालभैरव", "भैरव", "काशी", "కాలభైరవ", "భైరవ", "కాశీ"},
+    {"dattatreya", "datta", "दत्तात्रेय", "దత్తాత్రేయ"},
+    {"jagannath", "jagannatha", "puri", "जगन्नाथ", "पुरी", "జగన్నాథ", "జగన్నాథుడు", "పూరీ"},
+
+    # Krishna Specific Episodes & Attributes
+    {"raas leela", "ras leela", "raas", "ras", "రాసలీల", "రాసలీలల", "గోపికలు", "గోపికల", "గోపిక", "रासलीला", "रास", "गोपिका", "गोपियों"},
+    {"sudarshana", "sudarshan", "chakra", "सुदर्शन", "चक्र", "సుదర్శన", "సుదర్శన చక్రం", "సుదర్శనచక్రం"},
 
     # Sacred Practices & Ritual Items (Specific)
     {"aarti", "arti", "आरती", "హారతి"},
     {"bell", "bells", "घंटी", "గంట"},
+    {"gayatri", "गायत्री", "గాయత్రి", "గాయత్రీ"},
+    {"pradakshina", "circumambulation", "प्रदक्षिणा", "ప్రదక్షిణ", "ప్రదక్షిణలు"},
+    {"coconut", "coconuts", "नारियल", "కొబ్బరికాయ", "కొబ్బరి"},
+    {"sri yantra", "shree yantra", "yantra", "श्रीयंत्र", "यंत्र", "శ్రీయంత్రం", "శ్రీచక్రం", "యంత్రం"},
+    {"108", "one hundred eight", "ఒక వంద ఎనిమిది", "నూట ఎనిమిది"},
+    {"lamp", "lamps", "diya", "deepam", "दीप", "दीपक", "దీపం", "దీపాలు"},
+    {"tulsi", "vrinda", "तुलसी", "తులసి"},
+    {"conch", "shankh", "shankha", "शंख", "శంఖం", "శంఖము"},
 ]
 
 # Broad / Generic shared concepts that may appear across any deity or devotional story.
@@ -604,7 +626,9 @@ def check_title_topic_semantic_alignment(
 
     # 3. Known deity resolution alignment (only when neither has conflicting specific subjects)
     from src.assets.selector import resolve_deity
-    c_deity = resolve_deity(canonical_topic, deity_hint="", default=None)
+    c_deity = resolve_deity(canonical_topic, deity_hint="", default=None) or (
+        resolve_deity(canonical_topic, deity_hint=deity_hint, default=None) if deity_hint else None
+    )
     t_deity = resolve_deity(script_title, deity_hint="", default=None)
     if c_deity and t_deity and c_deity == t_deity:
         return True, f"Deity connection matched: '{c_deity}'"
