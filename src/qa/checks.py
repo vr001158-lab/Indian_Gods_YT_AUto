@@ -143,16 +143,22 @@ def check_topic_consistency(decision: dict, manifests: dict[str, dict]) -> tuple
             }
             overlap = canonical_words & value_words
             if len(overlap) == 0:
-                # Check cross-language deity consistency for Indic topics
-                from src.assets.selector import resolve_deity
-                canon_deity = resolve_deity(canonical, deity_hint=decision.get("deity", ""), default=None)
-                val_deity = resolve_deity(value, deity_hint=manifest.get("deity") or (manifest.get("approval_metadata") or {}).get("deity", ""), default=None)
-                if not (canon_deity and val_deity and canon_deity == val_deity):
-                    return (
-                        False,
-                        f"Topic mismatch in {name}.{field}: no keywords from "
-                        f"'{canonical}' found in '{value}'",
-                    )
+                # 1. Try comprehensive cross-lingual semantic alignment
+                from src.script.generator import check_title_topic_semantic_alignment
+                aligned, _ = check_title_topic_semantic_alignment(
+                    canonical, value
+                )
+                if not aligned:
+                    # 2. Check cross-language deity consistency for Indic topics
+                    from src.assets.selector import resolve_deity
+                    canon_deity = resolve_deity(canonical, default=None)
+                    val_deity = resolve_deity(value, default=None)
+                    if not (canon_deity and val_deity and canon_deity == val_deity):
+                        return (
+                            False,
+                            f"Topic mismatch in {name}.{field}: no keywords from "
+                            f"'{canonical}' found in '{value}'",
+                        )
     return True, "OK"
 
 

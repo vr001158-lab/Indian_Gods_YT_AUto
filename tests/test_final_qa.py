@@ -625,6 +625,22 @@ class TestFinalQAGate(unittest.TestCase):
         # Errors list must be populated
         self.assertTrue(len(result.errors) > 0)
 
+    # ── Test 28: Cross-lingual Indic topic consistency (Telugu) ───────────
+    def test_28_cross_lingual_indic_topic_consistency_telugu(self):
+        """Telugu script title matching canonical English topic passes topic consistency."""
+        from src.qa.checks import check_topic_consistency
+        dec = {
+            "selected_topic": "How Hanuman Carried Dronagiri Mountain for Sanjeevani Herb",
+            "deity": "hanuman",
+        }
+        manifests = {
+            "script": {
+                "title": "సంజీవని కోసం ద్రోణగిరిని ఎత్తిన హనుమంతుని అద్భుత గాథ",
+            }
+        }
+        ok, reason = check_topic_consistency(dec, manifests)
+        self.assertTrue(ok, f"Expected pass, got: {reason}")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 
