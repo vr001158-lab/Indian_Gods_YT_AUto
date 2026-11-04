@@ -648,5 +648,22 @@
     "duration_seconds": 49.32,
     "published_at": "20261103_143545",
     "video_file_name": "video_long_20261103_143517.mp4"
+  },
+  {
+    "youtube_video_id": "0h3TeuwGwEY",
+    "topic": "How Hanuman Carried Dronagiri Mountain for Sanjeevani Herb",
+    "title": "సంజీవని కోసం ద్రోణగిరిని ఎత్తిన మారుతి",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 30.24,
+    "published_at": "20261104_130220",
+    "published_at_utc": "2026-11-04T13:02:20.154188+00:00",
+    "published_at_kolkata": "2026-11-04 18:32:20 +0530",
+    "kolkata_date": "2026-11-04",
+    "video_file_name": "video_short_20261104_130145.mp4",
+    "success": true
   }
 ]
