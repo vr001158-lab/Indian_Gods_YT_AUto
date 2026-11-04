@@ -200,3 +200,23 @@ def validate_video_asset(path: str | Path) -> dict[str, Any]:
         "file_size_bytes": size,
         "valid": True,
     }
+
+
+def is_landscape_dimensions(width: int, height: int) -> bool:
+    """Return True if dimensions correspond to landscape format (width >= height)."""
+    return width > 0 and height > 0 and width >= height
+
+
+def validate_landscape_asset(meta: dict[str, Any]) -> tuple[bool, str]:
+    """
+    Validates that an image or video asset metadata is suitable for 16:9 landscape rendering.
+    Rejects portrait assets (width < height, or aspect ratio < 1.0).
+    """
+    w = meta.get("width", 0)
+    h = meta.get("height", 0)
+    p = meta.get("path", "")
+    if w <= 0 or h <= 0:
+        return False, f"Invalid asset dimensions {w}x{h} for {p}"
+    if w < h:
+        return False, f"Asset is portrait ({w}x{h}); strictly rejected for landscape long video: {p}"
+    return True, ""

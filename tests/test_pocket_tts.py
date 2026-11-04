@@ -20,6 +20,12 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    HAS_TORCH = False
+
 from src.voice.providers.pocket_tts import (
     PocketTTSProvider,
     POCKET_TTS_CONFIG,
@@ -176,6 +182,7 @@ class TestPocketTTSProvider(unittest.TestCase):
             if temp_path.exists():
                 temp_path.unlink()
 
+    @unittest.skipUnless(HAS_TORCH, "torch is required for Pocket TTS neural synthesis testing")
     def test_generate_speech_mocked(self):
         """Test end-to-end synthesis with mocked neural weights producing valid audio."""
         import torch
@@ -231,12 +238,11 @@ class TestPocketTTSFallbackIntegration(unittest.TestCase):
         self.assertTrue(len(candidates) > 0)
         # Edge TTS must be the first fallback candidate if pocket_tts fails
         self.assertEqual(candidates[0], "edge_neural_tts")
+        self.assertEqual(candidates, ["edge_neural_tts", "kokoro", "piper"])
 
     def test_fallback_candidates_when_edge_is_primary(self):
         candidates = _get_fallback_candidates("edge_neural_tts")
-        self.assertTrue(len(candidates) > 0)
-        # Pocket TTS is next in line
-        self.assertEqual(candidates[0], "pocket_tts")
+        self.assertEqual(candidates, ["kokoro", "piper"])
 
     def test_schema_validates_pocket_tts_audio_mapping(self):
         valid_map = {
@@ -267,64 +273,8 @@ class TestPocketTTSFallbackIntegration(unittest.TestCase):
         ok, err = validate_audio_output(valid_map)
         self.assertTrue(ok, f"Validation failed: {err}")
 
-    def test_edge_tts_failure_falls_back_to_pocket_tts_for_telugu(self):
-        """Simulates Edge TTS failing on Telugu; verifies pipeline cleanly falls back to Pocket TTS."""
-        from src.voice.generator import _make_silent_wav_bytes
-
-        script = {
-            "title": "శ్రీ వేంకటేశ్వర స్వామి దివ్య లీల",
-            "duration_seconds": 30,
-            "language_code": "te-IN",
-            "narration": "నమస్కారం భక్తులారా. ఇది తిరుమల వేంకటేశ్వర స్వామి దివ్య దర్శనం.",
-            "retention_hooks": ["తిరుమల రహస్యం"],
-            "shorts_scripts": [
-                {"title": "లఘు కథ 1", "hook": "మీకు తెలుసా?", "body": "తిరుమల స్వామి దివ్య కథ."}
-            ],
-            "scene_scripts": [
-                {
-                    "scene": 1,
-                    "duration_seconds": 15,
-                    "visual_reference": "Tirumala gopuram",
-                    "voice_text": "నమస్కారం భక్తులారా. ఇది తిరుమల వేంకటేశ్వర స్వామి దివ్య దర్శనం.",
-                    "emotion": "Devotional",
-                },
-                {
-                    "scene": 2,
-                    "duration_seconds": 15,
-                    "visual_reference": "Balaji idol",
-                    "voice_text": "స్వామివారి దివ్య రూపం దర్శించుకోండి.",
-                    "emotion": "Devotional",
-                },
-            ],
-            "approval_metadata": {
-                "approved_for_generation": True,
-                "data_source": "youtube_api",
-                "confidence": "high",
-                "selected_topic": "Tirumala Balaji Miracles",
-                "language_code": "te-IN",
-            },
-        }
-
-        def fake_pocket_speech(text, output_path, language_code="te-IN", voice_config=None):
-            output_path.write_bytes(_make_silent_wav_bytes(15))
-            return 15
-
-        with patch("src.voice.providers.edge_tts.EdgeTTSProvider.generate_speech", side_effect=VoiceProviderError("Edge network timeout")):
-            with patch("src.voice.providers.pocket_tts.PocketTTSProvider.generate_speech", side_effect=fake_pocket_speech) as mock_pocket:
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    audio_map = generate_voice_mapping(
-                        script=script,
-                        provider_name="edge_neural_tts",
-                        output_dir=Path(tmp_dir),
-                        mode="production",
-                    )
-                    self.assertEqual(audio_map["provider"], "pocket_tts")
-                    self.assertTrue(audio_map["fallback_used"])
-                    self.assertEqual(audio_map["primary_provider_configured"], "edge_neural_tts")
-                    self.assertTrue(mock_pocket.called)
-
-    def test_edge_and_pocket_tts_failure_falls_back_to_kokoro(self):
-        """Simulates both Edge TTS and Pocket TTS failing; verifies fallback cleanly proceeds to Kokoro without recursion."""
+    def test_pocket_and_edge_tts_failure_falls_back_to_kokoro(self):
+        """Simulates both Pocket TTS and Edge TTS failing; verifies fallback cleanly proceeds to Kokoro without recursion."""
         from src.voice.generator import _make_silent_wav_bytes
 
         script = {
@@ -363,34 +313,34 @@ class TestPocketTTSFallbackIntegration(unittest.TestCase):
 
         call_order = []
 
-        def edge_fail(*args, **kwargs):
-            call_order.append("edge_neural_tts")
-            raise VoiceProviderError("Edge timeout")
-
         def pocket_fail(*args, **kwargs):
             call_order.append("pocket_tts")
             raise VoiceProviderError("Pocket inference error")
+
+        def edge_fail(*args, **kwargs):
+            call_order.append("edge_neural_tts")
+            raise VoiceProviderError("Edge timeout")
 
         def kokoro_success(text, output_path, language_code="te-IN", voice_config=None):
             call_order.append("kokoro")
             output_path.write_bytes(_make_silent_wav_bytes(15))
             return 15
 
-        with patch("src.voice.providers.edge_tts.EdgeTTSProvider.generate_speech", side_effect=edge_fail):
-            with patch("src.voice.providers.pocket_tts.PocketTTSProvider.generate_speech", side_effect=pocket_fail):
+        with patch("src.voice.providers.pocket_tts.PocketTTSProvider.generate_speech", side_effect=pocket_fail):
+            with patch("src.voice.providers.edge_tts.EdgeTTSProvider.generate_speech", side_effect=edge_fail):
                 with patch("src.voice.providers.google_chirp.KokoroProvider.generate_speech", side_effect=kokoro_success):
                     with tempfile.TemporaryDirectory() as tmp_dir:
                         audio_map = generate_voice_mapping(
                             script=script,
-                            provider_name="edge_neural_tts",
+                            provider_name="pocket_tts",
                             output_dir=Path(tmp_dir),
                             mode="production",
                         )
                         self.assertEqual(audio_map["provider"], "kokoro")
                         self.assertTrue(audio_map["fallback_used"])
-                        self.assertEqual(audio_map["primary_provider_configured"], "edge_neural_tts")
-                        # First attempt cycle for scene 1 must be strictly edge -> pocket -> kokoro
-                        self.assertEqual(call_order[:3], ["edge_neural_tts", "pocket_tts", "kokoro"])
+                        self.assertEqual(audio_map["primary_provider_configured"], "pocket_tts")
+                        # First attempt cycle for scene 1 must be strictly pocket -> edge -> kokoro
+                        self.assertEqual(call_order[:3], ["pocket_tts", "edge_neural_tts", "kokoro"])
 
     def test_default_provider_resolution_by_language(self):
         """Verifies default production provider mapping: te-IN -> pocket_tts, hi-IN/ta-IN -> edge_neural_tts."""

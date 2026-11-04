@@ -73,7 +73,6 @@ PROVIDERS = {
 # All providers in this chain must be real_tts=True / mode=production.
 PRODUCTION_FALLBACK_CHAIN = [
     "edge_neural_tts",
-    "pocket_tts",
     "kokoro",
     "piper",
 ]
