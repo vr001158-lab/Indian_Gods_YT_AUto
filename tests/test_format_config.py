@@ -40,7 +40,8 @@ class TestFormatConfig(unittest.TestCase):
         self.assertEqual(cfg["resolution"], "1920x1080")
         self.assertEqual(cfg["width"], 1920)
         self.assertEqual(cfg["height"], 1080)
-        self.assertEqual(cfg["min_duration_seconds"], 1)
+        self.assertEqual(cfg["min_duration_seconds"], 120)
+        self.assertEqual(cfg["max_duration_seconds"], 300)
         self.assertEqual(cfg["publish_classification"], "long")
 
     def test_04_unknown_format_raises_error(self):
@@ -94,19 +95,24 @@ class TestFormatConfig(unittest.TestCase):
         self.assertFalse(validate_duration_for_content_type(5, "short")[0])
         self.assertFalse(validate_duration_for_content_type(200, "short")[0])
 
-        # Long duration bounds: any positive duration is valid (content_type is authoritative)
-        self.assertTrue(validate_duration_for_content_type(60, "long")[0])   # <181s is VALID
-        self.assertTrue(validate_duration_for_content_type(300, "long")[0])  # 5 min is VALID
-        self.assertFalse(validate_duration_for_content_type(0, "long")[0])   # 0s is invalid
+        # Long duration bounds: 120s to 300s
+        self.assertFalse(validate_duration_for_content_type(60, "long")[0])   # <120s is invalid
+        self.assertFalse(validate_duration_for_content_type(119, "long")[0])  # <120s is invalid
+        self.assertTrue(validate_duration_for_content_type(120, "long")[0])   # min boundary (120s) is valid
+        self.assertTrue(validate_duration_for_content_type(180, "long")[0])   # target (~180s) is valid
+        self.assertTrue(validate_duration_for_content_type(240, "long")[0])   # target (~240s) is valid
+        self.assertTrue(validate_duration_for_content_type(300, "long")[0])   # max boundary (300s) is valid
+        self.assertFalse(validate_duration_for_content_type(301, "long")[0])  # >300s is invalid
+        self.assertFalse(validate_duration_for_content_type(0, "long")[0])    # 0s is invalid
 
         # Zero or negative duration
         self.assertFalse(validate_duration_for_content_type(0, "short")[0])
         self.assertFalse(validate_duration_for_content_type(-10, "long")[0])
 
-    def test_10_regression_short_duration_long_format(self):
-        """Proves content_type='long' with duration < 181s and resolution 1920x1080 passes validation."""
-        ok_dur, err_dur = validate_duration_for_content_type(60.0, "long")
-        self.assertTrue(ok_dur, f"60s long format failed duration check: {err_dur}")
+    def test_10_regression_landscape_duration_long_format(self):
+        """Proves content_type='long' with target duration 180s and resolution 1920x1080 passes validation."""
+        ok_dur, err_dur = validate_duration_for_content_type(180.0, "long")
+        self.assertTrue(ok_dur, f"180s long format failed duration check: {err_dur}")
 
         ok_res, err_res = validate_resolution_for_content_type("1920x1080", "long")
         self.assertTrue(ok_res, f"1920x1080 long format failed resolution check: {err_res}")

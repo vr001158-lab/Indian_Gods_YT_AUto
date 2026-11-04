@@ -232,7 +232,14 @@ def get_video_filtergraph_for_scene(
 
     # 4. Add captions if provided
     if caption_text_file:
-        caption_filter = get_caption_filter(caption_text_file, language_code=language_code)
+        y_ratio = 0.82 if width > height else 0.72
+        cap_size = 36 if width > height else 42
+        caption_filter = get_caption_filter(
+            caption_text_file,
+            language_code=language_code,
+            fontsize=cap_size,
+            y_position_ratio=y_ratio,
+        )
         filter_chain += f",{caption_filter}"
 
     return filter_chain

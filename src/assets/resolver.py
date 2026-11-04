@@ -29,31 +29,55 @@ def create_scene_asset_plan(
     deity_hint = script.get("approval_metadata", {}).get("deity") or script.get("deity", "")
     deity = resolve_deity(topic, deity_hint=deity_hint)
 
-    manifest = load_asset_manifest(manifest_path=manifest_path, gods_dir=gods_dir)
     scene_scripts = script.get("scene_scripts", [])
-
     content_type = (script.get("content_type") or "short").lower()
     fmt = (script.get("format") or "").lower()
 
-    # Determine if timeline generator should build multi-segment retention timeline
-    if fmt == "old" or len(scene_scripts) <= 2 or script.get("use_retention_timeline"):
-        target_dur = float(script.get("duration_seconds") or script.get("total_duration_seconds") or 45.0)
-        if content_type == "short" and (target_dur < 35.0 or target_dur >= 60.0):
-            target_dur = 45.0
-        from src.assets.selector import build_deity_visual_timeline
-        scene_decisions = build_deity_visual_timeline(
-            deity_key=deity,
-            target_duration=target_dur,
-            content_type=content_type,
-            manifest=manifest,
-        )
+    if content_type == "long":
+        # Strictly select landscape assets from assets/gods_landscape_long_video
+        from src.assets.manifest import load_landscape_asset_manifest
+        from src.assets.selector import select_landscape_scene_assets, build_landscape_visual_timeline
+
+        landscape_dir = gods_dir if str(gods_dir) != "assets/gods" else "assets/gods_landscape_long_video"
+        manifest = load_landscape_asset_manifest(gods_dir=landscape_dir)
+
+        if fmt == "old" or len(scene_scripts) <= 2 or script.get("use_retention_timeline"):
+            target_dur = float(script.get("duration_seconds") or script.get("total_duration_seconds") or 180.0)
+            scene_decisions = build_landscape_visual_timeline(
+                deity_key=deity,
+                target_duration=target_dur,
+                manifest=manifest,
+                gods_dir=landscape_dir,
+            )
+        else:
+            scene_decisions = select_landscape_scene_assets(
+                deity_key=deity,
+                scene_scripts=scene_scripts,
+                manifest=manifest,
+                gods_dir=landscape_dir,
+            )
     else:
-        scene_decisions = select_scene_assets(
-            deity_key=deity,
-            scene_scripts=scene_scripts,
-            manifest=manifest,
-            allow_online_fallback=True,
-        )
+        manifest = load_asset_manifest(manifest_path=manifest_path, gods_dir=gods_dir)
+
+        # Determine if timeline generator should build multi-segment retention timeline
+        if fmt == "old" or len(scene_scripts) <= 2 or script.get("use_retention_timeline"):
+            target_dur = float(script.get("duration_seconds") or script.get("total_duration_seconds") or 45.0)
+            if content_type == "short" and (target_dur < 35.0 or target_dur >= 60.0):
+                target_dur = 45.0
+            from src.assets.selector import build_deity_visual_timeline
+            scene_decisions = build_deity_visual_timeline(
+                deity_key=deity,
+                target_duration=target_dur,
+                content_type=content_type,
+                manifest=manifest,
+            )
+        else:
+            scene_decisions = select_scene_assets(
+                deity_key=deity,
+                scene_scripts=scene_scripts,
+                manifest=manifest,
+                allow_online_fallback=True,
+            )
 
     asset_plan = {
         "topic": topic,

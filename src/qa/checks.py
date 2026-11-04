@@ -472,8 +472,8 @@ def check_video_with_ffprobe(
                     "duration_seconds": 150.0,
                     "video_codec": "h264",
                     "pixel_format": "yuv420p",
-                    "width": 1080,
-                    "height": 1920,
+                    "width": 1080 if content_type == "short" else 1920,
+                    "height": 1920 if content_type == "short" else 1080,
                     "audio_codec": "aac",
                     "audio_channels": 2,
                     "ffprobe_passed": True,
@@ -553,6 +553,10 @@ def check_video_with_ffprobe(
         duration = float(vs.get("duration", 0) or 0)
     if duration <= 0:
         return False, f"Video duration is not positive: {duration}", vval
+
+    ok_dur, dur_err = validate_duration_for_content_type(duration, content_type)
+    if not ok_dur:
+        return False, dur_err, vval
 
     vval["duration_seconds"] = duration
     vval["ffprobe_passed"] = True

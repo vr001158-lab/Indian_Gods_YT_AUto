@@ -151,6 +151,10 @@ def validate_video_file_with_ffprobe(
     if duration <= 0:
         return False, f"Video duration is not positive: {duration}"
 
+    ok_dur, dur_err = validate_duration_for_content_type(duration, content_type)
+    if not ok_dur:
+        return False, dur_err
+
     # ── ffmpeg decode test ────────────────────────────────────────────────
     try:
         decode_result = subprocess.run(

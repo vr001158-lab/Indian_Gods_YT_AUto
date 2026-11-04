@@ -270,3 +270,168 @@ def select_scene_assets(
         })
 
     return scene_plan
+
+
+def select_landscape_scene_assets(
+    deity_key: str,
+    scene_scripts: list[dict[str, Any]],
+    manifest: dict[str, Any] | None = None,
+    gods_dir: str | Path = "assets/gods_landscape_long_video",
+) -> list[dict[str, Any]]:
+    """
+    Select scene-aware landscape assets strictly from `assets/gods_landscape_long_video/<deity_key>/`.
+    Enforces:
+      - Only landscape assets (width >= height)
+      - Never uses assets/gods/ or portrait assets
+      - Rejects if deity folder has no valid landscape assets
+      - Logs selected folder and assets
+    """
+    if manifest is None:
+        from src.assets.manifest import load_landscape_asset_manifest
+        manifest = load_landscape_asset_manifest(gods_dir=gods_dir)
+
+    deities = manifest.get("deities", {})
+    target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
+    repo_images = [img for img in target_deity_assets.get("images", []) if img.get("width", 0) >= img.get("height", 0)]
+    repo_videos = [vid for vid in target_deity_assets.get("videos", []) if vid.get("width", 0) >= vid.get("height", 0)]
+    all_repo_assets = repo_videos + repo_images
+
+    if not all_repo_assets:
+        folder_path = Path(gods_dir) / deity_key
+        raise ValueError(
+            f"No valid landscape visual assets found for deity '{deity_key}' in {folder_path}. "
+            f"Fallback to portrait assets/gods/ is strictly prohibited."
+        )
+
+    import sys
+    print(
+        f"  [LANDSCAPE ASSET SELECTION] Deity: '{deity_key}' | Source folder: {Path(gods_dir)/deity_key} | "
+        f"Valid landscape assets: {len(all_repo_assets)}",
+        file=sys.stderr,
+    )
+
+    scene_plan: list[dict[str, Any]] = []
+    for item in scene_scripts:
+        scene_num = item["scene"]
+        visual_ref = item.get("visual_reference", "")
+        script_text = item.get("script_text", "")
+        keywords = [
+            w for w in re.sub(r"[^a-zA-Z0-9\s]", "", f"{visual_ref} {script_text}").lower().split()
+            if len(w) >= 4
+        ]
+
+        best_score = -1
+        best_candidate = None
+        for candidate in all_repo_assets:
+            score = _score_semantic_match(candidate["path"], keywords)
+            if score > best_score:
+                best_score = score
+                best_candidate = candidate
+
+        if best_candidate and best_score > 0:
+            selected_asset = best_candidate
+            selection_reason = f"Landscape semantic match (score={best_score}) for '{deity_key}'"
+        else:
+            idx = (scene_num - 1) % len(all_repo_assets)
+            selected_asset = all_repo_assets[idx]
+            selection_reason = f"Landscape asset #{idx+1} for '{deity_key}' (scene #{scene_num})"
+
+        scene_plan.append({
+            "scene": scene_num,
+            "asset_type": selected_asset["type"],
+            "asset": selected_asset["path"],
+            "asset_id": selected_asset.get("asset_id", ""),
+            "deity": deity_key,
+            "source": "landscape_repository",
+            "reason_for_selection": selection_reason,
+            "validation_result": "OK",
+            "width": selected_asset.get("width"),
+            "height": selected_asset.get("height"),
+        })
+
+    return scene_plan
+
+
+def build_landscape_visual_timeline(
+    deity_key: str,
+    target_duration: float = 180.0,
+    manifest: dict[str, Any] | None = None,
+    gods_dir: str | Path = "assets/gods_landscape_long_video",
+) -> list[dict[str, Any]]:
+    """
+    Constructs a visual timeline (mixing landscape images & landscape video clips)
+    strictly from `assets/gods_landscape_long_video/<deity_key>/`.
+    """
+    if manifest is None:
+        from src.assets.manifest import load_landscape_asset_manifest
+        manifest = load_landscape_asset_manifest(gods_dir=gods_dir)
+
+    deities = manifest.get("deities", {})
+    target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
+    repo_images = [img for img in target_deity_assets.get("images", []) if img.get("width", 0) >= img.get("height", 0)]
+    repo_videos = [vid for vid in target_deity_assets.get("videos", []) if vid.get("width", 0) >= vid.get("height", 0)]
+
+    if not repo_images and not repo_videos:
+        folder_path = Path(gods_dir) / deity_key
+        raise ValueError(
+            f"No valid landscape visual assets found for deity '{deity_key}' in {folder_path}. "
+            f"Fallback to portrait assets/gods/ is strictly prohibited."
+        )
+
+    import sys
+    print(
+        f"  [LANDSCAPE TIMELINE] Deity: '{deity_key}' | Folder: {Path(gods_dir)/deity_key} | "
+        f"Images: {len(repo_images)}, Videos: {len(repo_videos)}",
+        file=sys.stderr,
+    )
+
+    mixed_pool = []
+    max_len = max(len(repo_images), len(repo_videos))
+    for i in range(max_len):
+        if i < len(repo_videos):
+            mixed_pool.append(repo_videos[i])
+        if i < len(repo_images):
+            mixed_pool.append(repo_images[i])
+
+    timeline: list[dict[str, Any]] = []
+    current_time = 0.0
+    scene_idx = 1
+    pool_len = len(mixed_pool)
+    image_durations = [5.0, 6.0, 5.5, 7.0, 6.0, 5.0, 6.5, 8.0]
+
+    while current_time < target_duration:
+        asset_item = mixed_pool[(scene_idx - 1) % pool_len]
+        atype = asset_item.get("type", "image")
+
+        if atype == "video":
+            clip_dur = float(asset_item.get("duration", 8.0) or 8.0)
+            seg_dur = min(max(5.0, clip_dur), 15.0)
+        else:
+            seg_dur = image_durations[(scene_idx - 1) % len(image_durations)]
+
+        rem = target_duration - current_time
+        if rem < 3.0 and timeline:
+            timeline[-1]["duration_seconds"] = round(timeline[-1]["duration_seconds"] + rem, 2)
+            break
+        elif rem < seg_dur:
+            seg_dur = rem
+
+        timeline.append({
+            "scene": scene_idx,
+            "asset_type": atype,
+            "asset": asset_item["path"],
+            "image_file": asset_item["path"],
+            "asset_id": asset_item.get("asset_id", f"{deity_key}_{scene_idx}"),
+            "deity": deity_key,
+            "duration_seconds": round(seg_dur, 2),
+            "source": "landscape_repository",
+            "reason_for_selection": f"Landscape segment #{scene_idx} ({atype}) for deity '{deity_key}'",
+            "validation_result": "OK",
+            "width": asset_item.get("width"),
+            "height": asset_item.get("height"),
+        })
+
+        current_time += seg_dur
+        scene_idx += 1
+
+    return timeline

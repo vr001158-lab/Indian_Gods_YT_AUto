@@ -166,7 +166,8 @@ class FFmpegVideoComposer(VideoComposer):
             caption_file_path = None
             voice_text = s.get("voice_text", "")
             if voice_text:
-                formatted_cap = format_caption_text(voice_text)
+                max_chars = 50 if width > height else 35
+                formatted_cap = format_caption_text(voice_text, max_chars_per_line=max_chars)
                 txt_path = caption_dir / f"caption_scene_{i+1}.txt"
                 txt_path.write_text(formatted_cap, encoding="utf-8")
                 caption_file_path = str(txt_path.absolute())

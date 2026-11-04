@@ -12,6 +12,7 @@ from src.assets.validator import (
     AssetValidationError,
     validate_image_asset,
     validate_video_asset,
+    validate_landscape_asset,
 )
 
 
@@ -104,6 +105,83 @@ def scan_gods_assets(
                             total_videos += 1
                     except AssetValidationError as exc:
                         rejected_files.append({"file": str(item), "reason": str(exc)})
+
+        deities[deity_key] = {
+            "images": images,
+            "videos": videos,
+        }
+
+    return {
+        "deities": deities,
+        "stats": {
+            "deities_count": len(deities),
+            "total_images": total_images,
+            "total_videos": total_videos,
+            "total_valid_assets": total_images + total_videos,
+            "rejected_assets_count": len(rejected_files),
+            "rejected_files": rejected_files,
+        },
+    }
+
+
+def scan_gods_landscape_assets(
+    gods_dir: str | Path = "assets/gods_landscape_long_video",
+) -> dict[str, Any]:
+    """
+    Recursively scans `assets/gods_landscape_long_video/` folder for deity visual assets.
+    Enforces landscape-only validation: rejects any asset that is portrait (width < height).
+    Never scans or includes assets from assets/gods/.
+    """
+    base_path = Path(gods_dir)
+    if not base_path.exists():
+        raise FileNotFoundError(f"Landscape gods assets directory not found: {base_path}")
+
+    deities: dict[str, dict[str, list[dict]]] = {}
+    rejected_files: list[dict[str, str]] = []
+    total_images = 0
+    total_videos = 0
+
+    for folder in sorted(base_path.iterdir()):
+        if not folder.is_dir():
+            continue
+
+        deity_key = folder.name.lower()
+        images: list[dict] = []
+        videos: list[dict] = []
+
+        for item in sorted(folder.rglob("*")):
+            if not item.is_file():
+                continue
+
+            ext = item.suffix.lower()
+            if ext not in SUPPORTED_IMAGE_EXTS and ext not in SUPPORTED_VIDEO_EXTS:
+                continue
+
+            if ext in SUPPORTED_IMAGE_EXTS:
+                try:
+                    meta = validate_image_asset(item)
+                    meta["deity"] = deity_key
+                    ok_land, land_err = validate_landscape_asset(meta)
+                    if not ok_land:
+                        rejected_files.append({"file": str(item), "reason": land_err})
+                        continue
+                    images.append(meta)
+                    total_images += 1
+                except AssetValidationError as exc:
+                    rejected_files.append({"file": str(item), "reason": str(exc)})
+
+            elif ext in SUPPORTED_VIDEO_EXTS:
+                try:
+                    meta = validate_video_asset(item)
+                    meta["deity"] = deity_key
+                    ok_land, land_err = validate_landscape_asset(meta)
+                    if not ok_land:
+                        rejected_files.append({"file": str(item), "reason": land_err})
+                        continue
+                    videos.append(meta)
+                    total_videos += 1
+                except AssetValidationError as exc:
+                    rejected_files.append({"file": str(item), "reason": str(exc)})
 
         deities[deity_key] = {
             "images": images,

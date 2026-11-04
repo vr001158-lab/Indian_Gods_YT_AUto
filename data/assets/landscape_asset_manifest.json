@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-11-03T17:28:44.452451+00:00",
+  "deities": {
+    "7kondala_swami": {
+      "images": [],
+      "videos": []
+    },
+    "ayyappa": {
+      "images": [],
+      "videos": []
+    },
+    "ganesha": {
+      "images": [],
+      "videos": []
+    },
+    "hanuman": {
+      "images": [],
+      "videos": []
+    },
+    "krishna": {
+      "images": [],
+      "videos": []
+    },
+    "lakshmi_devi": {
+      "images": [],
+      "videos": []
+    },
+    "lord_shiva": {
+      "images": [],
+      "videos": []
+    },
+    "lord_vishnu": {
+      "images": [],
+      "videos": []
+    },
+    "narasimha": {
+      "images": [],
+      "videos": []
+    },
+    "parvathi": {
+      "images": [],
+      "videos": []
+    },
+    "ram": {
+      "images": [],
+      "videos": []
+    },
+    "subramanya": {
+      "images": [],
+      "videos": []
+    }
+  },
+  "stats": {
+    "deities_count": 12,
+    "total_images": 0,
+    "total_videos": 0,
+    "total_valid_assets": 0,
+    "rejected_assets_count": 0,
+    "rejected_files": []
+  }
+}

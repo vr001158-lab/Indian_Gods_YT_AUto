@@ -32,8 +32,10 @@ FORMAT_CONFIGS: dict[str, dict[str, Any]] = {
         "resolution":             "1920x1080",
         "width":                  1920,
         "height":                 1080,
-        "min_duration_seconds":   1,      # Any valid positive duration (content_type is authoritative)
-        "max_duration_seconds":   43200,  # Up to 12 hours YouTube limit
+        "min_duration_seconds":   120,    # Production Landscape long-video min duration: 120s
+        "max_duration_seconds":   300,    # Production Landscape long-video max duration: 300s
+        "target_duration_min":    180,    # Target duration: 180-240s
+        "target_duration_max":    240,
         "publish_classification": "long",
         "audio_sample_rate":      48000,
         "audio_channels":         2,
