@@ -33,7 +33,7 @@ def main():
     content_type = "short"
     format_type = "narrated"
     experiment_tag = None
-    language_code = os.environ.get("LANGUAGE_CODE", "hi-IN")
+    language_code = os.environ.get("LANGUAGE_CODE", "te-IN")
 
     # ── CLI parsing ───────────────────────────────────────────────────────────
     args = sys.argv[1:]
@@ -47,8 +47,8 @@ def main():
             i += 1
         elif args[i] in ("--language", "-l") and i + 1 < len(args):
             language_code = args[i + 1].strip()
-            if language_code not in ("hi-IN", "te-IN"):
-                print(f"❌ Invalid language: '{language_code}'. Must be 'hi-IN' (Hindi) or 'te-IN' (Telugu)", file=sys.stderr)
+            if language_code != "te-IN":
+                print(f"❌ Invalid language: '{language_code}'. Production pipeline supports Telugu ('te-IN') only.", file=sys.stderr)
                 sys.exit(1)
             i += 2
         elif args[i] == "--content-type" and i + 1 < len(args):
@@ -70,6 +70,10 @@ def main():
             print(f"❌ Unknown argument: {args[i]}", file=sys.stderr)
             print("Usage: python run_pipeline.py [--language hi-IN|te-IN] [--content-type short|long] [--format narrated|old] [--experiment-tag TAG] [--resume PIPELINE_ID] [--dry-run]", file=sys.stderr)
             sys.exit(1)
+
+    if language_code != "te-IN":
+        print(f"❌ Production pipeline supports Telugu ('te-IN') only. Received: '{language_code}'", file=sys.stderr)
+        sys.exit(1)
 
     # ── Initialize State ──────────────────────────────────────────────────────
     try:

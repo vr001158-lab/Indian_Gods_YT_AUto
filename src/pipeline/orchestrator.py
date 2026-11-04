@@ -28,7 +28,7 @@ class PipelineRunner:
         self.language_code = (
             language_code
             or getattr(state, "language_code", None)
-            or os.environ.get("LANGUAGE_CODE", "hi-IN")
+            or os.environ.get("LANGUAGE_CODE", "te-IN")
         )
         self.state = state or PipelineState(
             format=self.format,
@@ -414,6 +414,23 @@ class PipelineRunner:
             if enabled == "false":
                 PipelineLogger.info("⚠️ OLD_FORMAT_ENABLED is set to 'false'. Exiting evening old-format pipeline safely without upload.")
                 return self.state.pipeline_id
+
+        if self.language_code != "te-IN":
+            err = f"Production pipeline strictly supports Telugu ('te-IN') only. Attempted: '{self.language_code}'"
+            PipelineLogger.error(err)
+            raise ValueError(err)
+
+        from src.publisher.quota import check_publishing_quota
+        ok_quota, quota_msg = check_publishing_quota(
+            content_type=self.content_type,
+            language_code=self.language_code,
+        )
+        if not ok_quota:
+            if self.dry_run:
+                PipelineLogger.info(f"🌵 [DRY RUN QUOTA WARNING] {quota_msg}")
+            else:
+                PipelineLogger.error(f"❌ Publishing Quota Rejection: {quota_msg}")
+                raise ValueError(f"Publishing quota rejection: {quota_msg}")
 
         schedule = "evening" if self.format == "old" else "morning"
         PipelineLogger.info(f"🚀 Executing pipeline CONTENT_TYPE={self.content_type.upper()} FORMAT={self.format.upper()} SCHEDULE={schedule}")

@@ -120,10 +120,26 @@ def publish_video(
 
     vp = Path(video_file)
     ct = qa.get("content_type", "short")
+    lang = (qa.get("language_code") or qa.get("language") or "te-IN").strip()
+    if lang != "te-IN":
+        raise PublishError(f"Publishing blocked: Only Telugu ('te-IN') publishing is permitted. Attempted: '{lang}'")
+
     try:
         verify_video_with_ffprobe(vp, content_type=ct)
     except PublisherSafetyError as exc:
         raise PublishError(f"Pre-upload ffprobe validation failed for {vp.name}: {exc}") from exc
+
+    # Pre-upload quota recheck immediately before upload
+    from .quota import check_publishing_quota, record_successful_publish
+    is_temp_run = "tmp" in str(output_dir).lower() or "temp" in str(output_dir).lower() or "tmp" in str(vp).lower() or "temp" in str(vp).lower()
+    history_file = Path("data/publishing_history.json") if not is_temp_run else Path(output_dir) / "publishing_history.json"
+    ok_quota, quota_err = check_publishing_quota(
+        content_type=ct,
+        language_code=lang,
+        history_file=history_file,
+    )
+    if not ok_quota:
+        raise PublishError(f"Pre-upload quota rejection: {quota_err}")
 
     ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 
@@ -142,8 +158,8 @@ def publish_video(
             tags                   = tags,
             privacy_status         = REQUIRED_PRIVACY,
             category_id            = category_id,
-            default_language       = qa.get("default_language") or ("hi" if (qa.get("language_code") or "").startswith("hi") else ("te" if (qa.get("language_code") or "").startswith("te") else None)),
-            default_audio_language = qa.get("default_audio_language") or ("hi" if (qa.get("language_code") or "").startswith("hi") else ("te" if (qa.get("language_code") or "").startswith("te") else None)),
+            default_language       = "te",
+            default_audio_language = "te",
         )
     except Exception as exc:
         raise PublishError(f"YouTube video upload failed: {exc}") from exc
@@ -214,33 +230,23 @@ def publish_video(
     print(f"  Manifest : {manifest_path}")
 
     # ── Step 5: Append to persistent history file (production runs only) ───
-    is_temp_run = "tmp" in str(out_dir).lower() or "temp" in str(out_dir).lower() or "tmp" in str(vp).lower() or "temp" in str(vp).lower()
     if not is_temp_run:
-        history_file = Path("data/publishing_history.json")
-        history_file.parent.mkdir(parents=True, exist_ok=True)
-        history_records = []
-        if history_file.exists():
-            try:
-                history_records = json.loads(history_file.read_text(encoding="utf-8"))
-                if not isinstance(history_records, list):
-                    history_records = []
-            except Exception:
-                history_records = []
-
-        history_entry = {
-            "youtube_video_id": video_id,
-            "topic":            qa.get("selected_topic", ""),
-            "title":            title,
-            "content_type":     ct,
-            "experiment_tag":   qa.get("experiment_tag", ""),
-            "aspect_ratio":     qa.get("aspect_ratio", ""),
-            "resolution":       qa.get("resolution", ""),
-            "duration_seconds": qa.get("video_validation", {}).get("duration_seconds"),
-            "published_at":     ts,
-            "video_file_name":  vp.name,
-        }
-        history_records.append(history_entry)
-        history_file.write_text(json.dumps(history_records, indent=2, ensure_ascii=False), encoding="utf-8")
+        try:
+            record_successful_publish(
+                video_id         = video_id,
+                title            = title,
+                content_type     = ct,
+                language_code    = lang,
+                topic            = qa.get("selected_topic", ""),
+                aspect_ratio     = qa.get("aspect_ratio", ""),
+                resolution       = qa.get("resolution", ""),
+                duration_seconds = qa.get("video_validation", {}).get("duration_seconds"),
+                video_file_name  = vp.name,
+                experiment_tag   = qa.get("experiment_tag", ""),
+                history_file     = history_file,
+            )
+        except Exception as exc:
+            print(f"  [WARNING] Failed to record to persistent history: {exc}", file=sys.stderr)
 
     manifest["_manifest_path"] = str(manifest_path)
     return manifest

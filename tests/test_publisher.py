@@ -143,6 +143,7 @@ def _make_qa(
         "confidence": confidence,
         "data_source": data_source,
         "content_type": "short",
+        "language_code": "te-IN",
         "artifacts": {
             "decision":      str(tmp / "decision.json"),
             "content_brief": str(cb_file),

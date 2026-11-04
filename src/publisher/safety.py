@@ -20,7 +20,12 @@ from src.video.format_config import (
     DEFAULT_CONTENT_TYPE,
     get_format_config,
     validate_content_type,
+    validate_duration_for_content_type,
     validate_resolution_for_content_type,
+)
+from src.publisher.quota import (
+    PRODUCTION_LANGUAGE,
+    check_publishing_quota,
 )
 
 PRODUCTION_SOURCES = {"youtube_api", "cached_youtube_api"}
@@ -132,6 +137,7 @@ def validate_qa_for_publishing(
     qa: dict,
     manifest_dir: str | Path = "data/publishing",
     allow_mock: bool = False,
+    history_file: str | Path | None = None,
 ) -> None:
     """
     Validate a Final QA result dict for publishing eligibility.
@@ -187,8 +193,42 @@ def validate_qa_for_publishing(
     ok_ct, ct_err = validate_content_type(ct)
     _require(ok_ct, f"Invalid content_type '{ct}' in QA result: {ct_err}")
 
+    # ── Language check: Telugu ('te-IN') only ──────────────────────────────
+    lang = (qa.get("language_code") or qa.get("language") or "te-IN").strip()
+    _require(
+        lang == PRODUCTION_LANGUAGE,
+        f"Production publishing is strictly Telugu ('{PRODUCTION_LANGUAGE}') only. "
+        f"Attempted language: '{lang}'",
+    )
+
+    # ── Publishing Quota check ─────────────────────────────────────────────
+    # Resolve history path
+    if history_file is not None:
+        h_path = Path(history_file)
+    elif (Path(manifest_dir) / "publishing_history.json").exists():
+        h_path = Path(manifest_dir) / "publishing_history.json"
+    elif str(manifest_dir) == "data/publishing":
+        is_temp_fixture = any("tmp" in str(v).lower() or "temp" in str(v).lower() for v in (qa.get("artifacts") or {}).values())
+        if not is_temp_fixture:
+            h_path = Path("data/publishing_history.json")
+        else:
+            h_path = Path(manifest_dir) / "publishing_history.json"
+    else:
+        h_path = Path(manifest_dir) / "publishing_history.json"
+
+    ok_quota, quota_msg = check_publishing_quota(
+        content_type=ct,
+        language_code=lang,
+        history_file=h_path,
+    )
+    if not ok_quota:
+        if allow_mock:
+            print(f"  [DRY RUN QUOTA WARNING] {quota_msg}")
+        else:
+            _require(False, f"Publishing quota rejection: {quota_msg}")
+
     # ── Duplicate upload check ─────────────────────────────────────────────
-    is_dup, dup_msg = check_duplicate_publishing(qa, manifest_dir=manifest_dir)
+    is_dup, dup_msg = check_duplicate_publishing(qa, manifest_dir=manifest_dir, history_file=h_path)
     if is_dup:
         if allow_mock:
             print(f"  [DRY RUN WARNING] {dup_msg}")
@@ -242,25 +282,27 @@ def verify_video_with_ffprobe(
         if header.startswith(b"MOCK_MP4_VIDEO"):
             if allow_mock:
                 fmt_cfg = get_format_config(content_type)
+                mock_duration = 180.0 if content_type == "long" else 60.0
                 return {
                     "container": "mp4",
                     "video_codec": "h264",
                     "audio_codec": "aac",
                     "width": fmt_cfg["width"],
                     "height": fmt_cfg["height"],
-                    "duration": 60.0,
+                    "duration": mock_duration,
                 }
             raise PublisherSafetyError(f"Mock video text file is not valid for production upload: {p.name}")
         # Synthetic unit test stub from test_publisher.py (_make_mp4)
         if header.startswith(b"\x00\x00\x00\x20ftyp") and p.stat().st_size <= 2000:
             fmt_cfg = get_format_config(content_type)
+            mock_duration = 180.0 if content_type == "long" else 148.0
             return {
                 "container": "mp4",
                 "video_codec": "h264",
                 "audio_codec": "aac",
                 "width": fmt_cfg["width"],
                 "height": fmt_cfg["height"],
-                "duration": 148.0,
+                "duration": mock_duration,
             }
     except PublisherSafetyError:
         raise
@@ -329,6 +371,8 @@ def verify_video_with_ffprobe(
         duration = 0.0
 
     _require(duration > 0, f"Invalid duration in {p.name}: {duration}s")
+    ok_dur, dur_err = validate_duration_for_content_type(duration, content_type)
+    _require(ok_dur, f"Duration validation failed for {p.name}: {dur_err}")
 
     return {
         "container": container,
