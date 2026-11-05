@@ -135,7 +135,11 @@ class TestPublishingQuotaAndLanguage(unittest.TestCase):
 
     def test_shorts_daily_limit_two_uploaded_blocks_third(self):
         """When 2 shorts have been published today in Asia/Kolkata, 3rd short is blocked."""
-        now_kolkata = datetime.now(KOLKATA_TZ)
+        # Use a midday reference time so the simulated uploads cannot straddle
+        # the Asia/Kolkata calendar-day boundary when this test runs near midnight.
+        now_kolkata = datetime.now(KOLKATA_TZ).replace(
+            hour=12, minute=0, second=0, microsecond=0
+        )
         record_successful_publish(
             video_id="VID_SHORT_1",
             title="Telugu Short 1",
