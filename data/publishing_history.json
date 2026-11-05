@@ -665,5 +665,22 @@
     "kolkata_date": "2026-11-04",
     "video_file_name": "video_short_20261104_130145.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "UBIgPrQwmXY",
+    "topic": "The Lesson of Golden Deer Why Illusion Traps the Mind",
+    "title": "లౌకిక ప్రలోభాల వలయం: బంగారు లేడి ఇస్తున్న ఆధ్యాత్మిక పాఠం",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 41.28,
+    "published_at": "20261105_075134",
+    "published_at_utc": "2026-11-05T07:51:34.582309+00:00",
+    "published_at_kolkata": "2026-11-05 13:21:34 +0530",
+    "kolkata_date": "2026-11-05",
+    "video_file_name": "video_short_20261105_075106.mp4",
+    "success": true
   }
 ]
