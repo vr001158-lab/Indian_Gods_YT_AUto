@@ -682,5 +682,22 @@
     "kolkata_date": "2026-11-05",
     "video_file_name": "video_short_20261105_075106.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "bWSMfUrEzMU",
+    "topic": "The Mystery of Panchamukhi Hanuman Five Faces and Weapons",
+    "title": "పాతాళంలో అహిరావణుని వధించిన పంచముఖ ఆంజనేయ స్వామి దివ్య రహస్యం",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 34.4,
+    "published_at": "20261106_073147",
+    "published_at_utc": "2026-11-06T07:31:47.266627+00:00",
+    "published_at_kolkata": "2026-11-06 13:01:47 +0530",
+    "kolkata_date": "2026-11-06",
+    "video_file_name": "video_short_20261106_073115.mp4",
+    "success": true
   }
 ]
