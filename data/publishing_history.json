@@ -699,5 +699,22 @@
     "kolkata_date": "2026-11-06",
     "video_file_name": "video_short_20261106_073115.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "Ae9HywMfNoc",
+    "topic": "How Hanuman Set Golden Lanka on Fire with Burning Tail",
+    "title": "రావణుడి అహంకారానికి అగ్నిరూపం: హనుమంతుడు లంకను ఎలా దహనం చేశారు?",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 25.84,
+    "published_at": "20261106_195020",
+    "published_at_utc": "2026-11-06T19:50:20.687315+00:00",
+    "published_at_kolkata": "2026-11-07 01:20:20 +0530",
+    "kolkata_date": "2026-11-07",
+    "video_file_name": "video_short_20261106_194951.mp4",
+    "success": true
   }
 ]
