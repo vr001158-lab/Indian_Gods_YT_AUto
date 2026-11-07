@@ -716,5 +716,22 @@
     "kolkata_date": "2026-11-07",
     "video_file_name": "video_short_20261106_194951.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "SpdsQRZMYvk",
+    "topic": "Why Hanuman Tore His Chest to Reveal Rama and Sita Inside",
+    "title": "హనుమంతుడు తన గుండెను ఎందుకు చీల్చుకున్నాడు? - రామ సీతల దివ్య రహస్యం",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 34.92,
+    "published_at": "20261107_064332",
+    "published_at_utc": "2026-11-07T06:43:32.237870+00:00",
+    "published_at_kolkata": "2026-11-07 12:13:32 +0530",
+    "kolkata_date": "2026-11-07",
+    "video_file_name": "video_short_20261107_064309.mp4",
+    "success": true
   }
 ]
