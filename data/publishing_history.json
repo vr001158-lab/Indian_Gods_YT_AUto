@@ -733,5 +733,22 @@
     "kolkata_date": "2026-11-07",
     "video_file_name": "video_short_20261107_064309.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "SruZ1vCN0qM",
+    "topic": "The Sacred Mystery of Raas Leela Pure Soul Devotion",
+    "title": "గోపికల కోసం కృష్ణుడు అనంత రూపాలు ఎందుకు ధరించాడు? | రాసలీల రహస్యం",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 35.48,
+    "published_at": "20261108_181415",
+    "published_at_utc": "2026-11-08T18:14:15.963661+00:00",
+    "published_at_kolkata": "2026-11-08 23:44:15 +0530",
+    "kolkata_date": "2026-11-08",
+    "video_file_name": "video_short_20261108_181345.mp4",
+    "success": true
   }
 ]
