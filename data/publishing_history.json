@@ -750,5 +750,22 @@
     "kolkata_date": "2026-11-08",
     "video_file_name": "video_short_20261108_181345.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "ZtdH38lE25Y",
+    "topic": "The Humility of Hanuman Writing Ramayana on Mountain Rocks",
+    "title": "మహర్షి వాల్మీకి కోసం తన రామాయణాన్నే సముద్రంలో విసిరేసిన హనుమంతుని మహోన్నత త్యాగం",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 28.2,
+    "published_at": "20261109_072402",
+    "published_at_utc": "2026-11-09T07:24:02.092440+00:00",
+    "published_at_kolkata": "2026-11-09 12:54:02 +0530",
+    "kolkata_date": "2026-11-09",
+    "video_file_name": "video_short_20261109_072330.mp4",
+    "success": true
   }
 ]
