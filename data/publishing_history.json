@@ -767,5 +767,22 @@
     "kolkata_date": "2026-11-09",
     "video_file_name": "video_short_20261109_072330.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "zNrFyb_jzwo",
+    "topic": "The Story of Lord Ganesha and Kubera Endless Feast",
+    "title": "కుబేరుడి అహం అణచిన వినాయకుడి దివ్య లీల",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 32.56,
+    "published_at": "20261110_075536",
+    "published_at_utc": "2026-11-10T07:55:36.944292+00:00",
+    "published_at_kolkata": "2026-11-10 13:25:36 +0530",
+    "kolkata_date": "2026-11-10",
+    "video_file_name": "video_short_20261110_075501.mp4",
+    "success": true
   }
 ]
