@@ -784,5 +784,22 @@
     "kolkata_date": "2026-11-10",
     "video_file_name": "video_short_20261110_075501.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "ZksE634rUNw",
+    "topic": "Why Lord Ganesha Is Always Worshipped First in Every Ritual",
+    "title": "అన్ని పూజలలో వినాయకుడికి మొదటి ప్రాధాన్యత ఎందుకు?",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 32.04,
+    "published_at": "20261111_072155",
+    "published_at_utc": "2026-11-11T07:21:55.611175+00:00",
+    "published_at_kolkata": "2026-11-11 12:51:55 +0530",
+    "kolkata_date": "2026-11-11",
+    "video_file_name": "video_short_20261111_072123.mp4",
+    "success": true
   }
 ]
