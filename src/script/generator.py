@@ -510,7 +510,7 @@ SPECIFIC_SUBJECT_GROUPS: list[set[str]] = [
     # Ramayana Characters & Episodes
     {"golden deer", "deer", "maricha", "mareecha", "swarna mriga", "swarnamriga", "maya ledi", "మాయా లేడి", "మాయాలేడి", "బంగారు లేడి", "బంగారులేడి", "హరిణం", "మారీచుడు", "మారీచ", "मारीच", "स्वर्ण मृग", "स्वर्णमृग", "सोने का हिरण", "मायावी हिरण", "मृग"},
     {"jatayu", "जटायु", "జటాయు", "జటాయువు"},
-    {"shabri", "sabari", "शबरी", "శబరి"},
+    {"shabari", "shabri", "sabari", "शबरी", "శబరి"},
     {"kevat", "केवट", "కేవట్", "కేవటుడు", "గుహుడు"},
     {"ram setu", "setu", "रामसेतु", "सेतु", "రామసేతు", "సేతు"},
     {"ravana", "ravan", "रावण", "రావణ", "రావణుడు", "లంక", "लंका", "lanka"},
@@ -606,9 +606,14 @@ def check_title_topic_semantic_alignment(
     canon_text = canonical_topic.lower()
     title_text = script_title.lower()
 
+    def _match_kw(kw: str, words: set[str], text: str) -> bool:
+        if any(ord(c) > 127 for c in kw):
+            return kw in words or kw in text
+        return kw in words or (" " in kw and kw in text)
+
     # 2. Specific subject / entity group overlap
-    canon_subjects = [g for g in SPECIFIC_SUBJECT_GROUPS if any(kw in canon_words or (" " in kw and kw in canon_text) for kw in g)]
-    title_subjects = [g for g in SPECIFIC_SUBJECT_GROUPS if any(kw in title_words or (" " in kw and kw in title_text) for kw in g)]
+    canon_subjects = [g for g in SPECIFIC_SUBJECT_GROUPS if any(_match_kw(kw, canon_words, canon_text) for kw in g)]
+    title_subjects = [g for g in SPECIFIC_SUBJECT_GROUPS if any(_match_kw(kw, title_words, title_text) for kw in g)]
     matched_specific = [g for g in canon_subjects if g in title_subjects]
 
     if len(matched_specific) > 0:
@@ -774,6 +779,18 @@ def generate_script(brief: dict, language_code: str | None = None) -> dict:
     ok_out, err_out = validate_script_output(script_data, content_type=script_data.get("content_type", "short"))
     if not ok_out:
         raise RuntimeError(f"❌ Internal Error: Generated script does not conform to schema: {err_out}")
+
+    # Unified Pre-Voice Script QA Gate (Factuality, Language Integrity, Quality, Retention)
+    if lang in ("hi-IN", "te-IN"):
+        from src.script.script_qa_gate import run_pre_voice_script_qa
+        approved, qa_rep, qa_errors = run_pre_voice_script_qa(
+            script_data=script_data,
+            canonical_topic=canonical_topic,
+            deity_hint=meta.get("deity", ""),
+            language_code=lang,
+            content_type=script_data.get("content_type", "short"),
+            fail_fast=True,
+        )
 
     return script_data
 

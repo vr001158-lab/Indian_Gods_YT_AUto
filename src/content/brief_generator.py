@@ -305,6 +305,10 @@ def generate_content_brief(decision: dict, language_code: str | None = None) -> 
         or os.environ.get("LANGUAGE_CODE")
     )
 
+    ALLOWED_LANGUAGES = ("te-IN", "hi-IN", "en")
+    if lang and lang not in ALLOWED_LANGUAGES:
+        raise ValueError(f"❌ Safety Gate Rejection: Unsupported language '{lang}'. Only {ALLOWED_LANGUAGES} are supported.")
+
     if lang in ("hi-IN", "te-IN"):
         from src.content.gemini_provider import generate_brief_with_gemini
         brief_data = generate_brief_with_gemini(decision, language_code=lang, allow_fallback=True)

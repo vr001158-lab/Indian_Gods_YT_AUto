@@ -220,6 +220,36 @@ class FinalQAGate:
         })
         result.record("topic_consistency", ok, detail)
 
+        # ── Step 5b: Script QA Approval (Factuality & Pre-Voice QA) ───────
+        if arts.script:
+            qa_rep = arts.script.get("qa_report")
+            if qa_rep and isinstance(qa_rep, dict):
+                qa_approved = qa_rep.get("approved", False)
+                crit = qa_rep.get("critical_errors", [])
+                result.record(
+                    "script_qa_approval",
+                    qa_approved,
+                    f"Script QA approval status: {qa_approved}" + (f"; errors: {crit}" if not qa_approved else "")
+                )
+            elif expected_fmt == "old":
+                result.record("script_qa_approval", True, "Format is old (music-only), pre-voice script QA skipped.")
+            else:
+                # If qa_report is not present on legacy or mock scripts, run validation on the fly
+                meta = arts.script.get("approval_metadata") or (arts.decision if arts.decision else {})
+                target_lang = expected_lang or arts.script.get("language_code")
+                if target_lang in ("te-IN", "hi-IN"):
+                    from src.script.script_qa_gate import run_pre_voice_script_qa
+                    qa_ok, qa_report, qa_errors = run_pre_voice_script_qa(
+                        script_data=arts.script,
+                        canonical_topic=meta.get("selected_topic") or arts.script.get("title"),
+                        deity_hint=meta.get("deity", ""),
+                        language_code=target_lang,
+                        content_type=self._content_type,
+                        fail_fast=False,
+                    )
+                    result.record("script_qa_approval", qa_ok, f"Script QA approval evaluated on the fly: {qa_ok}")
+
+
         # ── Step 6: Audio QA ──────────────────────────────────────────────
         ok, detail = check_audio_map(arts.audio_map)
         result.record("audio", ok, detail)

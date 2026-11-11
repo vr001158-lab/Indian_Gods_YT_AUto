@@ -197,7 +197,10 @@ class ResearchCollector:
             return None
         try:
             cached_at = datetime.datetime.fromisoformat(ts_str)
-            age_hours = (datetime.datetime.utcnow() - cached_at).total_seconds() / 3600
+            if cached_at.tzinfo is None:
+                cached_at = cached_at.replace(tzinfo=datetime.timezone.utc)
+            now = datetime.datetime.now(datetime.timezone.utc)
+            age_hours = (now - cached_at).total_seconds() / 3600
             if age_hours <= self.cache_ttl_hours:
                 return entry
             entry["stale"] = True
@@ -207,9 +210,14 @@ class ResearchCollector:
 
     def _cache_put(self, key: str, results: list, data_source: str, api_method: str):
         """Store a cache entry with full metadata."""
+        # Never overwrite an existing real cached YouTube API entry with mock or offline data
+        existing = self._cache_raw.get(key)
+        if isinstance(existing, dict) and not existing.get("is_mock", True) and data_source in ("mock", "offline"):
+            return
+
         self._cache_raw[key] = {
             "query":         key,
-            "timestamp":     datetime.datetime.utcnow().isoformat(),
+            "timestamp":     datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "cache_version": CACHE_VERSION,
             "source":        data_source,
             "api_method":    api_method,
@@ -320,6 +328,14 @@ class ResearchCollector:
 
         # 3. No API key → offline/mock mode
         if not self.youtube:
+            # Fall back to cached real data if present (even if stale), rather than mock
+            if cached and not cached.get("is_mock", True):
+                return {
+                    "videos":      cached["result"],
+                    "data_source": "cached_youtube_api",
+                    "is_mock":     False,
+                    "stale":       cached.get("stale", False),
+                }
             videos = self._generate_mock_results(query)
             self._cache_put(query, videos, "mock", "none")
             return {"videos": videos, "data_source": "mock", "is_mock": True, "stale": False}

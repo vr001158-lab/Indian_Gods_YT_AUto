@@ -9,7 +9,7 @@ from pathlib import Path
 
 from src.decision.validator import validate_candidates
 from src.decision.selector  import select_topic
-from src.decision.strategy  import apply_old_format_topic_preferences
+from src.decision.strategy  import apply_old_format_topic_preferences, apply_content_intelligence_preferences
 
 OUTPUT_DIR = Path("data/decision")
 
@@ -18,7 +18,7 @@ def _build_selection_reason(candidate: dict, ranked: list) -> str:
     """Produces a human-readable explanation for why this topic was chosen."""
     rank_pos = ranked.index(candidate) + 1 if candidate in ranked else 1
     total    = len(ranked)
-    return (
+    base_reason = (
         f"Ranked #{rank_pos} of {total} validated real-data candidates. "
         f"Score: {candidate['overall_score']}/100, "
         f"Demand: {candidate['demand_score']}, "
@@ -26,6 +26,21 @@ def _build_selection_reason(candidate: dict, ranked: list) -> str:
         f"Confidence: {candidate['confidence']}, "
         f"Source: {candidate['data_source']}."
     )
+    if "intelligence_factors" in candidate:
+        factors = candidate["intelligence_factors"]
+        deity = factors.get("resolved_deity", "unknown")
+        fatigue = factors.get("fatigue_penalty", 0.0)
+        cal = factors.get("calendar_bonus", 0.0)
+        ser = factors.get("series_bonus", 0.0)
+        src_bonus = factors.get("source_bonus", 0.0)
+        citation = factors.get("source_citation", "")
+        base_reason += (
+            f" [Intelligence: Deity={deity}, FatiguePenalty={fatigue}, "
+            f"CalendarBonus={cal}, SeriesBonus={ser}, SourceBonus={src_bonus}"
+            + (f", Citation='{citation}'" if citation else "")
+            + "]"
+        )
+    return base_reason
 
 
 def run_decision_pipeline(
@@ -56,7 +71,12 @@ def run_decision_pipeline(
     valid, rejected = validate_candidates(candidates, min_score=min_score)
 
     # ── 2. Select ─────────────────────────────────────────────────────────────
-    candidates_to_select = apply_old_format_topic_preferences(valid) if (format or "").lower() == "old" else valid
+    if (format or "").lower() == "old":
+        candidates_to_select = apply_old_format_topic_preferences(valid)
+    elif language_code:
+        candidates_to_select = apply_content_intelligence_preferences(valid, language_code=language_code)
+    else:
+        candidates_to_select = valid
     result = select_topic(candidates_to_select)
     selected = result["selected"]
     ranked   = result["ranked"]
@@ -77,6 +97,7 @@ def run_decision_pipeline(
             "suggested_angle":  selected["suggested_angle"],
             "content_gap":      selected["content_gap"],
             "selection_reason": _build_selection_reason(selected, ranked),
+            "intelligence_factors": selected.get("intelligence_factors"),
             "rejected_candidates": [
                 {"topic": r["topic"], "reasons": r["reasons"]}
                 for r in rejected

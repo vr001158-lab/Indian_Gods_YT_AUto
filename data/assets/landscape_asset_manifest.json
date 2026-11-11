@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-03T17:28:44.452451+00:00",
+  "generated_at": "2026-11-11T15:36:44.349467+00:00",
   "deities": {
     "7kondala_swami": {
       "images": [],
@@ -14,11 +14,93 @@
       "videos": []
     },
     "hanuman": {
-      "images": [],
+      "images": [
+        {
+          "asset_id": "hanuman_carrying_dronagiri_sanjeevani_landscape",
+          "type": "image",
+          "path": "assets/gods_landscape_long_video/hanuman/hanuman_carrying_dronagiri_sanjeevani_landscape.png",
+          "width": 1376,
+          "height": 768,
+          "format": "png",
+          "aspect_ratio": "16:9",
+          "file_size_bytes": 1839293,
+          "valid": true,
+          "deity": "hanuman",
+          "avatar": "hanuman",
+          "narrative_event": "hanuman_carrying_dronagiri_sanjeevani",
+          "scene_description": "Panoramic night sky scene of Lord Hanuman flying over Himalayan peaks carrying Mount Dronagiri with Sanjeevani herbs",
+          "semantic_keywords": [
+            "hanuman",
+            "carrying",
+            "sanjeevani",
+            "dronagiri",
+            "mountain",
+            "herb",
+            "flying",
+            "night",
+            "sky"
+          ],
+          "source": "ai_devotional_artist",
+          "provenance": "Divine Dharshanam Daily generation workflow; visually verified",
+          "verification_status": "verified_visual",
+          "tags": [
+            "carrying",
+            "dronagiri",
+            "flying",
+            "hanuman",
+            "herb",
+            "mountain",
+            "night",
+            "sanjeevani",
+            "sky"
+          ]
+        }
+      ],
       "videos": []
     },
     "krishna": {
-      "images": [],
+      "images": [
+        {
+          "asset_id": "krishna_lifting_govardhan_hill_with_finger_landscape",
+          "type": "image",
+          "path": "assets/gods_landscape_long_video/krishna/krishna_lifting_govardhan_hill_with_finger_landscape.png",
+          "width": 1376,
+          "height": 768,
+          "format": "png",
+          "aspect_ratio": "16:9",
+          "file_size_bytes": 1965663,
+          "valid": true,
+          "deity": "krishna",
+          "avatar": "krishna",
+          "narrative_event": "krishna_lifting_govardhan_hill",
+          "scene_description": "Panoramic painting of Lord Krishna lifting Mount Govardhan sheltering Vrindavan from Indra's storm",
+          "semantic_keywords": [
+            "krishna",
+            "govardhan",
+            "lifting",
+            "hill",
+            "mountain",
+            "finger",
+            "storm",
+            "cows",
+            "vrindavan"
+          ],
+          "source": "ai_devotional_artist",
+          "provenance": "Divine Dharshanam Daily generation workflow; visually verified",
+          "verification_status": "verified_visual",
+          "tags": [
+            "cows",
+            "finger",
+            "govardhan",
+            "hill",
+            "krishna",
+            "lifting",
+            "mountain",
+            "storm",
+            "vrindavan"
+          ]
+        }
+      ],
       "videos": []
     },
     "lakshmi_devi": {
@@ -30,11 +112,131 @@
       "videos": []
     },
     "lord_vishnu": {
-      "images": [],
+      "images": [
+        {
+          "asset_id": "kurma_avatar_mandara_mountain_samudra_manthan_landscape",
+          "type": "image",
+          "path": "assets/gods_landscape_long_video/lord_vishnu/kurma_avatar_mandara_mountain_samudra_manthan_landscape.png",
+          "width": 1376,
+          "height": 768,
+          "format": "png",
+          "aspect_ratio": "16:9",
+          "file_size_bytes": 2080280,
+          "valid": true,
+          "deity": "lord_vishnu",
+          "avatar": "kurma",
+          "narrative_event": "kurma_supporting_mandara_mountain",
+          "scene_description": "Panoramic Samudra Manthan with Kurma Avatar supporting Mount Mandara with Devas and Asuras pulling Vasuki",
+          "semantic_keywords": [
+            "kurma",
+            "mandara",
+            "samudra",
+            "manthan",
+            "churning",
+            "tortoise",
+            "vasuki",
+            "ocean",
+            "milk"
+          ],
+          "source": "ai_devotional_artist",
+          "provenance": "Divine Dharshanam Daily generation workflow; visually verified",
+          "verification_status": "verified_visual",
+          "tags": [
+            "churning",
+            "kurma",
+            "mandara",
+            "manthan",
+            "milk",
+            "ocean",
+            "samudra",
+            "tortoise",
+            "vasuki"
+          ]
+        },
+        {
+          "asset_id": "vamana_trivikrama_three_strides_bali_landscape",
+          "type": "image",
+          "path": "assets/gods_landscape_long_video/lord_vishnu/vamana_trivikrama_three_strides_bali_landscape.png",
+          "width": 1376,
+          "height": 768,
+          "format": "png",
+          "aspect_ratio": "16:9",
+          "file_size_bytes": 2192445,
+          "valid": true,
+          "deity": "lord_vishnu",
+          "avatar": "vamana_trivikrama",
+          "narrative_event": "vamana_taking_three_strides",
+          "scene_description": "Panoramic cosmic scene of Trivikrama spanning universe with Brahma washing divine foot and Bali kneeling on Earth",
+          "semantic_keywords": [
+            "vamana",
+            "trivikrama",
+            "three",
+            "strides",
+            "steps",
+            "bali",
+            "brahma",
+            "cosmic",
+            "universe"
+          ],
+          "source": "ai_devotional_artist",
+          "provenance": "Divine Dharshanam Daily generation workflow; visually verified",
+          "verification_status": "verified_visual",
+          "tags": [
+            "bali",
+            "brahma",
+            "cosmic",
+            "steps",
+            "strides",
+            "three",
+            "trivikrama",
+            "universe",
+            "vamana"
+          ]
+        }
+      ],
       "videos": []
     },
     "narasimha": {
-      "images": [],
+      "images": [
+        {
+          "asset_id": "narasimha_emerging_from_pillar_prahlada_landscape",
+          "type": "image",
+          "path": "assets/gods_landscape_long_video/narasimha/narasimha_emerging_from_pillar_prahlada_landscape.png",
+          "width": 1376,
+          "height": 768,
+          "format": "png",
+          "aspect_ratio": "16:9",
+          "file_size_bytes": 2001642,
+          "valid": true,
+          "deity": "narasimha",
+          "avatar": "narasimha",
+          "narrative_event": "narasimha_emerging_from_pillar",
+          "scene_description": "Panoramic royal hall scene of Lord Narasimha bursting out from fractured golden pillar with Prahlada bowing",
+          "semantic_keywords": [
+            "narasimha",
+            "pillar",
+            "prahlada",
+            "emerging",
+            "shattered",
+            "fractured",
+            "bursting",
+            "palace"
+          ],
+          "source": "ai_devotional_artist",
+          "provenance": "Divine Dharshanam Daily generation workflow; visually verified",
+          "verification_status": "verified_visual",
+          "tags": [
+            "bursting",
+            "emerging",
+            "fractured",
+            "narasimha",
+            "palace",
+            "pillar",
+            "prahlada",
+            "shattered"
+          ]
+        }
+      ],
       "videos": []
     },
     "parvathi": {
@@ -52,9 +254,9 @@
   },
   "stats": {
     "deities_count": 12,
-    "total_images": 0,
+    "total_images": 5,
     "total_videos": 0,
-    "total_valid_assets": 0,
+    "total_valid_assets": 5,
     "rejected_assets_count": 0,
     "rejected_files": []
   }

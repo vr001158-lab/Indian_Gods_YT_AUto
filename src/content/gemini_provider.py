@@ -569,6 +569,16 @@ Output must be ONLY valid JSON matching this schema:
     if language_code not in ("hi-IN", "te-IN"):
         raise GeminiProviderError(f"Unsupported language code '{language_code}'. Only 'hi-IN' and 'te-IN' are supported.")
 
+    if language_code == "te-IN":
+        from src.content.telugu_blueprints import synthesize_telugu_brief
+        topic = decision.get("selected_topic", "")
+        deity = decision.get("deity", "")
+        fallback_brief = synthesize_telugu_brief(topic=topic, deity_hint=deity)
+        fallback_brief["language_code"] = language_code
+        fallback_brief["generation_source"] = "template_fallback"
+        logger.warning("Content brief generated via Telugu offline template fallback (%s, topic: %s)", language_code, topic)
+        return fallback_brief
+
     template = _OFFLINE_BRIEFS.get(language_code)
     if not template:
         raise GeminiProviderError(f"No offline template available for language '{language_code}'.")
@@ -697,6 +707,15 @@ Output must be ONLY valid JSON matching this schema:
         raise GeminiProviderError(f"Unsupported language code '{language_code}'. Only 'hi-IN' and 'te-IN' are supported.")
 
     brief_title = (brief.get("primary_title") or (brief.get("title_options") or [""])[0] or "").strip()
+
+    if language_code == "te-IN":
+        from src.content.telugu_blueprints import synthesize_telugu_script_from_brief
+        fallback_script = synthesize_telugu_script_from_brief(brief, content_type=ct)
+        fallback_script["language_code"] = language_code
+        fallback_script["generation_source"] = "template_fallback"
+        logger.warning("Script synthesized via Telugu offline fallback (%s, title: %s)", language_code, brief_title)
+        return fallback_script
+
     struct = brief.get("script_structure") or {}
     visuals = brief.get("visual_plan") or []
 

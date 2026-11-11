@@ -201,6 +201,26 @@ class PipelineRunner:
         if not script_file or not Path(script_file).exists():
             raise ValueError(f"Missing or invalid script input file: {script_file}")
 
+        # ── Pre-Voice QA Verification Gate ────────────────────────────────────
+        if self.format != "old":
+            from src.script.script_qa_gate import run_pre_voice_script_qa
+            script_data = json.loads(Path(script_file).read_text(encoding="utf-8"))
+            meta = script_data.get("approval_metadata") or {}
+            qa_ok, qa_report, qa_errors = run_pre_voice_script_qa(
+                script_data=script_data,
+                canonical_topic=meta.get("selected_topic") or script_data.get("title"),
+                deity_hint=meta.get("deity", ""),
+                language_code=self.language_code,
+                content_type=self.content_type,
+                fail_fast=False,
+            )
+            if not qa_ok:
+                raise ValueError(
+                    f"❌ Orchestrator Pre-Voice Gate Rejection: Script failed QA with {len(qa_errors)} error(s). "
+                    f"Voice synthesis blocked.\nErrors: {qa_errors}"
+                )
+            PipelineLogger.info("Pre-Voice Script QA gate passed.")
+
         start_time = time.time()
         if self.dry_run:
             provider = "mock"

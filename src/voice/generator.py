@@ -404,6 +404,27 @@ def generate_voice_mapping(
     if not ok:
         raise ValueError(f"❌ Safety Gate Rejection: {error_msg}")
 
+    # ── Pre-Voice Script QA Enforcement Gate ──────────────────────────────────
+    # Guarantee that unapproved or factually erroneous scripts never reach TTS synthesis.
+    if format != "old" and script.get("format") != "old":
+        from src.script.script_qa_gate import run_pre_voice_script_qa
+        meta = script.get("approval_metadata") or {}
+        explicit_lang = script.get("language_code") or meta.get("language_code")
+        if explicit_lang in ("te-IN", "hi-IN"):
+            qa_ok, qa_report, qa_errors = run_pre_voice_script_qa(
+                script_data=script,
+                canonical_topic=meta.get("selected_topic") or script.get("title"),
+                deity_hint=meta.get("deity", ""),
+                language_code=explicit_lang,
+                content_type=content_type,
+                fail_fast=False,
+            )
+            if not qa_ok:
+                raise ValueError(
+                    f"❌ Pre-Voice QA Gate Rejection: Script failed verification ({len(qa_errors)} error(s)). "
+                    f"Voice generation blocked to prevent unapproved audio.\nErrors: {qa_errors}"
+                )
+
     if mode not in ("production", "test"):
         raise ValueError("mode must be 'production' or 'test'")
 
