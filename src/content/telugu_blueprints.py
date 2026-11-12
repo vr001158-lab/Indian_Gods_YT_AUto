@@ -989,14 +989,14 @@ DEITY_NAME_TE: dict[str, str] = {
 TELUGU_BLUEPRINT_KEYWORDS: dict[str, list[str]] = {
     "lord_shiva": ["snake", "పాము", "vasuki", "వాసుకి", "హాలాహల", "halahala", "నీలకంఠ", "neelkanth", "throat", "neck", "serpent", "poison"],
     "ganesha": ["tusk", "broken tusk", "ఏకదంత", "దంతం", "tooth"],
-    "krishna": ["govardhan", "గోవర్ధన", "hill", "mountain", "గిరి", "lifting", "చిటికెన"],
+    "krishna": ["govardhan", "గోవర్ధన", "govardhana", "గోవర్ధనగిరి", "చిటికెన వేలు"],
     "ram": ["shabari", "sabari", "శబరి", "fruit", "berries", "ఎంగిలి", "పండ్లు"],
     "hanuman": ["dronagiri", "ద్రోణగిరి", "sanjeevani", "sanjeevini", "సంజీవని", "carrying"],
     "durga": ["mahishasura", "మహిషాసుర", "demon", "lion", "సింహం", "arms"],
     "vamana": ["vamana", "వామన", "three steps", "three strides", "మూడు అడుగుల", "bali", "బలి"],
     "kurma": ["kurma", "కూర్మ", "mandara", "మందర", "tortoise", "turtle", "తాబేలు"],
     "narasimha": ["narasimha", "నరసింహ", "pillar", "స్తంభం", "hiranyakashipu", "హిరణ్యకశిపు"],
-    "7Kondala_Swami": ["tirupati", "తిరుపతి", "venkateswara", "వేంకటేశ్వర", "balaji", "బాలాజీ", "ఏడుకొండల", "7kondala", "wealth"],
+    "7Kondala_Swami": ["tirupati", "తిరుపతి", "venkateswara", "వేంకటేశ్వర", "balaji", "బాలాజీ", "ఏడుకొండల", "7kondala", "seven hills", "శ్రీనివాస", "శ్రీనివాసుడు", "శేషాచల", "seshachala", "తిరుమల", "tirumala", "గోవింద", "గోవిందా"],
     "lord_vishnu": ["gajendra", "గజేంద్ర", "moksha", "మోక్షం", "crocodile", "మొసలి", "elephant"],
 }
 
@@ -1006,7 +1006,11 @@ def synthesize_telugu_brief(topic: str, deity_hint: str = "") -> dict[str, Any]:
     Synthesizes a structured Telugu content brief for any devotional topic.
     If the topic matches one of our rich blueprints, returns that blueprint.
     Otherwise builds a dynamic blueprint following the same strict schema.
+    Fails closed if both topic and deity_hint are empty.
     """
+    if not (topic or "").strip() and not (deity_hint or "").strip():
+        raise ValueError("Cannot synthesize Telugu content brief: missing topic and deity identifier.")
+
     topic_lower = (topic or "").lower()
     resolved_key = resolve_deity(topic, deity_hint=deity_hint, default=None)
 
@@ -1014,9 +1018,10 @@ def synthesize_telugu_brief(topic: str, deity_hint: str = "") -> dict[str, Any]:
     candidate_keys = []
     if resolved_key and resolved_key in TELUGU_DEITY_BRIEFS:
         candidate_keys.append(resolved_key)
-    hint_lower = (deity_hint or "").strip().lower()
-    if hint_lower in TELUGU_DEITY_BRIEFS and hint_lower not in candidate_keys:
-        candidate_keys.append(hint_lower)
+    hint_clean = (deity_hint or "").strip()
+    for k in TELUGU_DEITY_BRIEFS:
+        if hint_clean.lower() == k.lower() and k not in candidate_keys:
+            candidate_keys.append(k)
 
     for k in candidate_keys:
         keywords = TELUGU_BLUEPRINT_KEYWORDS.get(k, [])
@@ -1024,7 +1029,14 @@ def synthesize_telugu_brief(topic: str, deity_hint: str = "") -> dict[str, Any]:
             blueprint = json.loads(json.dumps(TELUGU_DEITY_BRIEFS[k], ensure_ascii=False))
             return blueprint
 
-    # Check other blueprints in case topic directly names them
+    # Strict Deity Isolation: If a candidate deity was resolved or hinted, use that
+    # deity's blueprint directly rather than falling through to unrelated deities.
+    if candidate_keys:
+        k = candidate_keys[0]
+        blueprint = json.loads(json.dumps(TELUGU_DEITY_BRIEFS[k], ensure_ascii=False))
+        return blueprint
+
+    # Check other blueprints in case topic directly names them without a candidate hint
     for k, keywords in TELUGU_BLUEPRINT_KEYWORDS.items():
         if any(kw in topic_lower or kw in topic for kw in keywords):
             blueprint = json.loads(json.dumps(TELUGU_DEITY_BRIEFS[k], ensure_ascii=False))

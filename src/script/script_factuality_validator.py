@@ -66,6 +66,8 @@ def validate_script_factuality(
                 ("lord_shiva", "parvathi"),
                 ("ram", "hanuman"),
                 ("krishna", "lord_vishnu"),
+                ("7Kondala_Swami", "lord_vishnu"),
+                ("krishna", "7Kondala_Swami"),
             }
             pair = (resolved_deity, text_deity)
             reverse_pair = (text_deity, resolved_deity)

@@ -29,7 +29,7 @@ DEITY_ALIASES: dict[str, list[str]] = {
         "हनुमान", "बजरंगबली", "मारुति", "आंजनेय", "संजीवनी", "द्रोणागिरि", "హనుమాన్", "హనుమంతుడు", "హనుమంతుని", "హనుమ", "సంజీవని", "ద్రోణగిరి", "ఆంజనేయ", "బజరంగబలి"
     ],
     "lakshmi_devi": [
-        "lakshmi", "laxmi", "sri", "wealth",
+        "lakshmi", "laxmi", "sridevi", "sri devi", "mahalakshmi", "wealth",
         "लक्ष्मी", "महालक्ष्मी", "లక్ష్మి", "లక్ష్మీ", "మహాలక్ష్మి"
     ],
     "narasimha": [
@@ -54,7 +54,10 @@ DEITY_ALIASES: dict[str, list[str]] = {
     ],
     "7Kondala_Swami": [
         "7kondala", "venkateswara", "balaji", "tirupati", "govinda", "7kondala_swami",
-        "वेंकटेश्वर", "बालाजी", "तिरुपति", "వేంకటేశ్వర", "శ్రీవారి", "బాలాజీ", "తిరుపతి", "ఏడుకొండల"
+        "tirumala", "srinivasa", "seshachala", "venkanna", "seven hills",
+        "वेंकटेश्वर", "बालाजी", "तिरुपति", "తిరుమల", "శ్రీనివాస", "శ్రీనివాసుడు", "వేంకటేశ్వర",
+        "శ్రీవారి", "బాలాజీ", "తిరుపతి", "ఏడుకొండల", "ఏడుకొండలవాడు", "ఏడుకొండలవాడా",
+        "గోవింద", "గోవిందా", "శేషాచల", "వెంకటేశ్వర", "వెంకన్న"
     ],
 }
 
@@ -76,13 +79,33 @@ def resolve_deity(topic: str, deity_hint: str = "", default: str | None = "lord_
             if hint_lower in [a.lower() for a in aliases]:
                 return key
 
-    normalised = topic.lower()
+    if not topic or not str(topic).strip():
+        return default
+
+    normalised = str(topic).lower()
+
+    # Score each candidate deity by alias occurrences in the text
+    deity_scores: dict[str, int] = {}
     for deity_key, aliases in DEITY_ALIASES.items():
+        score = 0
         for alias in aliases:
-            if re.search(r"\b" + re.escape(alias) + r"\b", normalised):
-                return deity_key
-            if alias in normalised:
-                return deity_key
+            a_lower = alias.lower()
+            if not a_lower:
+                continue
+            if a_lower.isascii() and a_lower.isalnum():
+                matches = len(re.findall(r"\b" + re.escape(a_lower) + r"\b", normalised))
+                score += matches
+            else:
+                if a_lower in normalised:
+                    score += normalised.count(a_lower)
+        if score > 0:
+            deity_scores[deity_key] = score
+
+    if deity_scores:
+        # Return deity with highest match score
+        best_deity = max(deity_scores, key=lambda k: deity_scores[k])
+        return best_deity
+
     return default
 
 

@@ -19,9 +19,8 @@ from src.script.schemas import validate_script_output
 
 logger = logging.getLogger("gemini_provider")
 
-DEFAULT_MODEL = (os.environ.get("GEMINI_MODEL") or "").strip() or "gemini-2.5-flash-lite"
+DEFAULT_MODEL = (os.environ.get("GEMINI_MODEL") or "").strip() or "gemini-3.5-flash-lite"
 FALLBACK_MODELS = [
-    "gemini-2.5-flash-lite",
     "gemini-3.5-flash-lite",
     "gemini-3.5-flash",
 ]
@@ -113,7 +112,7 @@ def call_gemini_api(
         )
 
     raw_target = (model or (os.environ.get("GEMINI_MODEL") or "").strip() or DEFAULT_MODEL).strip()
-    target_model = raw_target if raw_target else "gemini-2.5-flash-lite"
+    target_model = raw_target if raw_target else "gemini-3.5-flash-lite"
     raw_candidates = [target_model] + [m for m in FALLBACK_MODELS if m != target_model]
     candidate_models = [m.strip() for m in raw_candidates if m and m.strip()]
 
@@ -186,6 +185,8 @@ def call_gemini_api(
 
                 # Transient server errors
                 if resp.status_code in (500, 502, 503, 504):
+                    safe_msg = _redact_key(resp.text, key)
+                    last_error = GeminiProviderError(f"Gemini server error (HTTP {resp.status_code}) on model '{candidate}': {safe_msg}")
                     logger.warning("Gemini model %s server error (HTTP %s), retrying (attempt %d)...", candidate, resp.status_code, attempt)
                     time.sleep(1.0 * attempt)
                     continue
