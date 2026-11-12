@@ -18,7 +18,6 @@ output/
 temp/
 tmp/
 uploaded_archive/
-assets/gods_processed/
 
 # Ignore large media formats
 *.mp4
@@ -41,9 +40,12 @@ data/pipeline/*
 data/publishing/*
 data/qa/*
 
-# Keep gitkeep, persistent history file, canonical test asset plan fixture, and devotional audio assets
+# Keep gitkeep, persistent history file, canonical test asset plan fixture, devotional audio assets, and processed deity video assets
 !data/publishing_history.json
 !.gitkeep
 !data/visuals/asset_plan_20260814_071510.json
 !assets/music/devotional/*.mp3
 !assets/music/pixabay/*.mp3
+!assets/gods_processed/**/*.mp4
+assets/gods_processed/**/*_tmp.mp4
+assets/gods_processed/**/*_temp.mp4

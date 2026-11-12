@@ -76,7 +76,8 @@ def create_scene_asset_plan(
                 deity_key=deity,
                 scene_scripts=scene_scripts,
                 manifest=manifest,
-                allow_online_fallback=True,
+                allow_online_fallback=False,
+                content_type=content_type,
             )
 
     asset_plan = {

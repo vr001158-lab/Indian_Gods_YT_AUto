@@ -342,6 +342,28 @@ def scan_gods_landscape_assets(
                 except AssetValidationError as exc:
                     rejected_files.append({"file": str(item), "reason": str(exc)})
 
+        # Also scan assets/gods_processed/<folder.name>/horizontal for landscape videos
+        processed_dir = base_path.parent / "gods_processed" / folder.name / "horizontal"
+        if processed_dir.exists() and processed_dir.is_dir():
+            for item in sorted(processed_dir.rglob("*")):
+                if not item.is_file():
+                    continue
+                ext = item.suffix.lower()
+                if ext in SUPPORTED_VIDEO_EXTS:
+                    try:
+                        meta = validate_video_asset(item)
+                        meta["deity"] = deity_key
+                        meta = _enrich_asset_metadata(meta, item.stem, deity_key)
+                        ok_land, land_err = validate_landscape_asset(meta)
+                        if not ok_land:
+                            rejected_files.append({"file": str(item), "reason": land_err})
+                            continue
+                        if not any(v.get("path") == meta.get("path") for v in videos):
+                            videos.append(meta)
+                            total_videos += 1
+                    except AssetValidationError as exc:
+                        rejected_files.append({"file": str(item), "reason": str(exc)})
+
         deities[deity_key] = {
             "images": images,
             "videos": videos,

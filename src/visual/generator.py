@@ -85,11 +85,19 @@ def generate_visual_mapping(
         ext = ".mp4" if asset_type == "video" else ".png"
         image_file = run_visual_dir / f"scene_{scene_num}{ext}"
 
-        if source == "repository" and Path(asset_path).exists():
-            # Use repository asset directly
+        if source in ("repository", "landscape_repository"):
+            if not Path(asset_path).exists():
+                raise FileNotFoundError(
+                    f"Local repository visual asset not found on disk: {asset_path} for deity '{scene_item.get('deity')}'"
+                )
             image_file_str = asset_path
         else:
-            # Fallback to provider image synthesis if repo asset unavailable
+            # Fallback to provider image synthesis ONLY in test/mock mode
+            if provider_name != "mock":
+                raise RuntimeError(
+                    f"External or synthesized visual assets are strictly prohibited in production. "
+                    f"Asset source: '{source}', path: '{asset_path}'"
+                )
             prompt = f"Scene {scene_num} for {script['title']}"
             provider.generate_image(prompt, style_preset, image_file)
             image_file_str = str(image_file.absolute()).replace("\\", "/")

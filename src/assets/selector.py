@@ -244,6 +244,75 @@ def _get_semantic_match_details(asset: dict[str, Any] | str, keywords: Sequence[
     return len(matched), matched
 
 
+def is_matching_orientation(asset: dict[str, Any] | str, content_type: str) -> bool:
+    """
+    Strictly determine whether an asset matches the target orientation.
+    - 'short': Requires vertical (9:16 or height >= width).
+    - 'long': Requires horizontal (16:9 or width >= height).
+
+    Rules:
+    1. Reliable dimensions (width > 0 and height > 0) take precedence over path or folder names.
+       If width/height metadata contradicts a folder name, dimensions win.
+    2. If dimensions are unavailable (0 or None), check explicit aspect_ratio / orientation metadata.
+    3. If metadata is unavailable, inspect validated folder / path structure.
+    4. Safe fail-closed: If orientation cannot be verified, returns False (never silently accept unknown orientation).
+    """
+    target_is_long = (content_type == "long")
+
+    if isinstance(asset, str):
+        path_str = asset.lower().replace("\\", "/")
+        if "/horizontal/" in path_str:
+            return target_is_long
+        if "/vertical/" in path_str:
+            return not target_is_long
+        if "horizontal" in path_str or "landscape" in path_str:
+            return target_is_long
+        if "vertical" in path_str or "portrait" in path_str:
+            return not target_is_long
+        return False
+
+    if not isinstance(asset, dict):
+        return False
+
+    w = int(asset.get("width") or 0)
+    h = int(asset.get("height") or 0)
+
+    # 1. Concrete dimensions take precedence over folder/path metadata
+    if w > 0 and h > 0:
+        if target_is_long:
+            return w >= h
+        else:
+            return h >= w
+
+    # 2. Explicit aspect_ratio metadata
+    ar = str(asset.get("aspect_ratio") or "").lower().strip()
+    if ar in ("16:9", "horizontal", "landscape"):
+        return target_is_long
+    if ar in ("9:16", "vertical", "portrait"):
+        return not target_is_long
+
+    # 3. Explicit orientation attribute
+    orient = str(asset.get("orientation") or "").lower().strip()
+    if orient in ("horizontal", "landscape", "16:9"):
+        return target_is_long
+    if orient in ("vertical", "portrait", "9:16"):
+        return not target_is_long
+
+    # 4. Folder / path structure
+    path_str = str(asset.get("path") or "").lower().replace("\\", "/")
+    if "/horizontal/" in path_str:
+        return target_is_long
+    if "/vertical/" in path_str:
+        return not target_is_long
+    if "horizontal" in path_str or "landscape" in path_str:
+        return target_is_long
+    if "vertical" in path_str or "portrait" in path_str:
+        return not target_is_long
+
+    # Fail closed on unverified/unknown orientation
+    return False
+
+
 def build_deity_visual_timeline(
     deity_key: str,
     target_duration: float = 45.0,
@@ -280,32 +349,45 @@ def build_deity_visual_timeline(
     if not repo_images and not repo_videos:
         raise ValueError(f"No visual assets found in repository for deity '{deity_key}'")
 
-    # Combine pool: alternate between videos and images if both exist
-    mixed_pool = []
-    max_len = max(len(repo_images), len(repo_videos))
-    for i in range(max_len):
-        if i < len(repo_videos):
-            mixed_pool.append(repo_videos[i])
-        if i < len(repo_images):
-            mixed_pool.append(repo_images[i])
+    target_ct = "long" if content_type == "long" else "short"
+    deity_videos = [v for v in repo_videos if is_matching_orientation(v, target_ct)]
+
+    if content_type == "long":
+        preferred_images = [img for img in repo_images if is_matching_orientation(img, "long")]
+        eligible_images = preferred_images if preferred_images else repo_images
+    else:
+        eligible_images = repo_images
+
+    if not deity_videos and not eligible_images:
+        raise ValueError(f"No visual assets found in repository for deity '{deity_key}'")
+
+    if not deity_videos and eligible_images:
+        import sys
+        print(f"[ASSET NOTICE] Video coverage unavailable for deity '{deity_key}'. Falling back to local deity images.", file=sys.stderr)
+
+    # Videos first, then images as secondary/fallback
+    pool = deity_videos + eligible_images
 
     timeline: list[dict[str, Any]] = []
     current_time = 0.0
     scene_idx = 1
-    pool_len = len(mixed_pool)
+    pool_len = len(pool)
 
-    # Durations pattern for image segments (4s to 8s)
-    image_durations = [5.0, 6.0, 4.0, 7.0, 5.0, 6.0, 4.0, 8.0]
+    # Canonical retention segment durations (4s to 8s, 8 segments summing to 45.0s for shorts)
+    if content_type == "long":
+        segment_durations = [5.0, 6.0, 5.5, 7.0, 6.0, 5.0, 6.5, 8.0]
+    else:
+        segment_durations = [5.0, 6.0, 4.0, 7.0, 5.0, 6.0, 4.0, 8.0]
 
     while current_time < target_duration:
-        asset_item = mixed_pool[(scene_idx - 1) % pool_len]
+        asset_item = pool[(scene_idx - 1) % pool_len]
         atype = asset_item.get("type", "image")
 
-        if atype == "video":
+        if atype == "video" and content_type == "long":
             clip_dur = float(asset_item.get("duration", 8.0) or 8.0)
             seg_dur = min(max(5.0, clip_dur), 15.0)
         else:
-            seg_dur = image_durations[(scene_idx - 1) % len(image_durations)]
+            seg_dur = segment_durations[(scene_idx - 1) % len(segment_durations)]
 
         rem = target_duration - current_time
         if rem < 3.0 and timeline:
@@ -337,25 +419,54 @@ def select_scene_assets(
     deity_key: str,
     scene_scripts: list[dict[str, Any]],
     manifest: dict[str, Any],
-    allow_online_fallback: bool = True,
+    allow_online_fallback: bool = False,
+    content_type: str = "short",
 ) -> list[dict[str, Any]]:
     """
-    Select scene-aware visual assets for scene_scripts according to Priority rules:
-
-    Priority 1: Local repository assets in assets/gods/<deity_key>/
-    Priority 2: Strict deity isolation (never borrowing from other deities)
-    Priority 3: Online asset fetching ONLY when local repository has no usable assets for deity
+    Select scene-aware visual assets for scene_scripts strictly from repository deity assets.
+    Enforces Video-First Priority:
+      Priority 1: Videos are the primary visual source. Used for majority/all scenes where available.
+      Priority 2: Images are secondary source when suitable videos are unavailable or exhausted.
+      Priority 3: Strict deity isolation (never borrowing from other deities).
+      Priority 4: Fail closed if deity has no visual assets (no external synthesis in production).
 
     Returns a list of scene asset decision dicts.
     """
     deities = manifest.get("deities", {})
     target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
 
-    repo_images = target_deity_assets.get("images", [])
-    repo_videos = target_deity_assets.get("videos", [])
-    all_repo_assets = repo_videos + repo_images  # Strictly target deity assets
+    repo_images = list(target_deity_assets.get("images", []))
+    repo_videos = list(target_deity_assets.get("videos", []))
+
+    target_ct = "long" if content_type == "long" else "short"
+    deity_videos = [v for v in repo_videos if is_matching_orientation(v, target_ct)]
+
+    if content_type == "long":
+        preferred_images = [img for img in repo_images if is_matching_orientation(img, "long")]
+        eligible_images = preferred_images if preferred_images else repo_images
+    else:
+        eligible_images = repo_images
+
+    has_videos = bool(deity_videos)
+    has_images = bool(eligible_images)
+
+    if not has_videos and has_images:
+        import sys
+        print(
+            f"[ASSET NOTICE] Video coverage unavailable for deity '{deity_key}'. "
+            f"Falling back to local deity images.",
+            file=sys.stderr,
+        )
+
+    if not has_videos and not has_images:
+        if not allow_online_fallback:
+            raise RuntimeError(
+                f"Missing scene asset: No repository assets found for deity '{deity_key}' "
+                f"and online fallback is disabled."
+            )
 
     scene_plan: list[dict[str, Any]] = []
+    used_asset_paths: set[str] = set()
 
     for item in scene_scripts:
         scene_num = item["scene"]
@@ -368,44 +479,132 @@ def select_scene_assets(
         semantic_match_found = False
         matched_keywords: list[str] = []
 
-        # Priority 1: Local repo semantic search for target deity
-        if all_repo_assets:
-            best_score = -1
+        if has_videos:
+            unused_videos = [v for v in deity_videos if v.get("path") not in used_asset_paths]
             best_candidate = None
-            best_matched: list[str] = []
-            best_is_verified = False
-            for candidate in all_repo_assets:
-                score, matched = _get_semantic_match_details(candidate, keywords)
-                is_ver = (candidate.get("verification_status") == "verified_visual") if isinstance(candidate, dict) else False
-                if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_verified):
+            best_score = -1
+            best_matched = []
+            best_is_ver = False
+            for cand in unused_videos:
+                score, matched = _get_semantic_match_details(cand, keywords)
+                is_ver = (cand.get("verification_status") == "verified_visual") if isinstance(cand, dict) else False
+                if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_ver):
                     best_score = score
-                    best_candidate = candidate
+                    best_candidate = cand
                     best_matched = matched
-                    best_is_verified = is_ver
+                    best_is_ver = is_ver
 
             if best_candidate and best_score > 0:
                 selected_asset = best_candidate
                 semantic_match_found = True
                 matched_keywords = best_matched
                 semantic_confidence = "HIGH" if best_score >= 2 else "MEDIUM"
-                verified_str = " [VERIFIED]" if best_is_verified else ""
+                ver_str = " [VERIFIED]" if best_is_ver else ""
                 selection_reason = (
-                    f"Semantic match{verified_str} (score={best_score}, matched={best_matched}) "
+                    f"Video semantic match{ver_str} (score={best_score}, matched={best_matched}) "
                     f"in repository deity assets for '{deity_key}'"
                 )
-            else:
-                # Deterministic fallback by scene index within the SAME deity
+            elif unused_videos:
+                selected_asset = unused_videos[0]
                 semantic_confidence = "NONE"
                 semantic_match_found = False
-                idx = (scene_num - 1) % len(all_repo_assets)
-                selected_asset = all_repo_assets[idx]
                 sample_kws = keywords[:3] if keywords else ["general"]
                 selection_reason = (
-                    f"Deity repository general asset fallback for '{deity_key}' (scene #{scene_num}). "
+                    f"Deity repository video asset for '{deity_key}' (scene #{scene_num}). "
+                    f"Missing specific semantic asset (video) for keywords {sample_kws}."
+                )
+            else:
+                unused_images = [img for img in eligible_images if img.get("path") not in used_asset_paths]
+                if unused_images:
+                    img_best_cand = None
+                    img_best_score = -1
+                    img_best_matched = []
+                    img_best_is_ver = False
+                    for cand in unused_images:
+                        score, matched = _get_semantic_match_details(cand, keywords)
+                        is_ver = (cand.get("verification_status") == "verified_visual") if isinstance(cand, dict) else False
+                        if score > img_best_score or (score == img_best_score and score > 0 and is_ver and not img_best_is_ver):
+                            img_best_score = score
+                            img_best_cand = cand
+                            img_best_matched = matched
+                            img_best_is_ver = is_ver
+
+                    if img_best_cand and img_best_score > 0:
+                        selected_asset = img_best_cand
+                        semantic_match_found = True
+                        matched_keywords = img_best_matched
+                        semantic_confidence = "HIGH" if img_best_score >= 2 else "MEDIUM"
+                        ver_str = " [VERIFIED]" if img_best_is_ver else ""
+                        selection_reason = (
+                            f"Secondary image semantic match{ver_str} (score={img_best_score}, matched={img_best_matched}) "
+                            f"for '{deity_key}' (videos exhausted)"
+                        )
+                    else:
+                        selected_asset = unused_images[0]
+                        semantic_confidence = "NONE"
+                        semantic_match_found = False
+                        sample_kws = keywords[:3] if keywords else ["general"]
+                        selection_reason = (
+                            f"Secondary image asset fallback for '{deity_key}' (scene #{scene_num}). "
+                            f"Videos exhausted and missing specific semantic asset (image) for keywords {sample_kws}."
+                        )
+                else:
+                    idx = (scene_num - 1) % len(deity_videos)
+                    selected_asset = deity_videos[idx]
+                    semantic_confidence = "NONE"
+                    semantic_match_found = False
+                    sample_kws = keywords[:3] if keywords else ["general"]
+                    selection_reason = (
+                        f"Deity repository video loop #{idx+1} for '{deity_key}' (scene #{scene_num}). "
+                        f"Missing specific semantic asset (video loop) for keywords {sample_kws}."
+                    )
+
+        elif has_images:
+            unused_images = [img for img in eligible_images if img.get("path") not in used_asset_paths]
+            img_pool = unused_images if unused_images else eligible_images
+            best_candidate = None
+            best_score = -1
+            best_matched = []
+            best_is_ver = False
+            for cand in img_pool:
+                score, matched = _get_semantic_match_details(cand, keywords)
+                is_ver = (cand.get("verification_status") == "verified_visual") if isinstance(cand, dict) else False
+                if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_ver):
+                    best_score = score
+                    best_candidate = cand
+                    best_matched = matched
+                    best_is_ver = is_ver
+
+            if best_candidate and best_score > 0:
+                selected_asset = best_candidate
+                semantic_match_found = True
+                matched_keywords = best_matched
+                semantic_confidence = "HIGH" if best_score >= 2 else "MEDIUM"
+                ver_str = " [VERIFIED]" if best_is_ver else ""
+                selection_reason = (
+                    f"Semantic match{ver_str} (score={best_score}, matched={best_matched}) "
+                    f"in repository deity images for '{deity_key}'"
+                )
+            elif unused_images:
+                selected_asset = unused_images[0]
+                semantic_confidence = "NONE"
+                semantic_match_found = False
+                sample_kws = keywords[:3] if keywords else ["general"]
+                selection_reason = (
+                    f"Deity repository image fallback for '{deity_key}' (scene #{scene_num}). "
                     f"Missing specific semantic asset for keywords {sample_kws}."
                 )
+            else:
+                idx = (scene_num - 1) % len(eligible_images)
+                selected_asset = eligible_images[idx]
+                semantic_confidence = "NONE"
+                semantic_match_found = False
+                sample_kws = keywords[:3] if keywords else ["general"]
+                selection_reason = (
+                    f"Deity repository image loop #{idx+1} for '{deity_key}' (scene #{scene_num}). "
+                    f"Missing specific semantic asset (image loop) for keywords {sample_kws}."
+                )
 
-        # Online fallback if no local repo assets exist for target deity
         if not selected_asset:
             if not allow_online_fallback:
                 raise RuntimeError(
@@ -428,6 +627,9 @@ def select_scene_assets(
                 "height": 1280,
                 "valid": True,
             }
+
+        if selected_asset.get("path"):
+            used_asset_paths.add(selected_asset["path"])
 
         scene_plan.append({
             "scene": scene_num,
@@ -455,12 +657,13 @@ def select_landscape_scene_assets(
     gods_dir: str | Path = "assets/gods_landscape_long_video",
 ) -> list[dict[str, Any]]:
     """
-    Select scene-aware landscape assets strictly from `assets/gods_landscape_long_video/<deity_key>/`.
-    Enforces:
-      - Only landscape assets (width >= height)
-      - Never uses assets/gods/ or portrait assets
-      - Rejects if deity folder has no valid landscape assets
-      - Logs selected folder and assets
+    Select scene-aware landscape assets strictly from `assets/gods_landscape_long_video/<deity_key>/`
+    and `assets/gods_processed/<deity_key>/horizontal/`.
+    Enforces Video-First Priority:
+      Priority 1: Landscape videos (width >= height) are primary source.
+      Priority 2: Landscape images (width >= height) when videos are unavailable or exhausted.
+      Priority 3: Strict deity isolation.
+      Priority 4: Reject portrait assets.
     """
     if manifest is None:
         from src.assets.manifest import load_landscape_asset_manifest
@@ -468,60 +671,172 @@ def select_landscape_scene_assets(
 
     deities = manifest.get("deities", {})
     target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
-    repo_images = [img for img in target_deity_assets.get("images", []) if img.get("width", 0) >= img.get("height", 0)]
-    repo_videos = [vid for vid in target_deity_assets.get("videos", []) if vid.get("width", 0) >= vid.get("height", 0)]
-    all_repo_assets = repo_videos + repo_images
+    repo_images = [img for img in target_deity_assets.get("images", []) if is_matching_orientation(img, "long")]
+    repo_videos = [vid for vid in target_deity_assets.get("videos", []) if is_matching_orientation(vid, "long")]
 
-    if not all_repo_assets:
+    if not repo_images and not repo_videos:
         folder_path = Path(gods_dir) / deity_key
         raise ValueError(
             f"No valid landscape visual assets found for deity '{deity_key}' in {folder_path}. "
             f"Fallback to portrait assets/gods/ is strictly prohibited."
         )
 
+    has_videos = bool(repo_videos)
+    has_images = bool(repo_images)
+
     import sys
+    if not has_videos and has_images:
+        print(
+            f"[ASSET NOTICE] Video coverage unavailable for deity '{deity_key}'. "
+            f"Falling back to local deity images.",
+            file=sys.stderr,
+        )
+
     print(
         f"  [LANDSCAPE ASSET SELECTION] Deity: '{deity_key}' | Source folder: {Path(gods_dir)/deity_key} | "
-        f"Valid landscape assets: {len(all_repo_assets)}",
+        f"Valid landscape assets: {len(repo_videos) + len(repo_images)} (Videos: {len(repo_videos)}, Images: {len(repo_images)})",
         file=sys.stderr,
     )
 
     scene_plan: list[dict[str, Any]] = []
+    used_asset_paths: set[str] = set()
+
     for item in scene_scripts:
         scene_num = item["scene"]
         keywords = extract_scene_semantic_keywords(item)
 
-        best_score = -1
-        best_candidate = None
-        best_matched: list[str] = []
-        best_is_verified = False
-        for candidate in all_repo_assets:
-            score, matched = _get_semantic_match_details(candidate, keywords)
-            is_ver = (candidate.get("verification_status") == "verified_visual") if isinstance(candidate, dict) else False
-            if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_verified):
-                best_score = score
-                best_candidate = candidate
-                best_matched = matched
-                best_is_verified = is_ver
+        selected_asset = None
+        selection_reason = ""
+        semantic_confidence = "NONE"
+        semantic_match_found = False
+        matched_keywords: list[str] = []
 
-        if best_candidate and best_score > 0:
-            selected_asset = best_candidate
-            semantic_match_found = True
-            semantic_confidence = "HIGH" if best_score >= 2 else "MEDIUM"
-            verified_str = " [VERIFIED]" if best_is_verified else ""
-            selection_reason = (
-                f"Landscape semantic match{verified_str} (score={best_score}, matched={best_matched}) for '{deity_key}'"
-            )
-        else:
-            idx = (scene_num - 1) % len(all_repo_assets)
-            selected_asset = all_repo_assets[idx]
-            semantic_match_found = False
-            semantic_confidence = "NONE"
-            sample_kws = keywords[:3] if keywords else ["general"]
-            selection_reason = (
-                f"Landscape asset #{idx+1} for '{deity_key}' (scene #{scene_num}). "
-                f"Missing specific semantic asset for keywords {sample_kws}."
-            )
+        if has_videos:
+            unused_videos = [v for v in repo_videos if v.get("path") not in used_asset_paths]
+            best_candidate = None
+            best_score = -1
+            best_matched = []
+            best_is_ver = False
+            for candidate in unused_videos:
+                score, matched = _get_semantic_match_details(candidate, keywords)
+                is_ver = (candidate.get("verification_status") == "verified_visual") if isinstance(candidate, dict) else False
+                if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_ver):
+                    best_score = score
+                    best_candidate = candidate
+                    best_matched = matched
+                    best_is_ver = is_ver
+
+            if best_candidate and best_score > 0:
+                selected_asset = best_candidate
+                semantic_match_found = True
+                matched_keywords = best_matched
+                semantic_confidence = "HIGH" if best_score >= 2 else "MEDIUM"
+                verified_str = " [VERIFIED]" if best_is_ver else ""
+                selection_reason = (
+                    f"Landscape video semantic match{verified_str} (score={best_score}, matched={best_matched}) for '{deity_key}'"
+                )
+            elif unused_videos:
+                selected_asset = unused_videos[0]
+                semantic_match_found = False
+                semantic_confidence = "NONE"
+                sample_kws = keywords[:3] if keywords else ["general"]
+                selection_reason = (
+                    f"Landscape video #{scene_num} for '{deity_key}'. "
+                    f"Missing specific semantic asset (video) for keywords {sample_kws}."
+                )
+            else:
+                # Videos exhausted: use unused images
+                unused_images = [img for img in repo_images if img.get("path") not in used_asset_paths]
+                if unused_images:
+                    img_best_cand = None
+                    img_best_score = -1
+                    img_best_matched = []
+                    img_best_is_ver = False
+                    for candidate in unused_images:
+                        score, matched = _get_semantic_match_details(candidate, keywords)
+                        is_ver = (candidate.get("verification_status") == "verified_visual") if isinstance(candidate, dict) else False
+                        if score > img_best_score or (score == img_best_score and score > 0 and is_ver and not img_best_is_ver):
+                            img_best_score = score
+                            img_best_cand = candidate
+                            img_best_matched = matched
+                            img_best_is_ver = is_ver
+
+                    if img_best_cand and img_best_score > 0:
+                        selected_asset = img_best_cand
+                        semantic_match_found = True
+                        matched_keywords = img_best_matched
+                        semantic_confidence = "HIGH" if img_best_score >= 2 else "MEDIUM"
+                        verified_str = " [VERIFIED]" if img_best_is_ver else ""
+                        selection_reason = (
+                            f"Landscape secondary image semantic match{verified_str} (score={img_best_score}, matched={img_best_matched}) for '{deity_key}'"
+                        )
+                    else:
+                        selected_asset = unused_images[0]
+                        semantic_match_found = False
+                        semantic_confidence = "NONE"
+                        sample_kws = keywords[:3] if keywords else ["general"]
+                        selection_reason = (
+                            f"Landscape secondary image #{scene_num} for '{deity_key}'. "
+                            f"Videos exhausted and missing specific semantic asset (image) for keywords {sample_kws}."
+                        )
+                else:
+                    idx = (scene_num - 1) % len(repo_videos)
+                    selected_asset = repo_videos[idx]
+                    semantic_match_found = False
+                    semantic_confidence = "NONE"
+                    sample_kws = keywords[:3] if keywords else ["general"]
+                    selection_reason = (
+                        f"Landscape video loop #{idx+1} for '{deity_key}' (scene #{scene_num}). "
+                        f"Missing specific semantic asset (video loop) for keywords {sample_kws}."
+                    )
+
+        elif has_images:
+            unused_images = [img for img in repo_images if img.get("path") not in used_asset_paths]
+            img_pool = unused_images if unused_images else repo_images
+            best_candidate = None
+            best_score = -1
+            best_matched = []
+            best_is_ver = False
+            for candidate in img_pool:
+                score, matched = _get_semantic_match_details(candidate, keywords)
+                is_ver = (candidate.get("verification_status") == "verified_visual") if isinstance(candidate, dict) else False
+                if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_ver):
+                    best_score = score
+                    best_candidate = candidate
+                    best_matched = matched
+                    best_is_ver = is_ver
+
+            if best_candidate and best_score > 0:
+                selected_asset = best_candidate
+                semantic_match_found = True
+                matched_keywords = best_matched
+                semantic_confidence = "HIGH" if best_score >= 2 else "MEDIUM"
+                verified_str = " [VERIFIED]" if best_is_ver else ""
+                selection_reason = (
+                    f"Landscape image semantic match{verified_str} (score={best_score}, matched={best_matched}) for '{deity_key}'"
+                )
+            elif unused_images:
+                selected_asset = unused_images[0]
+                semantic_match_found = False
+                semantic_confidence = "NONE"
+                sample_kws = keywords[:3] if keywords else ["general"]
+                selection_reason = (
+                    f"Landscape image #{scene_num} for '{deity_key}'. "
+                    f"Missing specific semantic asset for keywords {sample_kws}."
+                )
+            else:
+                idx = (scene_num - 1) % len(repo_images)
+                selected_asset = repo_images[idx]
+                semantic_match_found = False
+                semantic_confidence = "NONE"
+                sample_kws = keywords[:3] if keywords else ["general"]
+                selection_reason = (
+                    f"Landscape image loop #{idx+1} for '{deity_key}' (scene #{scene_num}). "
+                    f"Missing specific semantic asset (image loop) for keywords {sample_kws}."
+                )
+
+        if selected_asset.get("path"):
+            used_asset_paths.add(selected_asset["path"])
 
         scene_plan.append({
             "scene": scene_num,
@@ -533,7 +848,7 @@ def select_landscape_scene_assets(
             "reason_for_selection": selection_reason,
             "semantic_confidence": semantic_confidence,
             "semantic_match_found": semantic_match_found,
-            "matched_keywords": best_matched,
+            "matched_keywords": matched_keywords,
             "missing_semantic_match": not semantic_match_found,
             "fallback_triggered": not semantic_match_found,
             "validation_result": "OK",
@@ -552,7 +867,9 @@ def build_landscape_visual_timeline(
 ) -> list[dict[str, Any]]:
     """
     Constructs a visual timeline (mixing landscape images & landscape video clips)
-    strictly from `assets/gods_landscape_long_video/<deity_key>/`.
+    strictly from `assets/gods_landscape_long_video/<deity_key>/` and
+    `assets/gods_processed/<deity_key>/horizontal/`.
+    Enforces Video-First Priority: Landscape videos used first up to target duration.
     """
     if manifest is None:
         from src.assets.manifest import load_landscape_asset_manifest
@@ -560,8 +877,8 @@ def build_landscape_visual_timeline(
 
     deities = manifest.get("deities", {})
     target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
-    repo_images = [img for img in target_deity_assets.get("images", []) if img.get("width", 0) >= img.get("height", 0)]
-    repo_videos = [vid for vid in target_deity_assets.get("videos", []) if vid.get("width", 0) >= vid.get("height", 0)]
+    repo_images = [img for img in target_deity_assets.get("images", []) if is_matching_orientation(img, "long")]
+    repo_videos = [vid for vid in target_deity_assets.get("videos", []) if is_matching_orientation(vid, "long")]
 
     if not repo_images and not repo_videos:
         folder_path = Path(gods_dir) / deity_key
@@ -571,28 +888,30 @@ def build_landscape_visual_timeline(
         )
 
     import sys
+    if not repo_videos and repo_images:
+        print(
+            f"[ASSET NOTICE] Video coverage unavailable for deity '{deity_key}'. "
+            f"Falling back to local deity images.",
+            file=sys.stderr,
+        )
+
     print(
         f"  [LANDSCAPE TIMELINE] Deity: '{deity_key}' | Folder: {Path(gods_dir)/deity_key} | "
-        f"Images: {len(repo_images)}, Videos: {len(repo_videos)}",
+        f"Videos: {len(repo_videos)}, Images: {len(repo_images)}",
         file=sys.stderr,
     )
 
-    mixed_pool = []
-    max_len = max(len(repo_images), len(repo_videos))
-    for i in range(max_len):
-        if i < len(repo_videos):
-            mixed_pool.append(repo_videos[i])
-        if i < len(repo_images):
-            mixed_pool.append(repo_images[i])
+    # Videos first, then images
+    pool = repo_videos + repo_images
 
     timeline: list[dict[str, Any]] = []
     current_time = 0.0
     scene_idx = 1
-    pool_len = len(mixed_pool)
+    pool_len = len(pool)
     image_durations = [5.0, 6.0, 5.5, 7.0, 6.0, 5.0, 6.5, 8.0]
 
     while current_time < target_duration:
-        asset_item = mixed_pool[(scene_idx - 1) % pool_len]
+        asset_item = pool[(scene_idx - 1) % pool_len]
         atype = asset_item.get("type", "image")
 
         if atype == "video":
