@@ -16,6 +16,7 @@ NOTE: drive.file and youtube.readonly are intentionally excluded.
 
 from pathlib import Path
 import json
+import os
 import sys
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -57,31 +58,57 @@ def get_google_credentials(
     credentials_file: Path = CREDENTIALS_FILE,
 ) -> Credentials:
     """
-    Load credentials from token_file, validate scopes, refresh if expired.
+    Load credentials from token_file or TOKEN_JSON env var, validate scopes, refresh if expired.
 
     Raises ValueError with clear re-authorization instructions if:
-      - token.json is missing
-      - token.json was issued without the required scopes
+      - token.json and TOKEN_JSON env var are both missing
+      - token was issued without the required scopes
       - the token is expired and cannot be refreshed
     """
-    if not token_file.exists():
+    token_path = Path(token_file) if token_file is not None else TOKEN_FILE
+    token_data = None
+
+    if token_path.exists():
+        try:
+            token_data = json.loads(token_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            raise ValueError(f"❌ Error reading token.json: {e}")
+    elif "TOKEN_JSON" in os.environ and os.environ["TOKEN_JSON"].strip():
+        try:
+            token_data = json.loads(os.environ["TOKEN_JSON"].strip())
+        except Exception as e:
+            raise ValueError(f"❌ Error parsing TOKEN_JSON environment variable: {e}")
+    else:
         raise ValueError(
-            "❌ Missing token.json. Please generate it locally using:\n"
+            "❌ Missing OAuth token. Please generate it locally using:\n"
             "       python refresh_token.py\n"
             "   Then update the TOKEN_JSON GitHub Secret with the new token.json."
         )
 
-    # ── 1. Raw scope check BEFORE loading credentials ─────────────────────
-    # Credentials.from_authorized_user_file() silently overwrites .scopes with
-    # the requested list, making post-load scope checks unreliable for detecting
-    # stale tokens. Read the JSON directly instead.
-    token_scopes = _read_raw_scopes_from_file(token_file)
-    required_scopes = set(SCOPES)
+    # ── 1. Structural check on parsed token data ──────────────────────────
+    if not isinstance(token_data, dict):
+        raise ValueError("❌ Invalid OAuth credentials: token data is not a valid JSON dictionary.")
 
-    if token_scopes and not required_scopes.issubset(token_scopes):
+    # ── 2. Raw scope check BEFORE loading credentials ─────────────────────
+    raw_scopes = token_data.get("scopes")
+    if raw_scopes is None:
+        raise ValueError(
+            "❌ OAUTH SCOPE ERROR — token is missing required 'scopes' metadata.\n"
+            "   Run: python refresh_token.py   then update TOKEN_JSON."
+        )
+
+    token_scopes = set(raw_scopes) if isinstance(raw_scopes, list) else set(raw_scopes.split()) if isinstance(raw_scopes, str) else set()
+    if not token_scopes:
+        raise ValueError(
+            "❌ OAUTH SCOPE ERROR — token 'scopes' metadata is empty.\n"
+            "   Run: python refresh_token.py   then update TOKEN_JSON."
+        )
+
+    required_scopes = set(SCOPES)
+    if not required_scopes.issubset(token_scopes):
         missing = sorted(required_scopes - token_scopes)
         raise ValueError(
-            f"\n❌ OAUTH SCOPE ERROR — token.json is missing required upload scopes.\n"
+            f"\n❌ OAUTH SCOPE ERROR — token is missing required upload scopes.\n"
             f"   Missing scopes : {missing}\n"
             f"   Token has      : {sorted(token_scopes)}\n"
             f"   Required       : {sorted(required_scopes)}\n\n"
@@ -90,27 +117,47 @@ def get_google_credentials(
             f"   👉 Then update the TOKEN_JSON GitHub Secret with the new token.json."
         )
 
-    # ── 2. Load credentials ────────────────────────────────────────────────
+    # ── 3. Load credentials using Google Auth Library ──────────────────────
     creds = None
     try:
-        creds = Credentials.from_authorized_user_file(str(token_file), SCOPES)
+        if token_path.exists():
+            creds = Credentials.from_authorized_user_file(str(token_path), SCOPES)
+        else:
+            creds = Credentials.from_authorized_user_info(token_data, SCOPES)
     except Exception as e:
-        raise ValueError(f"❌ Error reading token.json: {e}")
+        raise ValueError(f"❌ Error constructing Google OAuth credentials: {e}")
 
-    # ── 3. Refresh if expired ──────────────────────────────────────────────
+    # ── 4. Validate refresh capability and refresh if expired ──────────────
     if creds.expired and creds.refresh_token:
         print("🔄 Refreshing expired Google credentials...", file=sys.stderr)
         try:
             creds.refresh(Request())
-            token_file.write_text(creds.to_json(), encoding="utf-8")
+            if token_path.exists():
+                try:
+                    token_path.write_text(creds.to_json(), encoding="utf-8")
+                except Exception:
+                    pass
         except Exception as e:
             raise ValueError(
                 f"❌ Failed to refresh expired token: {e}\n"
                 f"   Run: python refresh_token.py   then update TOKEN_JSON."
             )
+    elif creds.expired and not creds.refresh_token:
+        raise ValueError(
+            "❌ Expired credentials lack a refresh_token and cannot be refreshed.\n"
+            "   Run: python refresh_token.py   then update TOKEN_JSON."
+        )
     elif not creds.valid:
         raise ValueError(
             "❌ Credentials are invalid and cannot be refreshed.\n"
+            "   Run: python refresh_token.py   then update TOKEN_JSON."
+        )
+
+    # Reject access-token-only credentials that cannot support automated refresh
+    if not getattr(creds, "refresh_token", None):
+        raise ValueError(
+            "❌ Missing 'refresh_token' in OAuth credentials.\n"
+            "   Access-token-only credentials cannot be refreshed for automated production runs.\n"
             "   Run: python refresh_token.py   then update TOKEN_JSON."
         )
 

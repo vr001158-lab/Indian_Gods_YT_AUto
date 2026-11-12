@@ -28,7 +28,12 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent))
 
-from publisher.safety   import load_qa_result, validate_qa_for_publishing, PublisherSafetyError
+from publisher.safety   import (
+    load_qa_result,
+    validate_qa_for_publishing,
+    validate_production_environment,
+    PublisherSafetyError,
+)
 from publisher.metadata import build_video_metadata
 from publisher.uploader import publish_video, REQUIRED_PRIVACY
 
@@ -68,6 +73,15 @@ def main() -> int:
     args = parser.parse_args()
 
     _print_banner()
+
+    # ── Step 0: Validate Production Environment & Authorization ─────────────
+    is_env_ok, env_err = validate_production_environment(allow_dry_run=args.dry_run)
+    if not is_env_ok:
+        print(f"\n[BLOCKED] Publisher production safety gate rejected:", file=sys.stderr)
+        print(f"  {env_err}", file=sys.stderr)
+        print(file=sys.stderr)
+        print("APPROVED FOR PUBLISHING: NO", file=sys.stderr)
+        return 1
 
     # ── Step 1: Load and validate QA result ──────────────────────────────────
     print(f"QA file  : {args.qa}")
@@ -127,6 +141,8 @@ def main() -> int:
     try:
         import google_auth_config
         creds = google_auth_config.get_google_credentials()
+        if creds is None:
+            raise ValueError("Credentials object returned from google_auth_config is None")
     except Exception as exc:
         print(f"[BLOCKED] OAuth credentials unavailable: {exc}", file=sys.stderr)
         print("Ensure TOKEN_JSON is configured correctly.", file=sys.stderr)

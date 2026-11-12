@@ -119,6 +119,9 @@ def publish_video(
 
     from .safety import verify_video_with_ffprobe, PublisherSafetyError
 
+    if creds is None:
+        raise PublishError("Publishing blocked: Missing OAuth credentials.")
+
     vp = Path(video_file)
     ct = qa.get("content_type", "short")
     lang = (qa.get("language_code") or qa.get("language") or "te-IN").strip()

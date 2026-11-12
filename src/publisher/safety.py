@@ -36,6 +36,124 @@ class PublisherSafetyError(ValueError):
     """Raised when the QA result fails the publisher safety gate."""
 
 
+def validate_production_environment(
+    allow_dry_run: bool = False,
+    token_file: Path | str | None = None,
+) -> tuple[bool, str]:
+    """
+    Validate that the runtime environment is strictly authorized and configured
+    for live YouTube publishing before any network, OAuth, or upload calls occur.
+
+    Fail-closed rules:
+    1. If allow_dry_run is True, dry-run mode is fully authorized (never uploads).
+    2. In production mode (allow_dry_run=False), explicit production authorization
+       is mandatory via YOUTUBE_PUBLISH_AUTHORIZED, YOUTUBE_PUBLISH, or
+       PRODUCTION_PUBLISH_AUTHORIZED set to a truthy value ('true', '1', 'yes').
+       Missing, empty, or other values fail closed.
+    3. Production mode requires non-empty OAuth credentials:
+       Either TOKEN_JSON environment variable containing valid JSON,
+       or an existing non-empty token.json file containing valid JSON.
+    4. Credential values, tokens, and secrets are NEVER logged, printed, or returned.
+
+    Returns:
+        (is_valid: bool, error_message: str)
+    """
+    if allow_dry_run:
+        return True, ""
+
+    import os
+    auth_val = (
+        os.environ.get("YOUTUBE_PUBLISH_AUTHORIZED")
+        or os.environ.get("YOUTUBE_PUBLISH")
+        or os.environ.get("PRODUCTION_PUBLISH_AUTHORIZED")
+        or ""
+    ).strip().lower()
+
+    if not auth_val:
+        return False, (
+            "Production upload blocked: Explicit production authorization is missing. "
+            "Set YOUTUBE_PUBLISH_AUTHORIZED='true' to authorize live production uploads."
+        )
+
+    if auth_val not in ("true", "1", "yes"):
+        return False, (
+            f"Production upload blocked: Production authorization is disabled or invalid ('{auth_val}'). "
+            "Must be explicitly 'true', '1', or 'yes'."
+        )
+
+    # Validate presence and basic structure of credentials
+    token_env = os.environ.get("TOKEN_JSON", "").strip()
+    tfile = Path(token_file) if token_file is not None else Path("token.json")
+
+    if not token_env and not tfile.exists():
+        return False, (
+            "Production upload blocked: Missing required OAuth credentials. "
+            "Neither TOKEN_JSON environment variable nor token.json file exists."
+        )
+
+    def _validate_oauth_dict(data: dict, source_name: str) -> tuple[bool, str]:
+        if not isinstance(data, dict) or not data:
+            return False, f"Production upload blocked: {source_name} is empty or not a valid JSON object."
+
+        # 1. Require client_id and client_secret
+        if not data.get("client_id") or not str(data["client_id"]).strip():
+            return False, f"Production upload blocked: {source_name} is missing required 'client_id'."
+        if not data.get("client_secret") or not str(data["client_secret"]).strip():
+            return False, f"Production upload blocked: {source_name} is missing required 'client_secret'."
+
+        # 2. Require refresh_token (reject access-token-only credentials)
+        if not data.get("refresh_token") or not str(data["refresh_token"]).strip():
+            return False, (
+                f"Production upload blocked: {source_name} is missing 'refresh_token' required "
+                "for automated production refresh workflow. Access-token-only credentials cannot be refreshed."
+            )
+
+        # 3. Require explicit scopes metadata and YouTube upload scope
+        scopes = data.get("scopes")
+        if scopes is None:
+            return False, f"Production upload blocked: {source_name} is missing required 'scopes' metadata."
+
+        if isinstance(scopes, list):
+            scope_set = set(scopes)
+        elif isinstance(scopes, str):
+            scope_set = set(scopes.split())
+        else:
+            return False, f"Production upload blocked: {source_name} 'scopes' field is invalid."
+
+        if not scope_set:
+            return False, f"Production upload blocked: {source_name} 'scopes' metadata is empty."
+
+        if "https://www.googleapis.com/auth/youtube.upload" not in scope_set:
+            return False, (
+                f"Production upload blocked: {source_name} is missing required upload scope "
+                "'https://www.googleapis.com/auth/youtube.upload'."
+            )
+
+        return True, ""
+
+    if token_env:
+        try:
+            parsed = json.loads(token_env)
+        except Exception:
+            return False, "Production upload blocked: TOKEN_JSON environment variable contains malformed JSON."
+        ok, err = _validate_oauth_dict(parsed, "TOKEN_JSON environment variable")
+        if not ok:
+            return False, err
+
+    if not token_env and tfile.exists():
+        try:
+            if tfile.stat().st_size == 0:
+                return False, "Production upload blocked: token.json file is empty (0 bytes)."
+            parsed = json.loads(tfile.read_text(encoding="utf-8"))
+        except Exception:
+            return False, "Production upload blocked: token.json file contains malformed JSON."
+        ok, err = _validate_oauth_dict(parsed, "token.json file")
+        if not ok:
+            return False, err
+
+    return True, ""
+
+
 def _require(condition: bool, msg: str) -> None:
     if not condition:
         raise PublisherSafetyError(msg)

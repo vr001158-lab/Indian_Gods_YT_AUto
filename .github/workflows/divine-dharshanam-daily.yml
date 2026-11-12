@@ -184,9 +184,19 @@ jobs:
                 ;;
             esac
           fi
-          DRY=""
-          if [ "$DRY_RUN_INPUT" = "true" ]; then
-            DRY="--dry-run"
+          # Authorization policy:
+          # 1. Scheduled production runs are authorized for live publication.
+          # 2. Manual workflow_dispatch is authorized ONLY if dry_run is explicitly 'false'.
+          # 3. All other events, missing inputs, empty inputs, or dry_run=true default to safe --dry-run.
+          DRY="--dry-run"
+          export YOUTUBE_PUBLISH_AUTHORIZED="false"
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            DRY=""
+            export YOUTUBE_PUBLISH_AUTHORIZED="true"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$DRY_RUN_INPUT" = "false" ]; then
+            DRY=""
+            export YOUTUBE_PUBLISH_AUTHORIZED="true"
           fi
           echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG $EXP_TAG $DRY"
           python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT" $EXP_TAG $DRY
