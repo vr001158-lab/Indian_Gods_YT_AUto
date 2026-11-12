@@ -197,7 +197,7 @@ class TestPipelineOrchestrator(unittest.TestCase):
                             with patch.object(PipelineRunner, "run_thumbnail") as mock_thumbnail:
                                 with patch.object(PipelineRunner, "run_qa") as mock_qa:
                                     with patch.object(PipelineRunner, "run_publisher") as mock_pub:
-                                        runner = PipelineRunner(state)
+                                        runner = PipelineRunner(state, dry_run=True)
                                         runner.execute_pipeline()
                                         
                                         # Content and subsequent should be called, but not research/decision
