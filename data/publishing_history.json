@@ -818,5 +818,22 @@
     "kolkata_date": "2026-11-12",
     "video_file_name": "video_short_20261112_064557.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "-WszTfQ2SgY",
+    "topic": "Why Lord Rama Accepted Fourteen Years Exile Without Hesitation",
+    "title": "పద్నాలుగేళ్ల వనవాసాన్ని శ్రీరాముడు ఎందుకు సంతోషంగా స్వీకరించారు?",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 28.96,
+    "published_at": "20261112_075408",
+    "published_at_utc": "2026-11-12T07:54:08.420050+00:00",
+    "published_at_kolkata": "2026-11-12 13:24:08 +0530",
+    "kolkata_date": "2026-11-12",
+    "video_file_name": "video_short_20261112_075345.mp4",
+    "success": true
   }
 ]
