@@ -150,9 +150,16 @@ def _enrich_asset_metadata(meta: dict[str, Any], stem: str, deity_key: str) -> d
         existing_tags.update(matched_entry["semantic_keywords"])
         meta["tags"] = sorted(existing_tags)
     else:
-        meta["avatar"] = deity_key
+        # Detect avatar from stem if present
+        detected_avatar = deity_key
+        for av in ("varaha", "kurma", "vamana", "trivikrama", "narasimha", "krishna", "rama", "matsya", "kalki"):
+            if av in stem_lower:
+                detected_avatar = "vamana_trivikrama" if av in ("vamana", "trivikrama") else av
+                break
+
+        meta["avatar"] = detected_avatar
         meta["narrative_event"] = "general_deity_portrait"
-        meta["scene_description"] = f"Repository visual asset for {deity_key}"
+        meta["scene_description"] = f"Repository visual asset for {deity_key} (avatar={detected_avatar})"
         meta["semantic_keywords"] = meta.get("tags", [])
         meta["aspect_ratio"] = measured_ar
         meta["source"] = "repository_collection"

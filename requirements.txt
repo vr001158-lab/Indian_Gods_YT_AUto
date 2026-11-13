@@ -11,5 +11,6 @@ pocket-tts>=0.1.0
 soundfile>=0.12.1
 sentencepiece>=0.2.0
 tzdata>=2024.1
+requests>=2.31.0
 
 

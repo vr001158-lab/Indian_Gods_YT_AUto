@@ -112,6 +112,10 @@ def _make_visual_scenes(tmp: Path, *, scenes=5, zero_byte=False, corrupt=False):
             "image_file": str(f),
             "style": "cinematic",
             "duration_seconds": 30,
+            "canonical_deity": "lord_shiva",
+            "avatar": None,
+            "verification_status": "DEITY_VERIFIED",
+            "provenance": "Repository collection; visually verified",
         })
     return items
 

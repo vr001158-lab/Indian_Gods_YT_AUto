@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 from typing import Any, Sequence
 
+from src.assets.exceptions import NoMatchingDeityAssetError, DeityIdentityMismatchError
+
 DEITY_ALIASES: dict[str, list[str]] = {
     "lord_shiva": [
         "shiva", "mahadev", "bholenath", "snake", "vasuki", "trishul", "kailash", "somnath", "mahakal", "shivling", "nataraja", "arunachalam", "kedarnath",
@@ -341,10 +343,11 @@ def build_deity_visual_timeline(
     target_duration: float = 45.0,
     content_type: str = "short",
     manifest: dict[str, Any] | None = None,
+    avatar: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Constructs a retention-optimized visual timeline (mixing images & video clips)
-    strictly for `deity_key`.
+    strictly for `deity_key` and `avatar` when specified.
 
     Shorts:
       - target_duration: >=35s and <60s (default 45.0s)
@@ -380,6 +383,22 @@ def build_deity_visual_timeline(
         eligible_images = preferred_images if preferred_images else repo_images
     else:
         eligible_images = repo_images
+
+    # Strict Avatar Isolation
+    if avatar:
+        deity_videos = [
+            v for v in deity_videos
+            if v.get("avatar") == avatar and v.get("verification_status") == "verified_visual"
+        ]
+        eligible_images = [
+            img for img in eligible_images
+            if img.get("avatar") == avatar and img.get("verification_status") == "verified_visual"
+        ]
+        if not deity_videos and not eligible_images:
+            raise NoMatchingDeityAssetError(
+                f"No verified visual assets found for deity '{deity_key}' with avatar '{avatar}'. "
+                f"Refusing to substitute unrelated deity or avatar artwork."
+            )
 
     # When genuine deity images exist on disk but listed videos do not (e.g. sparse checkout),
     # cleanly fall back to the available genuine images on disk.
@@ -433,9 +452,15 @@ def build_deity_visual_timeline(
             "image_file": asset_item["path"],
             "asset_id": asset_item.get("asset_id", f"{deity_key}_{scene_idx}"),
             "deity": deity_key,
+            "canonical_deity": deity_key,
+            "avatar": avatar or asset_item.get("avatar", deity_key),
+            "verification_status": "DEITY_VERIFIED" if (asset_item.get("verification_status") == "verified_visual") else "DEITY_UNVERIFIED",
+            "provenance": asset_item.get("provenance", "repository_collection"),
+            "source_path": asset_item["path"],
+            "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_idx}",
             "duration_seconds": round(seg_dur, 2),
             "source": "repository",
-            "reason_for_selection": f"Visual timeline segment #{scene_idx} ({atype}) for deity '{deity_key}'",
+            "reason_for_selection": f"Visual timeline segment #{scene_idx} ({atype}) for deity '{deity_key}' (avatar={avatar or deity_key})",
             "validation_result": "OK",
         })
 
@@ -451,6 +476,7 @@ def select_scene_assets(
     manifest: dict[str, Any],
     allow_online_fallback: bool = False,
     content_type: str = "short",
+    avatar: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Select scene-aware visual assets for scene_scripts strictly from repository deity assets.
@@ -458,7 +484,8 @@ def select_scene_assets(
       Priority 1: Videos are the primary visual source. Used for majority/all scenes where available.
       Priority 2: Images are secondary source when suitable videos are unavailable or exhausted.
       Priority 3: Strict deity isolation (never borrowing from other deities).
-      Priority 4: Fail closed if deity has no visual assets (no external synthesis in production).
+      Priority 4: Strict avatar isolation (never borrowing from unrelated avatars or generic images).
+      Priority 5: Fail closed if deity has no visual assets (no external synthesis in production).
 
     Returns a list of scene asset decision dicts.
     """
@@ -476,6 +503,22 @@ def select_scene_assets(
         eligible_images = preferred_images if preferred_images else repo_images
     else:
         eligible_images = repo_images
+
+    # Strict Avatar Isolation
+    if avatar:
+        deity_videos = [
+            v for v in deity_videos
+            if v.get("avatar") == avatar and v.get("verification_status") == "verified_visual"
+        ]
+        eligible_images = [
+            img for img in eligible_images
+            if img.get("avatar") == avatar and img.get("verification_status") == "verified_visual"
+        ]
+        if not deity_videos and not eligible_images:
+            raise NoMatchingDeityAssetError(
+                f"No verified visual assets found for deity '{deity_key}' with avatar '{avatar}'. "
+                f"Refusing to substitute unrelated deity or avatar artwork."
+            )
 
     # When genuine deity images exist on disk but listed videos do not (e.g. sparse checkout),
     # cleanly fall back to the available genuine images on disk.
@@ -674,6 +717,12 @@ def select_scene_assets(
             "asset": selected_asset["path"],
             "asset_id": selected_asset.get("asset_id", ""),
             "deity": deity_key,
+            "canonical_deity": deity_key,
+            "avatar": avatar or selected_asset.get("avatar", deity_key),
+            "verification_status": "DEITY_VERIFIED" if (selected_asset.get("verification_status") == "verified_visual") else "DEITY_UNVERIFIED",
+            "provenance": selected_asset.get("provenance", "repository_collection"),
+            "source_path": selected_asset.get("path"),
+            "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_num}",
             "source": selection_source,
             "reason_for_selection": selection_reason,
             "semantic_confidence": semantic_confidence,
@@ -692,6 +741,7 @@ def select_landscape_scene_assets(
     scene_scripts: list[dict[str, Any]],
     manifest: dict[str, Any] | None = None,
     gods_dir: str | Path = "assets/gods_landscape_long_video",
+    avatar: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Select scene-aware landscape assets strictly from `assets/gods_landscape_long_video/<deity_key>/`
@@ -700,7 +750,8 @@ def select_landscape_scene_assets(
       Priority 1: Landscape videos (width >= height) are primary source.
       Priority 2: Landscape images (width >= height) when videos are unavailable or exhausted.
       Priority 3: Strict deity isolation.
-      Priority 4: Reject portrait assets.
+      Priority 4: Strict avatar isolation when avatar is specified.
+      Priority 5: Reject portrait assets.
     """
     if manifest is None:
         from src.assets.manifest import load_landscape_asset_manifest
@@ -710,6 +761,23 @@ def select_landscape_scene_assets(
     target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
     repo_images = [img for img in target_deity_assets.get("images", []) if is_matching_orientation(img, "long")]
     repo_videos = [vid for vid in target_deity_assets.get("videos", []) if is_matching_orientation(vid, "long")]
+
+    # Strict avatar isolation
+    if avatar:
+        repo_images = [
+            img for img in repo_images
+            if img.get("avatar") == avatar and img.get("verification_status") == "verified_visual"
+        ]
+        repo_videos = [
+            vid for vid in repo_videos
+            if vid.get("avatar") == avatar and vid.get("verification_status") == "verified_visual"
+        ]
+        if not repo_images and not repo_videos:
+            folder_path = Path(gods_dir) / deity_key
+            raise NoMatchingDeityAssetError(
+                f"No valid landscape visual assets found for deity '{deity_key}' with avatar '{avatar}' in {folder_path}. "
+                f"Refusing to substitute unrelated deity or avatar artwork."
+            )
 
     if not repo_images and not repo_videos:
         folder_path = Path(gods_dir) / deity_key
@@ -881,6 +949,12 @@ def select_landscape_scene_assets(
             "asset": selected_asset["path"],
             "asset_id": selected_asset.get("asset_id", ""),
             "deity": deity_key,
+            "canonical_deity": deity_key,
+            "avatar": avatar or selected_asset.get("avatar", deity_key),
+            "verification_status": "DEITY_VERIFIED" if (selected_asset.get("verification_status") == "verified_visual") else "DEITY_UNVERIFIED",
+            "provenance": selected_asset.get("provenance", "repository_collection"),
+            "source_path": selected_asset.get("path"),
+            "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_num}",
             "source": "landscape_repository",
             "reason_for_selection": selection_reason,
             "semantic_confidence": semantic_confidence,
@@ -901,6 +975,7 @@ def build_landscape_visual_timeline(
     target_duration: float = 180.0,
     manifest: dict[str, Any] | None = None,
     gods_dir: str | Path = "assets/gods_landscape_long_video",
+    avatar: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     Constructs a visual timeline (mixing landscape images & landscape video clips)
@@ -916,6 +991,23 @@ def build_landscape_visual_timeline(
     target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
     repo_images = [img for img in target_deity_assets.get("images", []) if is_matching_orientation(img, "long")]
     repo_videos = [vid for vid in target_deity_assets.get("videos", []) if is_matching_orientation(vid, "long")]
+
+    # Strict avatar isolation
+    if avatar:
+        repo_images = [
+            img for img in repo_images
+            if img.get("avatar") == avatar and img.get("verification_status") == "verified_visual"
+        ]
+        repo_videos = [
+            vid for vid in repo_videos
+            if vid.get("avatar") == avatar and vid.get("verification_status") == "verified_visual"
+        ]
+        if not repo_images and not repo_videos:
+            folder_path = Path(gods_dir) / deity_key
+            raise NoMatchingDeityAssetError(
+                f"No valid landscape visual assets found for deity '{deity_key}' with avatar '{avatar}' in {folder_path}. "
+                f"Refusing to substitute unrelated deity or avatar artwork."
+            )
 
     if not repo_images and not repo_videos:
         folder_path = Path(gods_dir) / deity_key
@@ -971,9 +1063,15 @@ def build_landscape_visual_timeline(
             "image_file": asset_item["path"],
             "asset_id": asset_item.get("asset_id", f"{deity_key}_{scene_idx}"),
             "deity": deity_key,
+            "canonical_deity": deity_key,
+            "avatar": avatar or asset_item.get("avatar", deity_key),
+            "verification_status": "DEITY_VERIFIED" if (asset_item.get("verification_status") == "verified_visual") else "DEITY_UNVERIFIED",
+            "provenance": asset_item.get("provenance", "repository_collection"),
+            "source_path": asset_item["path"],
+            "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_idx}",
             "duration_seconds": round(seg_dur, 2),
             "source": "landscape_repository",
-            "reason_for_selection": f"Landscape segment #{scene_idx} ({atype}) for deity '{deity_key}'",
+            "reason_for_selection": f"Landscape segment #{scene_idx} ({atype}) for deity '{deity_key}' (avatar={avatar or deity_key})",
             "validation_result": "OK",
             "width": asset_item.get("width"),
             "height": asset_item.get("height"),

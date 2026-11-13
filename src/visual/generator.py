@@ -52,10 +52,10 @@ def _extract_video_frame(video_path: Path, output_frame_path: Path) -> bool:
     return False
 
 
-def _find_genuine_deity_image(deity_key: str, scene_num: int = 1, content_type: str = "short") -> Path | None:
+def _find_genuine_deity_image(deity_key: str, scene_num: int = 1, content_type: str = "short", avatar: str | None = None) -> Path | None:
     """
     Finds an existing genuine repository deity image on disk to serve as normal image fallback.
-    Strictly preserves deity isolation (only from the same deity directory).
+    Strictly preserves deity and avatar isolation (only from the same deity directory and matching avatar).
     """
     if not deity_key:
         return None
@@ -73,6 +73,13 @@ def _find_genuine_deity_image(deity_key: str, scene_num: int = 1, content_type: 
 
     if not candidates:
         return None
+
+    if avatar:
+        # Strict avatar isolation: only keep candidate files matching the avatar
+        avatar_cands = [p for p in candidates if avatar.lower() in p.stem.lower()]
+        if not avatar_cands:
+            return None
+        candidates = avatar_cands
 
     candidates.sort(key=lambda p: p.name)
     idx = (scene_num - 1) % len(candidates)
@@ -157,7 +164,8 @@ def generate_visual_mapping(
                     # If an existing genuine deity-specific image is available, use normal image fallback.
                     # Otherwise fail the scene safely.
                     deity = scene_item.get("deity") or ""
-                    fallback_img = _find_genuine_deity_image(deity, scene_num=scene_num, content_type=content_type or "short")
+                    avatar = scene_item.get("avatar")
+                    fallback_img = _find_genuine_deity_image(deity, scene_num=scene_num, content_type=content_type or "short", avatar=avatar)
                     if fallback_img and fallback_img.exists() and fallback_img.stat().st_size > 0:
                         image_file_str = str(fallback_img.absolute()).replace("\\", "/")
                         video_file_str = None
@@ -165,7 +173,7 @@ def generate_visual_mapping(
                     else:
                         raise RuntimeError(
                             f"FFmpeg frame extraction failed for video asset: {asset_path} "
-                            f"and no genuine fallback image exists for deity '{deity}'"
+                            f"and no genuine fallback image exists for deity '{deity}' (avatar='{avatar}')"
                         )
             else:
                 image_file_str = str(Path(asset_path).absolute()).replace("\\", "/")
@@ -198,6 +206,12 @@ def generate_visual_mapping(
             "source": source,
             "style": style_preset,
             "duration_seconds": duration,
+            "canonical_deity": scene_item.get("canonical_deity", asset_plan.get("deity")),
+            "avatar": scene_item.get("avatar", asset_plan.get("avatar")),
+            "verification_status": scene_item.get("verification_status", "DEITY_UNVERIFIED"),
+            "provenance": scene_item.get("provenance", source),
+            "source_path": scene_item.get("source_path", asset_path),
+            "scene_identity": scene_item.get("scene_identity", f"{asset_plan.get('deity')}:{asset_plan.get('avatar') or asset_plan.get('deity')}:scene_{scene_num}"),
         })
 
     # 3. Assemble final visual map
@@ -209,6 +223,8 @@ def generate_visual_mapping(
         "style_preset": style_preset,
         "provider": provider_name,
         "asset_plan_path": asset_plan.get("_asset_plan_path", ""),
+        "canonical_deity": asset_plan.get("deity"),
+        "avatar": asset_plan.get("avatar"),
         "visual_scenes": visual_scenes,
         "approval_metadata": script["approval_metadata"],
     }

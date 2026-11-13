@@ -27,7 +27,9 @@ def create_scene_asset_plan(
     """
     topic = script.get("title") or script.get("approval_metadata", {}).get("selected_topic", "")
     deity_hint = script.get("approval_metadata", {}).get("deity") or script.get("deity", "")
-    deity = resolve_deity(topic, deity_hint=deity_hint)
+    from src.thumbnail.asset_index import resolve_deity_and_avatar
+    res_deity, avatar = resolve_deity_and_avatar(f"{topic} {deity_hint}")
+    deity = res_deity or resolve_deity(topic, deity_hint=deity_hint)
 
     scene_scripts = script.get("scene_scripts", [])
     content_type = (script.get("content_type") or "short").lower()
@@ -48,6 +50,7 @@ def create_scene_asset_plan(
                 target_duration=target_dur,
                 manifest=manifest,
                 gods_dir=landscape_dir,
+                avatar=avatar,
             )
         else:
             scene_decisions = select_landscape_scene_assets(
@@ -55,6 +58,7 @@ def create_scene_asset_plan(
                 scene_scripts=scene_scripts,
                 manifest=manifest,
                 gods_dir=landscape_dir,
+                avatar=avatar,
             )
     else:
         manifest = load_asset_manifest(manifest_path=manifest_path, gods_dir=gods_dir)
@@ -70,6 +74,7 @@ def create_scene_asset_plan(
                 target_duration=target_dur,
                 content_type=content_type,
                 manifest=manifest,
+                avatar=avatar,
             )
         else:
             scene_decisions = select_scene_assets(
@@ -78,11 +83,14 @@ def create_scene_asset_plan(
                 manifest=manifest,
                 allow_online_fallback=False,
                 content_type=content_type,
+                avatar=avatar,
             )
 
     asset_plan = {
         "topic": topic,
         "deity": deity,
+        "canonical_deity": deity,
+        "avatar": avatar,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "approval_metadata": script.get("approval_metadata", {}),
         "scenes": scene_decisions,

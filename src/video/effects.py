@@ -104,6 +104,17 @@ def resolve_caption_font(
             return str(p.resolve()).replace("\\", "/")
         raise FileNotFoundError(f"Configured font environment variable path does not exist: {env_override}")
 
+    # 2.5 Bundled repository fonts (cross-platform, deterministic)
+    if lang == "te-IN":
+        for bf in (
+            "assets/fonts/NotoSansTelugu-Variable.ttf",
+            "assets/fonts/NotoSansTelugu-Bold.ttf",
+            "assets/fonts/NotoSansTelugu-Regular.ttf",
+        ):
+            p = Path(bf)
+            if p.exists() and p.is_file():
+                return str(p.resolve()).replace("\\", "/")
+
     # 3. System font candidates (platform-specific)
     candidates: list[str] = []
 

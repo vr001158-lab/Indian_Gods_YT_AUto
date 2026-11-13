@@ -20,6 +20,7 @@ from .artifacts import PipelineArtifacts, discover_artifacts
 from .checks import (
     check_audio_map,
     check_decision_approval,
+    check_deity_identity_consistency,
     check_format_consistency,
     check_json_file,
     check_language_consistency,
@@ -279,6 +280,17 @@ class FinalQAGate:
             arts.script, arts.audio_map, arts.visual_map, arts.video_map
         )
         result.record("scene_sync", ok, detail)
+
+        # ── Step 10b: Deity Identity Consistency Gate ────────────────────
+        ok, detail = check_deity_identity_consistency(
+            arts.decision,
+            arts.script,
+            arts.visual_map,
+            arts.video_map,
+            arts.thumbnail_meta,
+            allow_mock=self._allow_mock,
+        )
+        result.record("deity_identity_consistency", ok, detail)
 
         # ── Step 11: Populate metadata from decision ───────────────────────
         decision = arts.decision

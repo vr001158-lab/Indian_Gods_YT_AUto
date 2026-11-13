@@ -715,3 +715,197 @@ def check_scene_sync(
         return False, f"Duplicate scene numbers detected: {script_scenes}"
 
     return True, "OK"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Deity & Avatar Identity Consistency Gate
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _is_trusted_approved_asset(
+    img_path: str,
+    deity: str,
+    avatar: str | None = None,
+    allow_mock: bool = False,
+) -> tuple[bool, str]:
+    """
+    Checks whether an asset is backed by an explicit trusted asset approval record,
+    ensuring that caller-assigned metadata cannot bypass the guard.
+    Approval records are derived strictly from:
+      1. KNOWN_NARRATIVE_METADATA in src.assets.scanner
+      2. DeityAssetIndex where approval_status == "APPROVED" and integrity_status == "VALID"
+    """
+    if not img_path or not str(img_path).strip():
+        return False, "Asset path is empty"
+
+    norm_path = img_path.replace("\\", "/").lower().strip()
+    stem = Path(norm_path).stem.lower()
+
+    # 1. Match against canonical narrative-specific verified assets catalog
+    from src.assets.scanner import KNOWN_NARRATIVE_METADATA
+    for pattern_key, entry in KNOWN_NARRATIVE_METADATA.items():
+        p_clean = pattern_key.lower().replace(" ", "_")
+        stem_clean = stem.replace(" ", "_")
+        if p_clean in stem_clean or pattern_key.lower() in stem:
+            if entry.get("verification_status") != "verified_visual":
+                return False, f"Entry '{pattern_key}' in KNOWN_NARRATIVE_METADATA is not verified_visual"
+            cat_av = entry.get("avatar")
+            if avatar and cat_av and cat_av.lower() != avatar.lower():
+                return False, f"Catalog record avatar '{cat_av}' does not match requested avatar '{avatar}'"
+            return True, "Approved via KNOWN_NARRATIVE_METADATA"
+
+    # 2. Match against DeityAssetIndex approved records
+    from src.thumbnail.asset_index import DeityAssetIndex
+    index = DeityAssetIndex()
+    for rec in index.records:
+        rec_norm = rec.file_path.replace("\\", "/").lower()
+        if rec_norm == norm_path or norm_path.endswith(rec_norm) or rec_norm.endswith(norm_path):
+            if rec.approval_status != "APPROVED":
+                return False, f"Asset is recorded with approval status '{rec.approval_status}' in DeityAssetIndex"
+            if rec.integrity_status != "VALID":
+                return False, f"Asset has integrity status '{rec.integrity_status}' in DeityAssetIndex"
+            if avatar and rec.avatar and rec.avatar.lower() != avatar.lower():
+                return False, f"Asset in index has avatar '{rec.avatar}', expected '{avatar}'"
+            return True, "Approved via DeityAssetIndex"
+
+    # 3. If file path is in assets/gods or assets/gods_landscape_long_video, it MUST have matched above
+    if "assets/gods" in norm_path or "assets/gods_landscape_long_video" in norm_path:
+        return False, f"Asset '{img_path}' is in repository collection but lacks an explicit trusted approval record"
+
+    # 4. If mock is explicitly allowed (e.g. for mock tests outside assets/gods)
+    if allow_mock:
+        return True, "Allowed via mock override for test fixtures outside repository assets"
+
+    # Fail closed for any unreviewed or unverified asset
+    return False, f"Asset '{img_path}' lacks an explicit trusted asset approval record in repository catalog"
+
+
+def check_deity_identity_consistency(
+    decision: dict | None,
+    script: dict | None,
+    visual_map: dict | None,
+    video_map: dict | None,
+    thumbnail_meta: dict | None,
+    allow_mock: bool = False,
+) -> tuple[bool, str]:
+    """
+    Enforces strict deity and avatar identity consistency across video scenes and thumbnail.
+    Fails closed if:
+      - Any scene uses an unrelated deity or mismatched avatar.
+      - Any scene has missing canonical deity or missing avatar when topic requires an avatar.
+      - Any scene has missing, unverified, unapproved, or rejected verification status.
+      - Any scene has missing or invalid asset provenance.
+      - Any scene asset lacks an explicit trusted asset approval record (cannot bypass via metadata).
+      - The thumbnail depicts a different deity or avatar from the video topic.
+    """
+    try:
+        topic = ""
+        deity_hint = ""
+        if decision:
+            topic = decision.get("selected_topic") or ""
+            deity_hint = decision.get("deity") or ""
+        if not topic and script:
+            topic = script.get("title") or ""
+            deity_hint = deity_hint or (script.get("approval_metadata") or {}).get("deity") or ""
+
+        from src.thumbnail.asset_index import resolve_deity_and_avatar
+        expected_deity, expected_avatar = resolve_deity_and_avatar(f"{topic} {deity_hint}")
+
+        if not expected_deity and not expected_avatar:
+            return False, f"Could not resolve canonical deity/avatar identity for topic '{topic}'"
+
+        # 1. Check visual scenes
+        if visual_map:
+            scenes = visual_map.get("visual_scenes", [])
+            if not scenes:
+                return False, "Visual map contains no visual scenes"
+
+            for sc in scenes:
+                sc_num = sc.get("scene", "?")
+                sc_deity = sc.get("canonical_deity") or sc.get("deity")
+                sc_avatar = sc.get("avatar")
+                sc_img = str(sc.get("image_file") or sc.get("source_path") or "").strip()
+                stem = Path(sc_img.lower()).stem
+
+                # 1a. Canonical deity must be present and match
+                if not sc_deity or not str(sc_deity).strip():
+                    return False, f"Scene #{sc_num} missing canonical_deity metadata"
+                if expected_deity and str(sc_deity).strip().lower() != expected_deity.lower():
+                    return False, f"Scene #{sc_num} deity mismatch: topic is '{expected_deity}', but scene is '{sc_deity}'"
+
+                # 1b. Avatar must be present and match when topic requires an avatar
+                if expected_avatar:
+                    if not sc_avatar or not str(sc_avatar).strip():
+                        return False, f"Scene #{sc_num} missing required avatar metadata for avatar-specific topic '{expected_avatar}'"
+                    if str(sc_avatar).strip().lower() != expected_avatar.lower():
+                        return False, f"Scene #{sc_num} identity mismatch: topic is avatar '{expected_avatar}', but scene is avatar '{sc_avatar}'"
+                    for other_av in ("kurma", "narasimha", "krishna", "vamana", "trivikrama", "matsya", "varaha", "parashurama", "kalki"):
+                        if other_av != expected_avatar and other_av in stem:
+                            return False, f"Scene #{sc_num} asset mismatch: file '{sc_img}' depicts '{other_av}', but topic is '{expected_avatar}'"
+
+                # 1c. Verification status must be present and explicitly verified
+                sc_ver = sc.get("verification_status")
+                if not sc_ver or not str(sc_ver).strip():
+                    return False, f"Scene #{sc_num} missing verification_status metadata"
+                sc_ver_str = str(sc_ver).strip().upper()
+                if sc_ver_str in ("DEITY_MISMATCH", "DEITY_UNVERIFIED", "UNAPPROVED", "UNVERIFIED", "REJECTED"):
+                    return False, f"Scene #{sc_num} has rejected or unverified status: '{sc_ver}'"
+                if sc_ver_str not in ("DEITY_VERIFIED", "VERIFIED_VISUAL", "VERIFIED"):
+                    return False, f"Scene #{sc_num} verification status '{sc_ver}' is not recognized as verified"
+
+                sc_id = sc.get("identity_status")
+                if sc_id:
+                    sc_id_str = str(sc_id).strip().upper()
+                    if sc_id_str in ("DEITY_MISMATCH", "DEITY_UNVERIFIED", "UNAPPROVED", "REJECTED"):
+                        return False, f"Scene #{sc_num} has rejected identity status: '{sc_id}'"
+
+                # 1d. Provenance must be non-empty and valid
+                sc_prov = sc.get("provenance")
+                if not sc_prov or not str(sc_prov).strip() or str(sc_prov).strip().lower() in ("unverified", "unknown", "none"):
+                    return False, f"Scene #{sc_num} missing or invalid asset provenance"
+
+                # 1e. Anti-Bypass Guard: Verify asset is backed by trusted approval records
+                trusted_ok, trusted_detail = _is_trusted_approved_asset(
+                    img_path=sc_img,
+                    deity=expected_deity or str(sc_deity).strip().lower(),
+                    avatar=expected_avatar,
+                    allow_mock=allow_mock,
+                )
+                if not trusted_ok:
+                    return False, f"Scene #{sc_num} asset '{sc_img}' failed approval verification: {trusted_detail}"
+
+        # 2. Check thumbnail
+        if thumbnail_meta:
+            sel_asset = thumbnail_meta.get("selected_asset")
+            if sel_asset and isinstance(sel_asset, dict):
+                thumb_avatar = sel_asset.get("avatar")
+                thumb_deity = sel_asset.get("deity") or sel_asset.get("canonical_deity")
+                thumb_src = str(sel_asset.get("source_path") or "").replace("\\", "/").lower()
+                thumb_ver = sel_asset.get("verification_status")
+
+                if expected_deity and thumb_deity and str(thumb_deity).strip().lower() != expected_deity.lower():
+                    return False, f"Thumbnail deity mismatch: video topic is '{expected_deity}', but thumbnail deity is '{thumb_deity}'"
+
+                if expected_avatar:
+                    if not thumb_avatar or str(thumb_avatar).strip().lower() != expected_avatar.lower():
+                        return False, f"Thumbnail avatar mismatch: video topic is '{expected_avatar}', but thumbnail uses avatar '{thumb_avatar}'"
+                    for other_av in ("kurma", "narasimha", "krishna", "vamana", "trivikrama", "matsya", "varaha", "parashurama", "kalki"):
+                        if other_av != expected_avatar and other_av in Path(thumb_src).stem.lower():
+                            return False, f"Thumbnail asset mismatch: file '{thumb_src}' depicts '{other_av}', but video topic is '{expected_avatar}'"
+
+                if thumb_ver:
+                    thumb_ver_str = str(thumb_ver).strip().upper()
+                    if thumb_ver_str in ("DEITY_MISMATCH", "DEITY_UNVERIFIED", "UNAPPROVED", "REJECTED", "UNVERIFIED"):
+                        return False, f"Thumbnail asset has rejected or unverified status: {thumb_ver}"
+
+            # Check thumbnail title/topic consistency with expected deity & avatar
+            thumb_topic = thumbnail_meta.get("topic") or thumbnail_meta.get("title") or ""
+            if thumb_topic:
+                t_deity, t_avatar = resolve_deity_and_avatar(thumb_topic)
+                if expected_avatar and t_avatar and t_avatar != expected_avatar:
+                    return False, f"Thumbnail topic avatar mismatch: expected '{expected_avatar}', found '{t_avatar}' in '{thumb_topic}'"
+                if expected_deity and t_deity and t_deity != expected_deity:
+                    return False, f"Thumbnail topic deity mismatch: expected '{expected_deity}', found '{t_deity}' in '{thumb_topic}'"
+
+        return True, "OK"
+    except Exception as exc:
+        return False, f"Deity identity check failed with exception: {exc}"
