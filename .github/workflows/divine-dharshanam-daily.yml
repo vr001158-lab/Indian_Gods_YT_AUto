@@ -209,5 +209,9 @@ jobs:
           git checkout -- data/visuals/asset_plan_20260814_071510.json || true
           git checkout -- assets/music/music_manifest.json || true
           git add data/publishing_history.json
-          git diff-index --quiet HEAD || git commit -m "auto(publishing): update publishing_history.json [skip ci]"
-          git push || true
+          if git diff --cached --quiet; then
+            echo "No publishing history changes to persist."
+          else
+            git commit -m "auto(publishing): update publishing_history.json [skip ci]"
+            git push
+          fi
