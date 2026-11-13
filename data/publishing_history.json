@@ -835,5 +835,22 @@
     "kolkata_date": "2026-11-12",
     "video_file_name": "video_short_20261112_075345.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "wfXyBFsjQrg",
+    "topic": "The Secret of Varaha Avatar Rescuing Mother Earth",
+    "title": "వరాహ అవతార రహస్యం: భూదేవిని శ్రీమన్నారాయణుడు ఎలా రక్షించారు?",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 29.44,
+    "published_at": "20261113_073024",
+    "published_at_utc": "2026-11-13T07:30:24.555131+00:00",
+    "published_at_kolkata": "2026-11-13 13:00:24 +0530",
+    "kolkata_date": "2026-11-13",
+    "video_file_name": "video_short_20261113_072958.mp4",
+    "success": true
   }
 ]
