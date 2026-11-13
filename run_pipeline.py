@@ -30,6 +30,7 @@ from src.pipeline.logger import PipelineLogger
 def main():
     resume_id = None
     dry_run = False
+    render_only = False
     content_type = "short"
     format_type = "narrated"
     experiment_tag = None
@@ -44,6 +45,9 @@ def main():
             i += 2
         elif args[i] == "--dry-run":
             dry_run = True
+            i += 1
+        elif args[i] == "--render-only":
+            render_only = True
             i += 1
         elif args[i] in ("--language", "-l") and i + 1 < len(args):
             language_code = args[i + 1].strip()
@@ -68,8 +72,27 @@ def main():
             i += 2
         else:
             print(f"❌ Unknown argument: {args[i]}", file=sys.stderr)
-            print("Usage: python run_pipeline.py [--language hi-IN|te-IN] [--content-type short|long] [--format narrated|old] [--experiment-tag TAG] [--resume PIPELINE_ID] [--dry-run]", file=sys.stderr)
+            print("Usage: python run_pipeline.py [--language te-IN] [--content-type short|long] [--format narrated|old] [--experiment-tag TAG] [--resume PIPELINE_ID] [--dry-run] [--render-only]", file=sys.stderr)
             sys.exit(1)
+
+    if dry_run and render_only:
+        print("❌ Cannot combine --dry-run (mock providers) with --render-only (real media providers). Choose one.", file=sys.stderr)
+        sys.exit(1)
+
+    if render_only:
+        if language_code != "te-IN":
+            print(f"❌ Render-only mode strictly requires Telugu ('te-IN'). Received: '{language_code}'", file=sys.stderr)
+            sys.exit(1)
+        if content_type != "short":
+            print(f"❌ Render-only mode strictly requires content_type='short'. Received: '{content_type}'", file=sys.stderr)
+            sys.exit(1)
+        if format_type != "narrated":
+            print(f"❌ Render-only mode strictly requires format='narrated'. Received: '{format_type}'", file=sys.stderr)
+            sys.exit(1)
+        # Enforce fail-closed safety flags in the environment
+        os.environ["RENDER_ONLY"] = "true"
+        os.environ["YOUTUBE_PUBLISH_AUTHORIZED"] = "false"
+        os.environ["YOUTUBE_PUBLISH"] = "false"
 
     if language_code != "te-IN":
         print(f"❌ Production pipeline supports Telugu ('te-IN') only. Received: '{language_code}'", file=sys.stderr)
@@ -82,12 +105,19 @@ def main():
             state = PipelineState.load(resume_id)
             format_type = getattr(state, "format", format_type)
             language_code = getattr(state, "language_code", language_code)
+            render_only = getattr(state, "render_only", render_only)
             if experiment_tag:
                 state.experiment_tag = experiment_tag
             PipelineLogger.info(f"Resuming from current stage: {state.current_stage}")
         else:
-            state = PipelineState(format=format_type, experiment_tag=experiment_tag, language_code=language_code)
-            PipelineLogger.info(f"Initialized new pipeline run: {state.pipeline_id} ({language_code}, {content_type.upper()}, {format_type.upper()})")
+            state = PipelineState(
+                format=format_type,
+                experiment_tag=experiment_tag,
+                language_code=language_code,
+                render_only=render_only,
+            )
+            mode_str = "RENDER_ONLY" if render_only else ("DRY_RUN" if dry_run else "PRODUCTION")
+            PipelineLogger.info(f"Initialized new pipeline run: {state.pipeline_id} ({language_code}, {content_type.upper()}, {format_type.upper()}, {mode_str})")
     except FileNotFoundError as e:
         PipelineLogger.error(str(e))
         sys.exit(1)
@@ -101,6 +131,7 @@ def main():
             format=format_type,
             experiment_tag=experiment_tag,
             language_code=language_code,
+            render_only=render_only,
         )
         runner.execute_pipeline()
     except Exception as e:

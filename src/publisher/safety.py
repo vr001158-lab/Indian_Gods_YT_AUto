@@ -58,10 +58,12 @@ def validate_production_environment(
     Returns:
         (is_valid: bool, error_message: str)
     """
+    import os
+    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+        return False, "Production upload blocked: RENDER_ONLY mode is active. Live publishing is strictly forbidden."
+
     if allow_dry_run:
         return True, ""
-
-    import os
     auth_val = (
         os.environ.get("YOUTUBE_PUBLISH_AUTHORIZED")
         or os.environ.get("YOUTUBE_PUBLISH")

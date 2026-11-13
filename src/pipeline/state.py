@@ -21,6 +21,22 @@ STAGES = [
     "UPLOAD_READY",
 ]
 
+RENDER_ONLY_STAGES = [
+    "RESEARCH",
+    "DECISION",
+    "CONTENT",
+    "SCRIPT",
+    "VOICE",
+    "VISUAL",
+    "VIDEO",
+    "THUMBNAIL",
+    "QA",
+    "RENDER_PACKAGING",
+    "RENDER_COMPLETE",
+]
+
+ALL_VALID_STAGES = set(STAGES) | set(RENDER_ONLY_STAGES)
+
 
 class PipelineState:
     """Manages tracking, persistence, and loading of pipeline state."""
@@ -31,11 +47,13 @@ class PipelineState:
         format: str = "narrated",
         experiment_tag: str | None = None,
         language_code: str | None = None,
+        render_only: bool = False,
     ):
         fmt_suffix = "OLD" if (format or "").lower() == "old" else "NARRATED"
         self.format = (format or "narrated").lower()
         self.experiment_tag = experiment_tag
         self.language_code = language_code
+        self.render_only = render_only
         self.pipeline_id = pipeline_id or f"run_{time.strftime('%Y%m%d_%H%M%S')}_{fmt_suffix}"
         self.current_stage = "RESEARCH"
         self.completed_stages = []
@@ -43,21 +61,32 @@ class PipelineState:
         self.outputs = {}
         self.timestamp = time.time()
 
-    def update_stage(self, stage: str, status: str = "IN_PROGRESS"):
+    def update_stage(self, stage: str, status: str = "IN_PROGRESS", next_stage: str | None = None):
         """Updates current_stage parameters."""
-        if stage not in STAGES:
+        if stage not in ALL_VALID_STAGES:
             raise ValueError(f"Invalid stage name: {stage}")
+
+        stage_list = RENDER_ONLY_STAGES if self.render_only else STAGES
+        terminal_stage = "RENDER_COMPLETE" if self.render_only else "UPLOAD_READY"
 
         if status == "COMPLETED":
             if stage not in self.completed_stages:
                 self.completed_stages.append(stage)
             self.failed_stage = None
-            # Move to next stage if available
-            idx = STAGES.index(stage)
-            if idx + 1 < len(STAGES):
-                self.current_stage = STAGES[idx + 1]
+            if next_stage:
+                self.current_stage = next_stage
+            elif stage in (terminal_stage, "UPLOAD_READY", "RENDER_COMPLETE"):
+                self.current_stage = terminal_stage
             else:
-                self.current_stage = "UPLOAD_READY"
+                idx = stage_list.index(stage) if stage in stage_list else -1
+                if idx != -1 and idx + 1 < len(stage_list):
+                    self.current_stage = stage_list[idx + 1]
+                else:
+                    self.current_stage = terminal_stage
+                if idx + 1 < len(STAGES):
+                    self.current_stage = STAGES[idx + 1]
+                else:
+                    self.current_stage = "UPLOAD_READY"
         elif status == "FAILED":
             self.failed_stage = stage
             self.current_stage = stage
@@ -85,6 +114,7 @@ class PipelineState:
             "format":           self.format,
             "language_code":    self.language_code,
             "experiment_tag":   self.experiment_tag,
+            "render_only":      getattr(self, "render_only", False),
             "current_stage":     self.current_stage,
             "completed_stages":  self.completed_stages,
             "failed_stage":      self.failed_stage,
@@ -109,6 +139,7 @@ class PipelineState:
             format=data.get("format", "narrated"),
             experiment_tag=data.get("experiment_tag"),
             language_code=data.get("language_code"),
+            render_only=data.get("render_only", False),
         )
         state.current_stage = data["current_stage"]
         state.completed_stages = data["completed_stages"]

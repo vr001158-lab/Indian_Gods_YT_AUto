@@ -37,6 +37,14 @@ on:
         required: true
         default: true
         type: boolean
+      execution_mode:
+        description: 'Execution Mode (dry_run: offline mock validation | render_only: real media render without publishing)'
+        required: false
+        default: 'dry_run'
+        type: choice
+        options:
+          - dry_run
+          - render_only
       privacy_status:
         description: 'YouTube Privacy Status (unlisted / private for test runs | public for production)'
         required: true
@@ -147,59 +155,73 @@ jobs:
           CONTENT_TYPE_INPUT: ${{ inputs.content_type }}
           FORMAT_INPUT: ${{ inputs.format }}
           DRY_RUN_INPUT: ${{ inputs.dry_run }}
+          EXECUTION_MODE_INPUT: ${{ inputs.execution_mode }}
           PRIVACY_STATUS_INPUT: ${{ inputs.privacy_status }}
           SCHEDULE_CRON: ${{ github.event.schedule }}
         run: |
-          CT="${CONTENT_TYPE_INPUT:-short}"
-          FMT="narrated"
-          LANG="te-IN"
-          EXP_TAG=""
-          PRIVACY="public"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            PRIVACY="${PRIVACY_STATUS_INPUT:-unlisted}"
-          fi
-          export YOUTUBE_PRIVACY_STATUS="$PRIVACY"
-          echo "🔒 YouTube Privacy Status: $YOUTUBE_PRIVACY_STATUS"
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            case "$SCHEDULE_CRON" in
-              "0 1 * * *")
-                CT="short"
-                FMT="narrated"
-                LANG="te-IN"
-                ;;
-              "0 13 * * *")
-                CT="short"
-                FMT="narrated"
-                LANG="te-IN"
-                ;;
-              "0 6 */3 * *")
-                CT="long"
-                FMT="narrated"
-                LANG="te-IN"
-                ;;
-              *)
-                CT="short"
-                FMT="narrated"
-                LANG="te-IN"
-                ;;
-            esac
-          fi
-          # Authorization policy:
-          # 1. Scheduled production runs are authorized for live publication.
-          # 2. Manual workflow_dispatch is authorized ONLY if dry_run is explicitly 'false'.
-          # 3. All other events, missing inputs, empty inputs, or dry_run=true default to safe --dry-run.
-          DRY="--dry-run"
-          export YOUTUBE_PUBLISH_AUTHORIZED="false"
+          EXEC_MODE="${EXECUTION_MODE_INPUT:-dry_run}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$EXEC_MODE" = "render_only" ]; then
+            echo "🎬 [RENDER ONLY] Real media render mode selected. Enforcing strict publishing safety policy..."
+            CT="short"
+            FMT="narrated"
+            LANG="te-IN"
+            export YOUTUBE_PUBLISH_AUTHORIZED="false"
+            export RENDER_ONLY="true"
+            echo "🔒 YouTube publishing authorization forced to: $YOUTUBE_PUBLISH_AUTHORIZED"
+            echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG --render-only"
+            python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT" --render-only
+          else
+            CT="${CONTENT_TYPE_INPUT:-short}"
+            FMT="narrated"
+            LANG="te-IN"
+            EXP_TAG=""
+            PRIVACY="public"
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              PRIVACY="${PRIVACY_STATUS_INPUT:-unlisted}"
+            fi
+            export YOUTUBE_PRIVACY_STATUS="$PRIVACY"
+            echo "🔒 YouTube Privacy Status: $YOUTUBE_PRIVACY_STATUS"
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              case "$SCHEDULE_CRON" in
+                "0 1 * * *")
+                  CT="short"
+                  FMT="narrated"
+                  LANG="te-IN"
+                  ;;
+                "0 13 * * *")
+                  CT="short"
+                  FMT="narrated"
+                  LANG="te-IN"
+                  ;;
+                "0 6 */3 * *")
+                  CT="long"
+                  FMT="narrated"
+                  LANG="te-IN"
+                  ;;
+                *)
+                  CT="short"
+                  FMT="narrated"
+                  LANG="te-IN"
+                  ;;
+              esac
+            fi
+            # Authorization policy:
+            # 1. Scheduled production runs are authorized for live publication.
+            # 2. Manual workflow_dispatch is authorized ONLY if dry_run is explicitly 'false'.
+            # 3. All other events, missing inputs, empty inputs, or dry_run=true default to safe --dry-run.
+            DRY="--dry-run"
+            export YOUTUBE_PUBLISH_AUTHORIZED="false"
 
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            DRY=""
-            export YOUTUBE_PUBLISH_AUTHORIZED="true"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$DRY_RUN_INPUT" = "false" ]; then
-            DRY=""
-            export YOUTUBE_PUBLISH_AUTHORIZED="true"
+            if [ "${{ github.event_name }}" = "schedule" ]; then
+              DRY=""
+              export YOUTUBE_PUBLISH_AUTHORIZED="true"
+            elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$DRY_RUN_INPUT" = "false" ]; then
+              DRY=""
+              export YOUTUBE_PUBLISH_AUTHORIZED="true"
+            fi
+            echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG $EXP_TAG $DRY"
+            python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT" $EXP_TAG $DRY
           fi
-          echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG $EXP_TAG $DRY"
-          python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT" $EXP_TAG $DRY
 
       - name: Persist Lightweight Publishing History State
         if: always()
@@ -215,3 +237,11 @@ jobs:
             git commit -m "auto(publishing): update publishing_history.json [skip ci]"
             git push
           fi
+
+      - name: Archive Render-Only Output Media
+        if: always() && inputs.execution_mode == 'render_only'
+        uses: actions/upload-artifact@v4
+        with:
+          name: divine-dharshanam-render-only-short
+          path: data/render_only/
+          if-no-files-found: ignore

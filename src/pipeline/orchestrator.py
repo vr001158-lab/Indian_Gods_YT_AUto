@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 from src.pipeline.state import PipelineState
 from src.pipeline.logger import PipelineLogger
+from src.pipeline.render_validator import validate_render_only_output
 
 
 class PipelineRunner:
@@ -22,6 +23,7 @@ class PipelineRunner:
         format: str = "narrated",
         experiment_tag: str | None = None,
         language_code: str | None = None,
+        render_only: bool = False,
     ):
         self.format = (format or getattr(state, "format", "narrated")).lower()
         self.experiment_tag = experiment_tag or getattr(state, "experiment_tag", None)
@@ -30,10 +32,12 @@ class PipelineRunner:
             or getattr(state, "language_code", None)
             or os.environ.get("LANGUAGE_CODE", "te-IN")
         )
+        self.render_only = render_only or getattr(state, "render_only", False) or (os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"))
         self.state = state or PipelineState(
             format=self.format,
             experiment_tag=self.experiment_tag,
             language_code=self.language_code,
+            render_only=self.render_only,
         )
         if hasattr(self.state, "format"):
             self.state.format = self.format
@@ -41,6 +45,8 @@ class PipelineRunner:
             self.state.experiment_tag = self.experiment_tag
         if hasattr(self.state, "language_code"):
             self.state.language_code = self.language_code
+        if hasattr(self.state, "render_only"):
+            self.state.render_only = self.render_only
         self.dry_run = dry_run
         self.content_type = content_type
 
@@ -329,13 +335,27 @@ class PipelineRunner:
             raise ValueError(f"Missing or invalid decision input file: {decision_file}")
 
         start_time = time.time()
-        provider = "mock" if self.dry_run else "pil"
+        if self.dry_run:
+            provider = "mock"
+        elif self.render_only or os.environ.get("THUMBNAIL_PROVIDER") == "reuse":
+            provider = "reuse"
+        else:
+            provider = "pollinations"
         cmd = [
             sys.executable, "run_thumbnail_generator.py",
             "--input", str(decision_file),
             "--provider", provider,
             "--language", self.language_code,
         ]
+        script_file = self.state.get_output("script_output")
+        if script_file and Path(script_file).exists():
+            cmd.extend(["--script", str(script_file)])
+        visual_file = self.state.get_output("visual_map_output")
+        if visual_file and Path(visual_file).exists():
+            cmd.extend(["--visual-map", str(visual_file)])
+        video_file = self.state.get_output("video_output")
+        if video_file and Path(video_file).exists():
+            cmd.extend(["--video", str(video_file)])
         self._execute_cmd(cmd, stage)
 
         out_file = self._find_latest_file(Path("data/thumbnails"), "thumbnail_metadata_*.json", min_mtime=start_time - 2)
@@ -366,9 +386,10 @@ class PipelineRunner:
         from datetime import datetime, timezone
         from src.qa.gate import FinalQAGate
 
+        allow_mock = False if self.render_only else self.dry_run
         gate = FinalQAGate(
             base_dir=".",
-            allow_mock=self.dry_run,
+            allow_mock=allow_mock,
             content_type=self.content_type,
             language_code=self.language_code,
             format=self.format,
@@ -402,6 +423,11 @@ class PipelineRunner:
 
     def run_publisher(self) -> Path:
         """Executes the PUBLISHER stage (or dry-run)."""
+        if self.render_only or os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+            err = "CRITICAL SAFETY VIOLATION: run_publisher() invoked in render-only mode! Upload and live publishing are strictly forbidden."
+            PipelineLogger.error(err)
+            raise RuntimeError(err)
+
         stage = "PUBLISHER"
         PipelineLogger.stage_banner(stage)
         self.state.update_stage(stage, "IN_PROGRESS")
@@ -424,6 +450,166 @@ class PipelineRunner:
         PipelineLogger.success(f"PUBLISHER completed. Output: {manifest_file}")
         return manifest_file
 
+    def package_and_validate_render_only(self) -> Path:
+        """
+        Executes the RENDER_PACKAGING stage for render-only mode:
+        1. Copies all pipeline outputs into data/render_only/<pipeline_id>/
+        2. Validates media files (MP4, audio, thumbnail, script, visuals)
+        3. Generates render_summary.json
+        4. Fails if validation fails; marks RENDER_PACKAGING and RENDER_COMPLETE if successful.
+        """
+        stage = "RENDER_PACKAGING"
+        PipelineLogger.stage_banner(stage)
+        self.state.update_stage(stage, "IN_PROGRESS")
+        self.state.save()
+
+        import shutil
+
+        render_dir = Path("data/render_only") / self.state.pipeline_id
+        render_dir.mkdir(parents=True, exist_ok=True)
+        audio_dest_dir = render_dir / "audio"
+        visuals_dest_dir = render_dir / "visuals"
+        audio_dest_dir.mkdir(parents=True, exist_ok=True)
+        visuals_dest_dir.mkdir(parents=True, exist_ok=True)
+
+        # Source paths from pipeline state
+        cb_src = Path(self.state.get_output("content_brief_output") or "")
+        sc_src = Path(self.state.get_output("script_output") or "")
+        am_src = Path(self.state.get_output("audio_map_output") or "")
+        vm_src = Path(self.state.get_output("visual_map_output") or "")
+        vid_src = Path(self.state.get_output("video_output") or "")
+        thm_src = Path(self.state.get_output("thumbnail_output") or "")
+        qa_src = Path(self.state.get_output("qa_output") or "")
+
+        # Packaged destinations
+        cb_dst = render_dir / "content_brief.json"
+        sc_dst = render_dir / "script.json"
+        am_dst = render_dir / "audio_map.json"
+        vm_dst = render_dir / "visual_map.json"
+        vid_dst = render_dir / "video_short.mp4"
+        thm_dst = render_dir / "thumbnail.png"
+        qa_dst = render_dir / "final_qa.json"
+
+        if cb_src.exists():
+            shutil.copy2(cb_src, cb_dst)
+        if sc_src.exists():
+            shutil.copy2(sc_src, sc_dst)
+        if am_src.exists():
+            shutil.copy2(am_src, am_dst)
+        if vm_src.exists():
+            shutil.copy2(vm_src, vm_dst)
+        if vid_src.exists():
+            shutil.copy2(vid_src, vid_dst)
+            if vid_src.name != vid_dst.name:
+                shutil.copy2(vid_src, render_dir / vid_src.name)
+        if thm_src.exists():
+            shutil.copy2(thm_src, thm_dst)
+        if qa_src.exists():
+            shutil.copy2(qa_src, qa_dst)
+
+        # Copy audio files
+        audio_files_packaged = []
+        if am_src.exists():
+            try:
+                am_data = json.loads(am_src.read_text(encoding="utf-8"))
+                full_narration = am_data.get("full_narration_audio_file")
+                if full_narration and Path(full_narration).exists():
+                    fn_dst = audio_dest_dir / Path(full_narration).name
+                    shutil.copy2(full_narration, fn_dst)
+                    audio_files_packaged.append(str(fn_dst))
+                for s in am_data.get("audio_scenes", []):
+                    af = s.get("audio_file")
+                    if af and Path(af).exists():
+                        af_dst = audio_dest_dir / Path(af).name
+                        shutil.copy2(af, af_dst)
+                        audio_files_packaged.append(str(af_dst))
+            except Exception as e:
+                PipelineLogger.warning(f"Error copying audio scene files: {e}")
+
+        # Copy visual files
+        visual_files_packaged = []
+        if vm_src.exists():
+            try:
+                vm_data = json.loads(vm_src.read_text(encoding="utf-8"))
+                for vs in vm_data.get("visual_scenes", []):
+                    for k in ("image_file", "video_file"):
+                        vf = vs.get(k)
+                        if vf and Path(vf).exists():
+                            vf_dst = visuals_dest_dir / Path(vf).name
+                            shutil.copy2(vf, vf_dst)
+                            visual_files_packaged.append(str(vf_dst))
+            except Exception as e:
+                PipelineLogger.warning(f"Error copying visual assets: {e}")
+
+        # Validation
+        artifacts_for_validation = {
+            "video": vid_dst if vid_dst.exists() else vid_src,
+            "audio": Path(audio_files_packaged[0]) if audio_files_packaged else (am_src),
+            "thumbnail": thm_dst if thm_dst.exists() else thm_src,
+            "script": sc_dst if sc_dst.exists() else sc_src,
+            "visual_map": vm_dst if vm_dst.exists() else vm_src,
+        }
+
+        is_valid, details, errors = validate_render_only_output(
+            render_dir=render_dir,
+            artifacts=artifacts_for_validation,
+            content_type=self.content_type,
+            language_code=self.language_code,
+        )
+
+        from datetime import datetime, timezone
+        summary_data = {
+            "pipeline_id": self.state.pipeline_id,
+            "execution_mode": "render_only",
+            "status": "SUCCESS" if is_valid else "FAILED",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "language_code": self.language_code,
+            "content_type": self.content_type,
+            "format": self.format,
+            "publishing_safety": {
+                "publisher_stage_executed": False,
+                "youtube_upload_attempted": False,
+                "oauth_credentials_required": False,
+                "publishing_history_modified": False,
+                "quota_consumed": False,
+                "youtube_publish_authorized": False,
+            },
+            "artifacts": {
+                "render_directory": str(render_dir).replace("\\", "/"),
+                "content_brief": str(cb_dst).replace("\\", "/") if cb_dst.exists() else None,
+                "script": str(sc_dst).replace("\\", "/") if sc_dst.exists() else None,
+                "audio_map": str(am_dst).replace("\\", "/") if am_dst.exists() else None,
+                "visual_map": str(vm_dst).replace("\\", "/") if vm_dst.exists() else None,
+                "video": str(vid_dst).replace("\\", "/") if vid_dst.exists() else None,
+                "thumbnail": str(thm_dst).replace("\\", "/") if thm_dst.exists() else None,
+                "final_qa": str(qa_dst).replace("\\", "/") if qa_dst.exists() else None,
+                "audio_files_count": len(audio_files_packaged),
+                "visual_files_count": len(visual_files_packaged),
+            },
+            "validation": {
+                "passed": is_valid,
+                "details": details,
+                "errors": errors,
+            },
+        }
+
+        summary_file = render_dir / "render_summary.json"
+        summary_file.write_text(json.dumps(summary_data, indent=2, ensure_ascii=False), encoding="utf-8")
+
+        if not is_valid:
+            err_msg = f"❌ Render-Only Final Validation Failed with {len(errors)} error(s): {errors}"
+            PipelineLogger.error(err_msg)
+            self.state.update_stage(stage, "FAILED")
+            self.state.save()
+            raise ValueError(err_msg)
+
+        self.state.set_output("render_only_dir", render_dir)
+        self.state.set_output("render_only_summary", summary_file)
+        self.state.update_stage(stage, "COMPLETED")
+        self.state.save()
+        PipelineLogger.success(f"RENDER_PACKAGING completed. Directory: {render_dir}")
+        return render_dir
+
     def execute_pipeline(self) -> str:
         """
         Orchestrates pipeline execution starting from the current_stage.
@@ -440,23 +626,32 @@ class PipelineRunner:
             PipelineLogger.error(err)
             raise ValueError(err)
 
-        from src.publisher.quota import check_publishing_quota
-        ok_quota, quota_msg = check_publishing_quota(
-            content_type=self.content_type,
-            language_code=self.language_code,
-        )
-        if not ok_quota:
-            if self.dry_run:
-                PipelineLogger.info(f"🌵 [DRY RUN QUOTA WARNING] {quota_msg}")
-            else:
-                PipelineLogger.error(f"❌ Publishing Quota Rejection: {quota_msg}")
-                raise ValueError(f"Publishing quota rejection: {quota_msg}")
+        if self.render_only:
+            if self.content_type != "short":
+                raise ValueError(f"Render-only mode supports 'short' content-type only. Attempted: '{self.content_type}'")
+            if self.format != "narrated":
+                raise ValueError(f"Render-only mode supports 'narrated' format only. Attempted: '{self.format}'")
+            PipelineLogger.info("🔒 [RENDER ONLY] Real media render mode active. Live publishing & quota consumption disabled.")
+        else:
+            from src.publisher.quota import check_publishing_quota
+            ok_quota, quota_msg = check_publishing_quota(
+                content_type=self.content_type,
+                language_code=self.language_code,
+            )
+            if not ok_quota:
+                if self.dry_run:
+                    PipelineLogger.info(f"🌵 [DRY RUN QUOTA WARNING] {quota_msg}")
+                else:
+                    PipelineLogger.error(f"❌ Publishing Quota Rejection: {quota_msg}")
+                    raise ValueError(f"Publishing quota rejection: {quota_msg}")
 
         schedule = "evening" if self.format == "old" else "morning"
         PipelineLogger.info(f"🚀 Executing pipeline CONTENT_TYPE={self.content_type.upper()} FORMAT={self.format.upper()} SCHEDULE={schedule}")
         PipelineLogger.info(f"Pipeline ID: {self.state.pipeline_id}")
         if self.dry_run:
             PipelineLogger.info("🌵 Dry Run Mode Enabled.")
+        elif self.render_only:
+            PipelineLogger.info("🎬 Render-Only Mode Enabled (Real media generation without live publication).")
 
         stages_map = {
             "RESEARCH":     self.run_research,
@@ -468,8 +663,11 @@ class PipelineRunner:
             "VIDEO":        self.run_video,
             "THUMBNAIL":    self.run_thumbnail,
             "QA":           self.run_qa,
-            "PUBLISHER":    self.run_publisher,
         }
+        if self.render_only:
+            stages_map["RENDER_PACKAGING"] = self.package_and_validate_render_only
+        else:
+            stages_map["PUBLISHER"] = self.run_publisher
 
         # Identify which stages need execution based on current_stage index
         all_stages = list(stages_map.keys())
@@ -484,7 +682,12 @@ class PipelineRunner:
                 raise
 
         # Complete final state update
-        self.state.update_stage("UPLOAD_READY", "COMPLETED")
-        self.state.save()
-        PipelineLogger.success(f"🏆 Pipeline Run {self.state.pipeline_id} fully complete! Package is ready for upload.")
+        if self.render_only:
+            self.state.update_stage("RENDER_COMPLETE", "COMPLETED")
+            self.state.save()
+            PipelineLogger.success(f"🏆 Render-Only Pipeline Run {self.state.pipeline_id} fully complete! Output packaged and verified in: {self.state.get_output('render_only_dir')}")
+        else:
+            self.state.update_stage("UPLOAD_READY", "COMPLETED")
+            self.state.save()
+            PipelineLogger.success(f"🏆 Pipeline Run {self.state.pipeline_id} fully complete! Package is ready for upload.")
         return self.state.pipeline_id

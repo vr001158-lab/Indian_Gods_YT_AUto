@@ -74,6 +74,13 @@ def main() -> int:
 
     _print_banner()
 
+    # ── Step -1: Immediate Render-Only Fail-Closed Safety Gate ───────────────
+    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+        print("\n[BLOCKED] Publisher execution rejected: Pipeline is in RENDER_ONLY mode.", file=sys.stderr)
+        print("  Live publishing and YouTube upload operations are strictly forbidden in render-only mode.", file=sys.stderr)
+        print("APPROVED FOR PUBLISHING: NO", file=sys.stderr)
+        return 1
+
     # ── Step 0: Validate Production Environment & Authorization ─────────────
     is_env_ok, env_err = validate_production_environment(allow_dry_run=args.dry_run)
     if not is_env_ok:

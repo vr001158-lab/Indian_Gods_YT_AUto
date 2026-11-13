@@ -25,6 +25,10 @@ def upload_to_youtube(
     Returns the generated YouTube Video ID on success.
     Raises exception on failure.
     """
+    import os
+    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes") or os.environ.get("YOUTUBE_PUBLISH_AUTHORIZED", "").lower() != "true":
+        raise PermissionError("CRITICAL SAFETY BLOCK: YouTube API upload is blocked. RENDER_ONLY is active or YOUTUBE_PUBLISH_AUTHORIZED is not 'true'.")
+
     if not video_path.exists():
         raise FileNotFoundError(f"❌ Video file not found: {video_path}")
 

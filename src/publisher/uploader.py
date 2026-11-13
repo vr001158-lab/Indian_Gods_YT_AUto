@@ -49,6 +49,9 @@ def upload_thumbnail(creds: Any, video_id: str, thumbnail_file: str | Path) -> b
 
     Never logs credential values.
     """
+    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+        raise PublishError("CRITICAL SAFETY VIOLATION: upload_thumbnail() invoked in RENDER_ONLY mode! Upload is blocked.")
+
     tf = Path(thumbnail_file)
     if not tf.exists() or tf.stat().st_size == 0:
         print(
@@ -115,6 +118,9 @@ def publish_video(
     -------
     dict — the publishing manifest (without credential values).
     """
+    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+        raise PublishError("CRITICAL SAFETY VIOLATION: publish_video() invoked in RENDER_ONLY mode! Live YouTube upload is forbidden.")
+
     import youtube_uploader as _yt_uploader
 
     from .safety import verify_video_with_ffprobe, PublisherSafetyError
