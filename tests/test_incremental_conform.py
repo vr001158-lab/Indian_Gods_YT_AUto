@@ -33,6 +33,8 @@ def get_ffmpeg_count_from_output(output: str) -> int:
 
 def run_test():
     print("🧪 Starting Incremental Asset Conform tests...\n")
+    manifest_file = Path("assets/asset_manifest.json")
+    orig_manifest_bytes = manifest_file.read_bytes() if manifest_file.exists() else None
     clean_test_dirs()
 
     # Find a real image to copy for realistic test
@@ -155,7 +157,15 @@ def run_test():
 
     # Clean up test directories
     clean_test_dirs()
+    if orig_manifest_bytes is not None and manifest_file.exists():
+        manifest_file.write_bytes(orig_manifest_bytes)
     print("\n🎉 All 5 incremental conforming tests completed successfully!")
+
+import unittest
+
+class TestIncrementalConform(unittest.TestCase):
+    def test_incremental_conforming(self):
+        run_test()
 
 if __name__ == "__main__":
     run_test()

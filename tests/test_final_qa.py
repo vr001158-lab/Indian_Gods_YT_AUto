@@ -641,6 +641,118 @@ class TestFinalQAGate(unittest.TestCase):
         ok, reason = check_topic_consistency(dec, manifests)
         self.assertTrue(ok, f"Expected pass, got: {reason}")
 
+    # ── Test 29: Video file in image_file slot rejected ────────────────────
+    def test_29_video_file_in_image_file_rejected(self):
+        """Putting an mp4 file in image_file slot violates visual contract and is rejected."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            mp4_file = tmp / "scene_1.mp4"
+            mp4_file.write_bytes(b"MOCK_VIDEO_DATA")
+            vmap = {
+                "script_title": "Test Title",
+                "total_scenes": 1,
+                "style_preset": "Devotional",
+                "provider": "flux",
+                "visual_scenes": [
+                    {
+                        "scene": 1,
+                        "visual_prompt": "Scene 1",
+                        "image_file": str(mp4_file),
+                        "style": "cinematic",
+                        "duration_seconds": 10,
+                    }
+                ],
+            }
+            ok, err = check_visual_map(vmap)
+            self.assertFalse(ok)
+            self.assertIn("has video file in image_file slot", err)
+
+    # ── Test 30: Video scene with valid image and video accepted ───────────
+    def test_30_video_scene_with_valid_image_and_video_accepted(self):
+        """Video scene with extracted frame in image_file and mp4 in video_file passes QA."""
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            img_file = tmp / "scene_1.png"
+            Image.new("RGB", (720, 1280), color=(30, 40, 50)).save(img_file, "PNG")
+
+            vid_file = tmp / "scene_1.mp4"
+            vid_file.write_bytes(b"MOCK_VIDEO_BYTES_NON_ZERO")
+
+            vmap = {
+                "script_title": "Test Title",
+                "total_scenes": 1,
+                "style_preset": "Devotional",
+                "provider": "mock",
+                "visual_scenes": [
+                    {
+                        "scene": 1,
+                        "visual_prompt": "Scene 1",
+                        "image_file": str(img_file),
+                        "video_file": str(vid_file),
+                        "asset_type": "video",
+                        "style": "cinematic",
+                        "duration_seconds": 10,
+                    }
+                ],
+            }
+            ok, err = check_visual_map(vmap)
+            self.assertTrue(ok, f"Expected pass, got: {err}")
+
+    # ── Test 31: Video scene missing or zero-byte video file rejected ──────
+    def test_31_video_scene_missing_or_empty_video_file_rejected(self):
+        """Video scene missing video_file or having zero-byte video_file is rejected."""
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            img_file = tmp / "scene_1.png"
+            Image.new("RGB", (720, 1280), color=(30, 40, 50)).save(img_file, "PNG")
+
+            # Missing video_file attribute
+            vmap_missing_attr = {
+                "script_title": "Test Title",
+                "total_scenes": 1,
+                "style_preset": "Devotional",
+                "provider": "mock",
+                "visual_scenes": [
+                    {
+                        "scene": 1,
+                        "visual_prompt": "Scene 1",
+                        "image_file": str(img_file),
+                        "asset_type": "video",
+                        "style": "cinematic",
+                        "duration_seconds": 10,
+                    }
+                ],
+            }
+            ok, err = check_visual_map(vmap_missing_attr)
+            self.assertFalse(ok)
+            self.assertIn("missing video_file", err)
+
+            # Zero-byte video file
+            zero_vid = tmp / "zero.mp4"
+            zero_vid.touch()
+            vmap_zero = {
+                "script_title": "Test Title",
+                "total_scenes": 1,
+                "style_preset": "Devotional",
+                "provider": "mock",
+                "visual_scenes": [
+                    {
+                        "scene": 1,
+                        "visual_prompt": "Scene 1",
+                        "image_file": str(img_file),
+                        "video_file": str(zero_vid),
+                        "asset_type": "video",
+                        "style": "cinematic",
+                        "duration_seconds": 10,
+                    }
+                ],
+            }
+            ok, err = check_visual_map(vmap_zero)
+            self.assertFalse(ok)
+            self.assertIn("video file is zero bytes", err)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 

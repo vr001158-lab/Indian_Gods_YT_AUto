@@ -22,6 +22,63 @@ PROVIDERS = {
 }
 
 
+def _extract_video_frame(video_path: Path, output_frame_path: Path) -> bool:
+    """
+    Extracts a representative still frame (at 00:00:00) from video_path and saves it to output_frame_path.
+    Returns True if extraction succeeded and output_frame_path is a valid non-empty file.
+    Returns False on FFmpeg missing, non-zero return code, or extraction failure.
+    NEVER creates synthetic RGB placeholder images.
+    """
+    output_frame_path.parent.mkdir(parents=True, exist_ok=True)
+    if not video_path.exists() or video_path.stat().st_size == 0:
+        return False
+
+    try:
+        import subprocess
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", "00:00:00",
+            "-i", str(video_path),
+            "-vframes", "1",
+            "-q:v", "2",
+            str(output_frame_path),
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+        if res.returncode == 0 and output_frame_path.exists() and output_frame_path.stat().st_size > 0:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def _find_genuine_deity_image(deity_key: str, scene_num: int = 1, content_type: str = "short") -> Path | None:
+    """
+    Finds an existing genuine repository deity image on disk to serve as normal image fallback.
+    Strictly preserves deity isolation (only from the same deity directory).
+    """
+    if not deity_key:
+        return None
+
+    gods_dirs = []
+    if content_type == "long":
+        gods_dirs.append(Path("assets/gods_landscape_long_video") / deity_key)
+    gods_dirs.append(Path("assets/gods") / deity_key)
+
+    candidates: list[Path] = []
+    for g_dir in gods_dirs:
+        if g_dir.exists() and g_dir.is_dir():
+            for ext in ("*.jpg", "*.jpeg", "*.png", "*.webp"):
+                candidates.extend([p for p in g_dir.glob(ext) if p.is_file() and p.stat().st_size > 0])
+
+    if not candidates:
+        return None
+
+    candidates.sort(key=lambda p: p.name)
+    idx = (scene_num - 1) % len(candidates)
+    return candidates[idx]
+
+
 def generate_visual_mapping(
     script: dict,
     provider_name: str = "mock",
@@ -82,15 +139,36 @@ def generate_visual_mapping(
                 break
 
         # Output asset file for this run
-        ext = ".mp4" if asset_type == "video" else ".png"
-        image_file = run_visual_dir / f"scene_{scene_num}{ext}"
+        image_file = run_visual_dir / f"scene_{scene_num}.png"
+        video_file_str = None
 
         if source in ("repository", "landscape_repository"):
             if not Path(asset_path).exists():
                 raise FileNotFoundError(
                     f"Local repository visual asset not found on disk: {asset_path} for deity '{scene_item.get('deity')}'"
                 )
-            image_file_str = asset_path
+            if asset_type == "video":
+                frame_ok = _extract_video_frame(Path(asset_path), image_file)
+                if frame_ok:
+                    image_file_str = str(image_file.absolute()).replace("\\", "/")
+                    video_file_str = str(Path(asset_path).absolute()).replace("\\", "/")
+                else:
+                    # FFmpeg missing or extraction failure:
+                    # If an existing genuine deity-specific image is available, use normal image fallback.
+                    # Otherwise fail the scene safely.
+                    deity = scene_item.get("deity") or ""
+                    fallback_img = _find_genuine_deity_image(deity, scene_num=scene_num, content_type=content_type or "short")
+                    if fallback_img and fallback_img.exists() and fallback_img.stat().st_size > 0:
+                        image_file_str = str(fallback_img.absolute()).replace("\\", "/")
+                        video_file_str = None
+                        asset_type = "image"
+                    else:
+                        raise RuntimeError(
+                            f"FFmpeg frame extraction failed for video asset: {asset_path} "
+                            f"and no genuine fallback image exists for deity '{deity}'"
+                        )
+            else:
+                image_file_str = str(Path(asset_path).absolute()).replace("\\", "/")
         else:
             # Fallback to provider image synthesis ONLY in test/mock mode
             if provider_name != "mock":
@@ -101,6 +179,13 @@ def generate_visual_mapping(
             prompt = f"Scene {scene_num} for {script['title']}"
             provider.generate_image(prompt, style_preset, image_file)
             image_file_str = str(image_file.absolute()).replace("\\", "/")
+            if asset_type == "video":
+                if Path(asset_path).exists():
+                    video_file_str = str(Path(asset_path).absolute()).replace("\\", "/")
+                else:
+                    mock_vid = run_visual_dir / f"scene_{scene_num}.mp4"
+                    mock_vid.write_text("MOCK_MP4_VIDEO", encoding="utf-8")
+                    video_file_str = str(mock_vid.absolute()).replace("\\", "/")
 
         v_prompt = f"{visual_ref} (Scene #{scene_num}: {asset_type} asset from {source})" if visual_ref else f"Scene #{scene_num}: {asset_type} asset from {source}"
 
@@ -108,6 +193,7 @@ def generate_visual_mapping(
             "scene": scene_num,
             "visual_prompt": v_prompt,
             "image_file": image_file_str,
+            "video_file": video_file_str,
             "asset_type": asset_type,
             "source": source,
             "style": style_preset,

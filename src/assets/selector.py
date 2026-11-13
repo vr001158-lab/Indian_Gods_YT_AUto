@@ -381,6 +381,13 @@ def build_deity_visual_timeline(
     else:
         eligible_images = repo_images
 
+    # When genuine deity images exist on disk but listed videos do not (e.g. sparse checkout),
+    # cleanly fall back to the available genuine images on disk.
+    disk_videos = [v for v in deity_videos if Path(v.get("path", "")).exists()]
+    disk_images = [img for img in repo_images if Path(img.get("path", "")).exists()]
+    if disk_images and not disk_videos and deity_videos:
+        deity_videos = []
+
     if not deity_videos and not eligible_images:
         raise ValueError(f"No visual assets found in repository for deity '{deity_key}'")
 
@@ -469,6 +476,13 @@ def select_scene_assets(
         eligible_images = preferred_images if preferred_images else repo_images
     else:
         eligible_images = repo_images
+
+    # When genuine deity images exist on disk but listed videos do not (e.g. sparse checkout),
+    # cleanly fall back to the available genuine images on disk.
+    disk_videos = [v for v in deity_videos if Path(v.get("path", "")).exists()]
+    disk_images = [img for img in repo_images if Path(img.get("path", "")).exists()]
+    if disk_images and not disk_videos and deity_videos:
+        deity_videos = []
 
     has_videos = bool(deity_videos)
     has_images = bool(eligible_images)

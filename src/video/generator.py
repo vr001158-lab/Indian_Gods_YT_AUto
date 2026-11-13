@@ -316,10 +316,35 @@ def create_visual_map_from_asset_plan(
         source = p_sc.get("source", "repository")
         scene_duration = a_sc["duration_seconds"]
 
+        video_file_str = None
+        if asset_type == "video":
+            frame_dir = Path("data/visuals/frames")
+            frame_dir.mkdir(parents=True, exist_ok=True)
+            frame_file = frame_dir / f"{asset_path.stem}_frame.png"
+            from src.visual.generator import _extract_video_frame, _find_genuine_deity_image
+            frame_ok = _extract_video_frame(asset_path, frame_file)
+            if frame_ok:
+                image_file_str = str(frame_file.absolute()).replace("\\", "/")
+                video_file_str = str(asset_path.absolute()).replace("\\", "/")
+            else:
+                fallback_img = _find_genuine_deity_image(p_sc.get("deity") or "", scene_num=a_sc["scene"])
+                if fallback_img and fallback_img.exists() and fallback_img.stat().st_size > 0:
+                    image_file_str = str(fallback_img.absolute()).replace("\\", "/")
+                    video_file_str = None
+                    asset_type = "image"
+                else:
+                    raise RuntimeError(
+                        f"Frame extraction failed for video asset: {asset_path} "
+                        f"and no genuine fallback image exists for deity '{p_sc.get('deity')}'"
+                    )
+        else:
+            image_file_str = str(asset_path.absolute()).replace("\\", "/")
+
         visual_scenes.append({
             "scene": a_sc["scene"],
             "visual_prompt": f"Scene #{a_sc['scene']}: {asset_type} asset from {source}",
-            "image_file": str(asset_path.absolute()).replace("\\", "/"),
+            "image_file": image_file_str,
+            "video_file": video_file_str,
             "asset_type": asset_type,
             "source": source,
             "style": "Devotional Cinematic Painting, 8k, divine golden glow",
@@ -418,6 +443,14 @@ def compose_video_pipeline(
         if aud_path.stat().st_size == 0:
             raise ValueError(f"Audio asset for scene {a_sc['scene']} is empty (zero-byte): {aud_path}")
 
+        vid_path_str = v_sc.get("video_file")
+        if vid_path_str:
+            vid_path = Path(vid_path_str)
+            if not vid_path.exists():
+                raise FileNotFoundError(f"Missing video asset for scene {a_sc['scene']}: {vid_path}")
+            if vid_path.stat().st_size == 0:
+                raise ValueError(f"Video asset for scene {a_sc['scene']} is empty (zero-byte): {vid_path}")
+
         duration = a_sc["duration_seconds"]
         total_duration += duration
 
@@ -425,6 +458,8 @@ def compose_video_pipeline(
         scenes.append({
             "scene":            a_sc["scene"],
             "image_file":       str(img_path.absolute()).replace("\\", "/"),
+            "video_file":       str(Path(vid_path_str).absolute()).replace("\\", "/") if vid_path_str else None,
+            "asset_type":       v_sc.get("asset_type", "video" if vid_path_str else "image"),
             "audio_file":       str(aud_path.absolute()).replace("\\", "/"),
             "duration_seconds": duration,
             "voice_text":       "" if is_old_format else a_sc.get("voice_text", ""),

@@ -358,6 +358,8 @@ def check_visual_map(visual_map: dict) -> tuple[bool, str]:
         if not img:
             return False, f"Visual scene {scene.get('scene')} missing image_file"
         p = Path(img)
+        if p.suffix.lower() in (".mp4", ".mov", ".webm", ".mkv"):
+            return False, f"Visual scene {scene.get('scene')} has video file in image_file slot: {img}"
         if not p.exists():
             return False, f"Visual scene {scene.get('scene')} image missing: {p}"
         if p.stat().st_size == 0:
@@ -369,6 +371,33 @@ def check_visual_map(visual_map: dict) -> tuple[bool, str]:
                     img_obj.load()
             except Exception as exc:
                 return False, f"Visual scene {scene.get('scene')} image corrupt/unreadable: {exc}"
+
+        # If asset_type is video or video_file is specified
+        if scene.get("asset_type") == "video" or scene.get("video_file"):
+            vid = scene.get("video_file")
+            if not vid:
+                return False, f"Visual scene {scene.get('scene')} is asset_type 'video' but missing video_file"
+            vid_p = Path(vid)
+            if not vid_p.exists():
+                return False, f"Visual scene {scene.get('scene')} video file missing: {vid_p}"
+            if vid_p.stat().st_size == 0:
+                return False, f"Visual scene {scene.get('scene')} video file is zero bytes: {vid_p}"
+            vid_ext = vid_p.suffix.lower()
+            if vid_ext not in (".mp4", ".mov", ".webm", ".mkv"):
+                return False, f"Visual scene {scene.get('scene')} video file has non-video extension: {vid_p}"
+            if not is_mock:
+                try:
+                    import subprocess
+                    cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(vid_p)]
+                    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                    if proc.returncode != 0:
+                        err_text = proc.stderr.decode("utf-8", errors="replace").strip() or "ffprobe failed"
+                        return False, f"Visual scene {scene.get('scene')} video file corrupt/unreadable: {err_text}"
+                except FileNotFoundError:
+                    # ffprobe not installed in environment
+                    pass
+                except Exception as exc:
+                    return False, f"Visual scene {scene.get('scene')} video probe error: {exc}"
 
     return True, "OK"
 

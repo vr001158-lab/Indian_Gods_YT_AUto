@@ -128,19 +128,21 @@ class FFmpegVideoComposer(VideoComposer):
 
         # ── 1. Register Inputs ────────────────────────────────────────────────
         for s in scenes:
+            vid_p = s.get("video_file")
             img_p = Path(s["image_file"])
-            is_video = s.get("asset_type") == "video" or img_p.suffix.lower() in (".mp4", ".mov", ".mkv", ".webm")
+            is_video = s.get("asset_type") == "video" or bool(vid_p) or img_p.suffix.lower() in (".mp4", ".mov", ".mkv", ".webm")
+            media_input = Path(vid_p) if (vid_p and Path(vid_p).exists()) else img_p
             if is_video:
                 cmd.extend([
                     "-stream_loop", "-1",
                     "-t", str(s["duration_seconds"]),
-                    "-i", str(img_p)
+                    "-i", str(media_input)
                 ])
             else:
                 cmd.extend([
                     "-loop", "1",
                     "-t", str(s["duration_seconds"]),
-                    "-i", str(img_p)
+                    "-i", str(media_input)
                 ])
             cmd.extend([
                 "-i", s["audio_file"]

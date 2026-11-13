@@ -59,6 +59,8 @@ def print_visual_map(visual_map: dict):
         print(f"   Scene #{scene['scene']} ({scene['duration_seconds']}s):")
         print(f"       Visual Prompt: \"{scene['visual_prompt'][:80]}...\"")
         print(f"       Image File:    {scene['image_file']}")
+        if scene.get("video_file"):
+            print(f"       Video File:    {scene['video_file']}")
         print()
 
     print("=" * 60)

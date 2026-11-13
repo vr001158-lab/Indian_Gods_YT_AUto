@@ -1,6 +1,8 @@
 # src/visual/schemas.py
 # Phase 2F — Script Input and Visual Output validation schemas
 
+from pathlib import Path
+
 REQUIRED_SCRIPT_FIELDS = (
     "title",
     "duration_seconds",
@@ -108,10 +110,21 @@ def validate_visual_map_output(vmap: dict) -> tuple:
         if not isinstance(scene["image_file"], str) or not scene["image_file"]:
             return False, f"Visual scene {i+1} 'image_file' must be a non-empty string"
 
+        img_ext = Path(scene["image_file"]).suffix.lower()
+        if img_ext in (".mp4", ".mov", ".webm", ".mkv"):
+            return False, f"Visual scene {i+1} 'image_file' must be an image file, got video '{scene['image_file']}'"
+
         if not isinstance(scene["style"], str) or not scene["style"]:
             return False, f"Visual scene {i+1} 'style' must be a non-empty string"
 
         if not isinstance(scene["duration_seconds"], int) or scene["duration_seconds"] <= 0:
             return False, f"Visual scene {i+1} 'duration_seconds' must be a positive integer"
+
+        if scene.get("asset_type") == "video":
+            if "video_file" not in scene or not scene["video_file"]:
+                return False, f"Visual scene {i+1} is asset_type 'video' but missing 'video_file'"
+            vid_ext = Path(scene["video_file"]).suffix.lower()
+            if vid_ext not in (".mp4", ".mov", ".webm", ".mkv"):
+                return False, f"Visual scene {i+1} 'video_file' must be a video file, got '{scene['video_file']}'"
 
     return True, ""
