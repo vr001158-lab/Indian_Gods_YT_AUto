@@ -196,34 +196,48 @@ class DeityAssetIndex:
         # 1. Index curated landscape repository assets (Priority 1 Candidates)
         landscape_dir = Path("assets/gods_landscape_long_video")
         if landscape_dir.exists():
-            for f in landscape_dir.rglob("*.png"):
-                if f.name.endswith(".gitkeep") or f.name.endswith(".keep"):
+            for f in landscape_dir.rglob("*"):
+                if f.name.endswith(".gitkeep") or f.name.endswith(".keep") or not f.is_file():
                     continue
-                record = self._inspect_file(
-                    f,
-                    default_source="approved_landscape_artwork",
-                    default_approval="APPROVED"
-                )
-                if record:
-                    self.records.append(record)
+                if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".mp4", ".mov", ".webm", ".avi", ".mkv"):
+                    record = self._inspect_file(
+                        f,
+                        default_source="approved_landscape_artwork",
+                        default_approval="APPROVED"
+                    )
+                    if record:
+                        self.records.append(record)
 
         # 2. Index standard repository collection (assets/gods/)
         gods_dir = Path("assets/gods")
         if gods_dir.exists():
             for f in gods_dir.rglob("*"):
-                if f.suffix.lower() in (".png", ".jpg", ".jpeg"):
-                    if f.name.endswith(".gitkeep") or f.name.endswith(".keep"):
-                        continue
-                    # Curated named assets in lord_vishnu with explicit avatars
-                    if "kurma_avatar" in f.name:
-                        approval = "APPROVED"
-                        avatar = "kurma"
-                    elif "vamana_trivikrama" in f.name:
-                        approval = "APPROVED"
-                        avatar = "vamana_trivikrama"
+                if not f.is_file() or f.name.endswith(".gitkeep") or f.name.endswith(".keep"):
+                    continue
+                if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".mp4", ".mov", ".webm", ".avi", ".mkv"):
+                    folder_name = f.parent.name.lower()
+                    fname_lower = f.name.lower()
+
+                    if folder_name == "lord_vishnu":
+                        # In lord_vishnu, only curated named assets with explicit avatars are approved
+                        if "kurma_avatar" in fname_lower:
+                            approval = "APPROVED"
+                            avatar = "kurma"
+                        elif "vamana_trivikrama" in fname_lower:
+                            approval = "APPROVED"
+                            avatar = "vamana_trivikrama"
+                        else:
+                            approval = "UNAPPROVED"  # Generic unverified Vishnu download
+                            avatar = None
                     else:
-                        approval = "UNAPPROVED"  # Unknown/unverified generic download
-                        avatar = None
+                        # For other curated repository deity folders
+                        if "chatgpt" in fname_lower or "unverified" in fname_lower:
+                            approval = "UNAPPROVED"
+                            avatar = None
+                        else:
+                            approval = "APPROVED"
+                            _, detected_av = resolve_deity_and_avatar(f.name + " " + folder_name)
+                            avatar = detected_av or folder_name
 
                     record = self._inspect_file(
                         f,
@@ -234,12 +248,37 @@ class DeityAssetIndex:
                     if record:
                         self.records.append(record)
 
+        # 3. Index processed repository videos (assets/gods_processed/)
+        processed_dir = Path("assets/gods_processed")
+        if processed_dir.exists():
+            for f in processed_dir.rglob("*"):
+                if not f.is_file() or f.name.endswith(".gitkeep") or f.name.endswith(".keep"):
+                    continue
+                if f.suffix.lower() in (".mp4", ".mov", ".webm", ".avi", ".mkv"):
+                    parts = f.parts
+                    deity_part = None
+                    for idx, part in enumerate(parts):
+                        if part == "gods_processed" and idx + 1 < len(parts):
+                            deity_part = parts[idx + 1].lower()
+                            break
+                    folder_deity = deity_part or f.parent.name.lower()
+                    record = self._inspect_file(
+                        f,
+                        default_source="curated_processed_video",
+                        default_approval="APPROVED",
+                        force_avatar=folder_deity,
+                        force_deity=folder_deity,
+                    )
+                    if record:
+                        self.records.append(record)
+
     def _inspect_file(
         self,
         file_path: Path,
         default_source: str,
         default_approval: str,
         force_avatar: Optional[str] = None,
+        force_deity: Optional[str] = None,
     ) -> Optional[ThumbnailAssetRecord]:
         """Inspects file integrity, dimensions, and calculates a quality score."""
         p = Path(file_path)
@@ -248,11 +287,33 @@ class DeityAssetIndex:
 
         # Determine deity from parent folder
         folder_name = p.parent.name.lower()
+        if folder_name in ("horizontal", "vertical"):
+            folder_name = p.parent.parent.name.lower()
         deity, detected_av = resolve_deity_and_avatar(p.name + " " + folder_name)
         if not deity:
             deity = folder_name
+        deity = force_deity or deity
 
         avatar = force_avatar or detected_av
+
+        # Handle video assets directly without PIL image open
+        if p.suffix.lower() in (".mp4", ".mov", ".webm", ".avi", ".mkv"):
+            return ThumbnailAssetRecord(
+                asset_id=p.stem,
+                file_path=str(p).replace("\\", "/"),
+                deity=deity,
+                avatar=avatar,
+                width=1920,
+                height=1080,
+                aspect_ratio="16:9",
+                file_format=p.suffix.lower().lstrip("."),
+                file_size_bytes=p.stat().st_size,
+                integrity_status="VALID",
+                source=default_source,
+                approval_status=default_approval,
+                quality_score=85.0,
+                description=f"Curated repository asset for {deity} (avatar={avatar}) in 16:9",
+            )
 
         # Integrity & image checks
         try:
@@ -320,7 +381,7 @@ class DeityAssetIndex:
             source=default_source,
             approval_status=default_approval,
             quality_score=round(score, 1),
-            description=f"Asset for {deity} (avatar={avatar}) in {ar_str}",
+            description=f"Curated repository asset for {deity} (avatar={avatar}) in {ar_str}",
         )
 
     def find_approved_assets(

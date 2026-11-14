@@ -468,6 +468,360 @@ class TestDeityIdentityConsistency(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("mismatch", detail.lower())
 
+    def test_15_curated_repository_deity_asset_passes_final_qa(self):
+        """15. Curated repository deity asset -> receives DEITY_VERIFIED and passes final QA."""
+        # Find a genuine curated asset from assets/gods/ganesha
+        ganesha_dir = Path("assets/gods/ganesha")
+        cands = [p for p in ganesha_dir.glob("*.jpg") if "chatgpt" not in p.name.lower()]
+        self.assertTrue(len(cands) > 0, "Expected at least one curated Ganesha asset in repository")
+        selected_cand = cands[0]
+
+        decision = {
+            "selected_topic": "The Legend of Chandra Curse Why Ganesha Punished the Moon",
+            "deity": "ganesha",
+        }
+        script = {"title": "వినాయకుడి ఏకదంతం వెనుక ఉన్న అసలు రహస్యం"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": str(selected_cand).replace("\\", "/"),
+                    "source_path": str(selected_cand).replace("\\", "/"),
+                    "canonical_deity": "ganesha",
+                    "avatar": "ganesha",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity visual asset",
+                }
+            ]
+        }
+        thumbnail_meta = {
+            "selected_asset": {
+                "source_path": str(selected_cand).replace("\\", "/"),
+                "avatar": "ganesha",
+                "canonical_deity": "ganesha",
+                "verification_status": "DEITY_VERIFIED",
+            },
+            "topic": "వినాయకుడి ఏకదంతం వెనుక ఉన్న అసలు రహస్యం",
+        }
+
+        # 15a: Correct deity -> passes final QA even with allow_mock=False
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=thumbnail_meta,
+            allow_mock=False,
+        )
+        self.assertTrue(ok, f"Expected QA pass for curated Ganesha asset, got: {detail}")
+        self.assertEqual(detail, "OK")
+
+        # 15b: Cross-deity mismatch (using Ganesha asset on Lord Shiva topic) -> rejected
+        shiva_decision = {
+            "selected_topic": "The Story of Markandeya How Shiva Defeated Death",
+            "deity": "lord_shiva",
+        }
+        shiva_script = {"title": "శివుని దివ్య లీల"}
+        ok_mismatch, detail_mismatch = check_deity_identity_consistency(
+            decision=shiva_decision,
+            script=shiva_script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok_mismatch)
+        self.assertIn("deity mismatch", detail_mismatch.lower())
+
+    def test_16_ganesha_scene_with_kurma_avatar_rejected(self):
+        """16. Adversarial 1: Ganesha scene with Kurma avatar -> REJECT."""
+        ganesha_dir = Path("assets/gods/ganesha")
+        cands = [p for p in ganesha_dir.glob("*.jpg") if "chatgpt" not in p.name.lower()]
+        img_path = str(cands[0]).replace("\\", "/") if cands else "assets/gods/ganesha/ganesha.jpg"
+
+        decision = {"selected_topic": "Lord Ganesha Divine Wisdom", "deity": "ganesha"}
+        script = {"title": "వినాయకుడి మహిమ"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": img_path,
+                    "canonical_deity": "ganesha",
+                    "avatar": "kurma",  # Contradictory avatar on Ganesha!
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertTrue("contradictory" in detail.lower() or "deity_mismatch" in detail.lower())
+
+    def test_17_ganesha_scene_with_shiva_video_rejected(self):
+        """17. Adversarial 2: Ganesha scene with Shiva video -> REJECT."""
+        decision = {"selected_topic": "Lord Ganesha Divine Tales", "deity": "ganesha"}
+        script = {"title": "గణపతి లీలలు"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "video_file": "assets/gods_processed/lord_shiva/horizontal/shiva_dance.mp4",
+                    "canonical_deity": "ganesha",
+                    "avatar": "ganesha",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertIn("lord_shiva", detail.lower())
+        self.assertIn("mismatch", detail.lower())
+
+    def test_18_shiva_scene_with_ganesha_video_rejected(self):
+        """18. Adversarial 3: Shiva scene with Ganesha video -> REJECT."""
+        decision = {"selected_topic": "Lord Shiva Meditation on Mount Kailash", "deity": "lord_shiva"}
+        script = {"title": "శివుని ధ్యానం"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "video_file": "assets/gods_processed/ganesha/horizontal/ganesha_celebration.mp4",
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertIn("ganesha", detail.lower())
+        self.assertIn("mismatch", detail.lower())
+
+    def test_19_correct_deity_image_with_mismatched_video_rejected(self):
+        """19. Adversarial 4: Correct deity image with mismatched video -> REJECT."""
+        shiva_dir = Path("assets/gods/lord_shiva")
+        cands = [p for p in shiva_dir.glob("*.jpg") if "chatgpt" not in p.name.lower()]
+        shiva_img = str(cands[0]).replace("\\", "/") if cands else "assets/gods/lord_shiva/shiva.jpg"
+
+        decision = {"selected_topic": "Secrets of Lord Shiva Neelkanth", "deity": "lord_shiva"}
+        script = {"title": "శివుని హాలాహలం"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": shiva_img,  # Correct Shiva image
+                    "video_file": "assets/gods_processed/ganesha/horizontal/ganesha_procession.mp4",  # Mismatched Ganesha video
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertIn("ganesha", detail.lower())
+        self.assertIn("mismatch", detail.lower())
+
+    def test_20_correct_deity_and_matching_video_passes_with_catalog_evidence(self):
+        """20. Adversarial 5: Correct deity and matching video -> PASS with valid catalog evidence."""
+        decision = {"selected_topic": "Sri Rama Ayodhya Pattabhishekam", "deity": "ram"}
+        script = {"title": "శ్రీరామ పట్టాభిషేకం"}
+        ram_vid = "assets/gods_processed/ram/horizontal/1116118720173406492__img_tmp.mp4"
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "video_file": ram_vid,
+                    "canonical_deity": "ram",
+                    "avatar": "ram",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertTrue(ok, f"Expected PASS for valid indexed Ram video, got: {detail}")
+        self.assertEqual(detail, "OK")
+
+    def test_21_missing_video_identity_evidence_rejected(self):
+        """21. Adversarial 6: Missing video identity evidence -> REJECT."""
+        decision = {"selected_topic": "Lord Shiva Cosmic Tandava Dance", "deity": "lord_shiva"}
+        script = {"title": "శివ తాండవం"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "video_file": "data/videos/unindexed_unverified_clip.mp4",
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertTrue("failed approval verification" in detail.lower() or "lacks an explicit trusted" in detail.lower())
+
+    def test_22_correct_indexed_deity_and_avatar_passes(self):
+        """22. Adversarial 7: Correct indexed deity and avatar -> PASS."""
+        decision = {"selected_topic": "Kurma Avatar Mandara Mountain Samudra Manthan", "deity": "lord_vishnu"}
+        script = {"title": "కూర్మ అవతార కథ"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": "assets/gods_landscape_long_video/lord_vishnu/kurma_avatar_mandara_mountain_samudra_manthan_landscape.png",
+                    "canonical_deity": "lord_vishnu",
+                    "avatar": "kurma",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Divine Dharshanam Daily generation workflow; visually verified",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertTrue(ok, f"Expected PASS for correctly indexed Kurma avatar, got: {detail}")
+        self.assertEqual(detail, "OK")
+
+    def test_23_incorrect_deity_asset_index_deity_rejected(self):
+        """23. Adversarial 8: Incorrect DeityAssetIndex deity -> REJECT."""
+        ganesha_dir = Path("assets/gods/ganesha")
+        cands = [p for p in ganesha_dir.glob("*.jpg") if "chatgpt" not in p.name.lower()]
+        ganesha_img = str(cands[0]).replace("\\", "/") if cands else "assets/gods/ganesha/ganesha.jpg"
+
+        decision = {"selected_topic": "Secrets of Lord Shiva Neelkanth", "deity": "lord_shiva"}
+        script = {"title": "శివుని హాలాహలం"}
+        # Asset in index belongs to Ganesha, topic is Lord Shiva
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": ganesha_img,
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertTrue("mismatch" in detail.lower() or "ganesha" in detail.lower())
+
+    def test_24_unapproved_generated_image_rejected(self):
+        """24. Adversarial 9: Unapproved generated image -> REJECT."""
+        decision = {"selected_topic": "Lord Vishnu Cosmic Sleep", "deity": "lord_vishnu"}
+        script = {"title": "మహావిష్ణువు యోగనిద్ర"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": "assets/gods/lord_vishnu/ChatGPT Image May 29.png",  # Raw unapproved file
+                    "canonical_deity": "lord_vishnu",
+                    "avatar": "lord_vishnu",
+                    "verification_status": "DEITY_VERIFIED",  # Forged verification flag!
+                    "provenance": "Divine Dharshanam Daily generation workflow; visually verified",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertTrue("failed approval verification" in detail.lower() or "approval status" in detail.lower())
+
+    def test_25_existing_vishnu_avatar_restrictions_remain_intact(self):
+        """25. Adversarial 10: Existing Vishnu avatar restrictions remain intact."""
+        decision = {"selected_topic": "The Story of Varaha Avatar Rescuing Mother Earth", "deity": "lord_vishnu"}
+        script = {"title": "వరాహ అవతార రహస్యం"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": "assets/gods_landscape_long_video/lord_vishnu/kurma_avatar_mandara_mountain_samudra_manthan_landscape.png",
+                    "canonical_deity": "lord_vishnu",
+                    "avatar": "kurma",  # Kurma avatar supplied on Varaha topic
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Divine Dharshanam Daily generation workflow; visually verified",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertIn("varaha", detail.lower())
+        self.assertIn("kurma", detail.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

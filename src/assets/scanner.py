@@ -157,14 +157,21 @@ def _enrich_asset_metadata(meta: dict[str, Any], stem: str, deity_key: str) -> d
                 detected_avatar = "vamana_trivikrama" if av in ("vamana", "trivikrama") else av
                 break
 
+        # In lord_vishnu, only vetted narrative assets are verified; generic vishnu images without avatar are unverified
+        is_unverified_vishnu = (deity_key.lower() == "lord_vishnu" and detected_avatar == deity_key)
+        # Any file explicitly tagged or named unverified, or raw unvetted draft
+        is_unapproved_draft = ("chatgpt" in stem_lower) or ("unverified" in stem_lower)
+
+        is_verified_curated = not is_unverified_vishnu and not is_unapproved_draft
+
         meta["avatar"] = detected_avatar
         meta["narrative_event"] = "general_deity_portrait"
-        meta["scene_description"] = f"Repository visual asset for {deity_key} (avatar={detected_avatar})"
+        meta["scene_description"] = f"Curated repository asset for {deity_key} (avatar={detected_avatar})"
         meta["semantic_keywords"] = meta.get("tags", [])
         meta["aspect_ratio"] = measured_ar
         meta["source"] = "repository_collection"
-        meta["provenance"] = "Existing repository collection"
-        meta["verification_status"] = "unverified"
+        meta["provenance"] = "Repository collection; curated deity asset" if is_verified_curated else "Existing repository collection"
+        meta["verification_status"] = "verified_visual" if is_verified_curated else "unverified"
 
     return meta
 
