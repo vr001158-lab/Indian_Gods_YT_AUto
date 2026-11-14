@@ -655,9 +655,49 @@ class TestDeityIdentityConsistency(unittest.TestCase):
 
     def test_20_correct_deity_and_matching_video_passes_with_catalog_evidence(self):
         """20. Adversarial 5: Correct deity and matching video -> PASS with valid catalog evidence."""
+        import subprocess
+
+        ram_vid = "assets/gods_processed/ram/vertical/1116118720173406492__img.mp4"
+
+        # Verify that this canonical asset is tracked in Git
+        tracked_check = subprocess.run(
+            ["git", "ls-files", ram_vid],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertIn(
+            ram_vid,
+            tracked_check.stdout.replace("\\", "/"),
+            f"Expected canonical Ram video '{ram_vid}' to be tracked in Git",
+        )
+
+        # Check if the file is physically hydrated on disk (may be absent under local sparse checkout)
+        if not Path(ram_vid).exists():
+            self.skipTest(
+                f"Canonical Git-tracked video '{ram_vid}' is not hydrated on disk (sparse checkout active)"
+            )
+
+        # In environments where the video is hydrated (such as GitHub Actions CI), verify DeityAssetIndex
+        from src.thumbnail.asset_index import DeityAssetIndex
+
+        idx = DeityAssetIndex()
+        norm_ram_vid = ram_vid.replace("\\", "/")
+        matching_recs = [
+            r for r in (idx.records if idx else [])
+            if r.file_path == norm_ram_vid or norm_ram_vid.endswith(r.file_path)
+        ]
+        self.assertTrue(
+            len(matching_recs) > 0,
+            f"Expected canonical Ram video '{ram_vid}' to be discovered by DeityAssetIndex",
+        )
+        rec = matching_recs[0]
+        self.assertEqual(rec.deity, "ram")
+        self.assertEqual(rec.approval_status, "APPROVED")
+        self.assertEqual(rec.integrity_status, "VALID")
+
         decision = {"selected_topic": "Sri Rama Ayodhya Pattabhishekam", "deity": "ram"}
         script = {"title": "శ్రీరామ పట్టాభిషేకం"}
-        ram_vid = "assets/gods_processed/ram/horizontal/1116118720173406492__img_tmp.mp4"
         visual_map = {
             "visual_scenes": [
                 {
