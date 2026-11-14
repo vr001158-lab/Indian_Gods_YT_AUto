@@ -201,6 +201,7 @@ class TestInsufficientScopeDetection(unittest.TestCase):
 class TestOAuthCredentialHandling(unittest.TestCase):
     """Verify uploader OAuth credentials check, refresh, and clear failures."""
 
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "RENDER_ONLY": "false"})
     @patch("youtube_uploader.build")
     def test_uploader_receives_oauth_credentials(self, mock_build):
         """Existing YouTube uploader still receives credentials."""
