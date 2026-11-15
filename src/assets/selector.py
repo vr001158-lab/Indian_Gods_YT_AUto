@@ -338,6 +338,130 @@ def is_matching_orientation(asset: dict[str, Any] | str, content_type: str) -> b
     return False
 
 
+def _is_matching_avatar(av1: str | None, av2: str | None) -> bool:
+    """Checks whether two avatar labels match, accounting for canonical aliases (e.g. ram/rama)."""
+    if not av1 or not av2:
+        return False
+    a1 = str(av1).strip().lower()
+    a2 = str(av2).strip().lower()
+    if a1 == a2:
+        return True
+    RAMA_ALIASES = {"ram", "rama"}
+    VAMANA_ALIASES = {"vamana", "vamana_trivikrama", "trivikrama"}
+    if a1 in RAMA_ALIASES and a2 in RAMA_ALIASES:
+        return True
+    if a1 in VAMANA_ALIASES and a2 in VAMANA_ALIASES:
+        return True
+    return False
+
+
+def _is_item_verified_visual(item: dict[str, Any], deity_key: str, avatar: str | None = None) -> bool:
+    """
+    Validates whether an asset item has genuine visual verification.
+    Populates missing deity identity metadata (avatar, provenance, verification_status)
+    from scanner narrative catalog or curated repository classification if verified.
+    Strictly preserves deity and avatar isolation:
+      - Generic Vishnu images without explicit avatar are UNVERIFIED.
+      - Drafts containing 'chatgpt' or 'unverified' in filename are UNVERIFIED.
+      - Wrong-deity assets are UNVERIFIED.
+    """
+    if not isinstance(item, dict):
+        return False
+
+    path_str = str(
+        item.get("path")
+        or item.get("source_path")
+        or item.get("image_file")
+        or item.get("video_file")
+        or ""
+    ).replace("\\", "/")
+    stem = Path(path_str).stem.lower() if path_str else ""
+
+    # 1. Unapproved drafts or generic unverified files are strictly rejected
+    if "chatgpt" in stem or "unverified" in stem:
+        item["verification_status"] = "unverified"
+        return False
+
+    # Reject explicit deity mismatch or cross-deity directory in path
+    item_deity = (item.get("deity") or item.get("canonical_deity") or "").strip().lower()
+    if item_deity:
+        from src.thumbnail.asset_index import AVATAR_TO_PARENT_DEITY
+        valid_deities = {deity_key.lower()}
+        if deity_key.lower() == "lord_vishnu":
+            valid_deities.update({"ram", "rama", "krishna", "narasimha", "varaha", "kurma", "vamana", "trivikrama", "matsya", "kalki", "parashurama"})
+        parent = AVATAR_TO_PARENT_DEITY.get(item_deity)
+        if parent:
+            valid_deities.add(parent.lower())
+        if item_deity not in valid_deities and deity_key.lower() not in valid_deities:
+            return False
+
+    from src.thumbnail.asset_index import CANONICAL_DEITIES
+    for other_deity, aliases in CANONICAL_DEITIES.items():
+        if other_deity == deity_key.lower():
+            continue
+        if deity_key.lower() == "lord_vishnu" and other_deity in ("narasimha", "krishna", "ram"):
+            continue
+        if other_deity == "lord_vishnu" and deity_key.lower() in ("narasimha", "krishna", "ram"):
+            continue
+        for alias in [other_deity] + aliases:
+            if not alias or len(alias) < 4:
+                continue
+            if f"/{alias}/" in path_str.lower() or f"/{alias}_" in path_str.lower():
+                return False
+
+    # 2. Check canonical narrative catalog first
+    from src.assets.scanner import KNOWN_NARRATIVE_METADATA, _enrich_asset_metadata
+    for pattern_key, entry in KNOWN_NARRATIVE_METADATA.items():
+        p_clean = pattern_key.lower().replace(" ", "_")
+        stem_clean = stem.replace(" ", "_")
+        if p_clean in stem_clean or pattern_key.lower() in stem:
+            cat_av = entry.get("avatar")
+            from src.thumbnail.asset_index import AVATAR_TO_PARENT_DEITY
+            cat_parent = AVATAR_TO_PARENT_DEITY.get(cat_av.lower()) if cat_av else None
+            valid_parents = {cat_parent.lower()} if cat_parent else set()
+            if cat_av and cat_av.lower() in ("matsya", "kurma", "varaha", "narasimha", "vamana", "vamana_trivikrama", "trivikrama", "parashurama", "buddha", "kalki", "krishna", "ram", "rama"):
+                valid_parents.add("lord_vishnu")
+            if deity_key.lower() not in valid_parents and cat_parent:
+                return False
+            if avatar and cat_av:
+                if not _is_matching_avatar(cat_av, avatar):
+                    return False
+            item["verification_status"] = "verified_visual"
+            item["avatar"] = cat_av or avatar or deity_key
+            item["provenance"] = entry.get("provenance") or "Divine Dharshanam Daily generation workflow; visually verified"
+            return True
+
+    # 3. For Lord Vishnu, only vetted narrative assets or explicit avatars are verified
+    if deity_key.lower() == "lord_vishnu":
+        detected_av = None
+        for av in ("varaha", "kurma", "vamana", "trivikrama", "narasimha", "krishna", "rama", "matsya", "kalki"):
+            if av in stem:
+                detected_av = "vamana_trivikrama" if av in ("vamana", "trivikrama") else av
+                break
+        if not detected_av and not (item.get("avatar") and item.get("avatar") != "lord_vishnu"):
+            item["verification_status"] = "unverified"
+            return False
+        if avatar:
+            target_av = detected_av or item.get("avatar")
+            if not _is_matching_avatar(target_av, avatar):
+                return False
+
+    # 4. If path indicates a repository deity asset matching deity_key
+    enriched = _enrich_asset_metadata(dict(item), stem, deity_key)
+    if enriched.get("verification_status") == "verified_visual":
+        target_av = enriched.get("avatar") or item.get("avatar")
+        if avatar and target_av and not _is_matching_avatar(target_av, avatar):
+            return False
+        item["verification_status"] = "verified_visual"
+        if not item.get("avatar") or item.get("avatar") == deity_key:
+            item["avatar"] = enriched.get("avatar", avatar or deity_key)
+        if not item.get("provenance") or "unverified" in str(item.get("provenance")).lower():
+            item["provenance"] = enriched.get("provenance") or "Repository collection; curated deity asset"
+        return True
+
+    return item.get("verification_status") == "verified_visual"
+
+
 def build_deity_visual_timeline(
     deity_key: str,
     target_duration: float = 45.0,
@@ -388,11 +512,11 @@ def build_deity_visual_timeline(
     if avatar:
         deity_videos = [
             v for v in deity_videos
-            if v.get("avatar") == avatar and v.get("verification_status") == "verified_visual"
+            if _is_matching_avatar(v.get("avatar"), avatar) and _is_item_verified_visual(v, deity_key, avatar)
         ]
         eligible_images = [
             img for img in eligible_images
-            if img.get("avatar") == avatar and img.get("verification_status") == "verified_visual"
+            if _is_matching_avatar(img.get("avatar"), avatar) and _is_item_verified_visual(img, deity_key, avatar)
         ]
         if not deity_videos and not eligible_images:
             raise NoMatchingDeityAssetError(
@@ -400,12 +524,18 @@ def build_deity_visual_timeline(
                 f"Refusing to substitute unrelated deity or avatar artwork."
             )
 
-    # When genuine deity images exist on disk but listed videos do not (e.g. sparse checkout),
-    # cleanly fall back to the available genuine images on disk.
+    # When genuine deity assets exist on disk (e.g. handling local sparse checkout),
+    # cleanly prefer physically available assets on disk.
     disk_videos = [v for v in deity_videos if Path(v.get("path", "")).exists()]
     disk_images = [img for img in repo_images if Path(img.get("path", "")).exists()]
-    if disk_images and not disk_videos and deity_videos:
+    if disk_videos:
+        deity_videos = disk_videos
+    elif disk_images and deity_videos:
         deity_videos = []
+
+    disk_eligible = [img for img in eligible_images if Path(img.get("path", "")).exists()]
+    if disk_eligible:
+        eligible_images = disk_eligible
 
     if not deity_videos and not eligible_images:
         raise ValueError(f"No visual assets found in repository for deity '{deity_key}'")
@@ -454,7 +584,7 @@ def build_deity_visual_timeline(
             "deity": deity_key,
             "canonical_deity": deity_key,
             "avatar": avatar or asset_item.get("avatar", deity_key),
-            "verification_status": "DEITY_VERIFIED" if (asset_item.get("verification_status") == "verified_visual") else "DEITY_UNVERIFIED",
+            "verification_status": "DEITY_VERIFIED" if _is_item_verified_visual(asset_item, deity_key, avatar) else "DEITY_UNVERIFIED",
             "provenance": asset_item.get("provenance") or "Repository collection; curated deity asset",
             "source_path": asset_item["path"],
             "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_idx}",
@@ -508,11 +638,11 @@ def select_scene_assets(
     if avatar:
         deity_videos = [
             v for v in deity_videos
-            if v.get("avatar") == avatar and v.get("verification_status") == "verified_visual"
+            if _is_matching_avatar(v.get("avatar"), avatar) and _is_item_verified_visual(v, deity_key, avatar)
         ]
         eligible_images = [
             img for img in eligible_images
-            if img.get("avatar") == avatar and img.get("verification_status") == "verified_visual"
+            if _is_matching_avatar(img.get("avatar"), avatar) and _is_item_verified_visual(img, deity_key, avatar)
         ]
         if not deity_videos and not eligible_images:
             raise NoMatchingDeityAssetError(
@@ -520,12 +650,18 @@ def select_scene_assets(
                 f"Refusing to substitute unrelated deity or avatar artwork."
             )
 
-    # When genuine deity images exist on disk but listed videos do not (e.g. sparse checkout),
-    # cleanly fall back to the available genuine images on disk.
+    # When genuine deity assets exist on disk (e.g. handling local sparse checkout),
+    # cleanly prefer physically available assets on disk.
     disk_videos = [v for v in deity_videos if Path(v.get("path", "")).exists()]
     disk_images = [img for img in repo_images if Path(img.get("path", "")).exists()]
-    if disk_images and not disk_videos and deity_videos:
+    if disk_videos:
+        deity_videos = disk_videos
+    elif disk_images and deity_videos:
         deity_videos = []
+
+    disk_eligible = [img for img in eligible_images if Path(img.get("path", "")).exists()]
+    if disk_eligible:
+        eligible_images = disk_eligible
 
     has_videos = bool(deity_videos)
     has_images = bool(eligible_images)
@@ -567,7 +703,7 @@ def select_scene_assets(
             best_is_ver = False
             for cand in unused_videos:
                 score, matched = _get_semantic_match_details(cand, keywords)
-                is_ver = (cand.get("verification_status") == "verified_visual") if isinstance(cand, dict) else False
+                is_ver = _is_item_verified_visual(cand, deity_key, avatar)
                 if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_ver):
                     best_score = score
                     best_candidate = cand
@@ -602,7 +738,7 @@ def select_scene_assets(
                     img_best_is_ver = False
                     for cand in unused_images:
                         score, matched = _get_semantic_match_details(cand, keywords)
-                        is_ver = (cand.get("verification_status") == "verified_visual") if isinstance(cand, dict) else False
+                        is_ver = _is_item_verified_visual(cand, deity_key, avatar)
                         if score > img_best_score or (score == img_best_score and score > 0 and is_ver and not img_best_is_ver):
                             img_best_score = score
                             img_best_cand = cand
@@ -648,7 +784,7 @@ def select_scene_assets(
             best_is_ver = False
             for cand in img_pool:
                 score, matched = _get_semantic_match_details(cand, keywords)
-                is_ver = (cand.get("verification_status") == "verified_visual") if isinstance(cand, dict) else False
+                is_ver = _is_item_verified_visual(cand, deity_key, avatar)
                 if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_ver):
                     best_score = score
                     best_candidate = cand
@@ -719,7 +855,7 @@ def select_scene_assets(
             "deity": deity_key,
             "canonical_deity": deity_key,
             "avatar": avatar or selected_asset.get("avatar", deity_key),
-            "verification_status": "DEITY_VERIFIED" if (selected_asset.get("verification_status") == "verified_visual") else "DEITY_UNVERIFIED",
+            "verification_status": "DEITY_VERIFIED" if _is_item_verified_visual(selected_asset, deity_key, avatar) else "DEITY_UNVERIFIED",
             "provenance": selected_asset.get("provenance") or "Repository collection; curated deity asset",
             "source_path": selected_asset.get("path"),
             "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_num}",
@@ -766,11 +902,11 @@ def select_landscape_scene_assets(
     if avatar:
         repo_images = [
             img for img in repo_images
-            if img.get("avatar") == avatar and img.get("verification_status") == "verified_visual"
+            if _is_matching_avatar(img.get("avatar"), avatar) and _is_item_verified_visual(img, deity_key, avatar)
         ]
         repo_videos = [
             vid for vid in repo_videos
-            if vid.get("avatar") == avatar and vid.get("verification_status") == "verified_visual"
+            if _is_matching_avatar(vid.get("avatar"), avatar) and _is_item_verified_visual(vid, deity_key, avatar)
         ]
         if not repo_images and not repo_videos:
             folder_path = Path(gods_dir) / deity_key
@@ -824,7 +960,7 @@ def select_landscape_scene_assets(
             best_is_ver = False
             for candidate in unused_videos:
                 score, matched = _get_semantic_match_details(candidate, keywords)
-                is_ver = (candidate.get("verification_status") == "verified_visual") if isinstance(candidate, dict) else False
+                is_ver = _is_item_verified_visual(candidate, deity_key, avatar)
                 if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_ver):
                     best_score = score
                     best_candidate = candidate
@@ -859,7 +995,7 @@ def select_landscape_scene_assets(
                     img_best_is_ver = False
                     for candidate in unused_images:
                         score, matched = _get_semantic_match_details(candidate, keywords)
-                        is_ver = (candidate.get("verification_status") == "verified_visual") if isinstance(candidate, dict) else False
+                        is_ver = _is_item_verified_visual(candidate, deity_key, avatar)
                         if score > img_best_score or (score == img_best_score and score > 0 and is_ver and not img_best_is_ver):
                             img_best_score = score
                             img_best_cand = candidate
@@ -904,7 +1040,7 @@ def select_landscape_scene_assets(
             best_is_ver = False
             for candidate in img_pool:
                 score, matched = _get_semantic_match_details(candidate, keywords)
-                is_ver = (candidate.get("verification_status") == "verified_visual") if isinstance(candidate, dict) else False
+                is_ver = _is_item_verified_visual(candidate, deity_key, avatar)
                 if score > best_score or (score == best_score and score > 0 and is_ver and not best_is_ver):
                     best_score = score
                     best_candidate = candidate
@@ -951,7 +1087,7 @@ def select_landscape_scene_assets(
             "deity": deity_key,
             "canonical_deity": deity_key,
             "avatar": avatar or selected_asset.get("avatar", deity_key),
-            "verification_status": "DEITY_VERIFIED" if (selected_asset.get("verification_status") == "verified_visual") else "DEITY_UNVERIFIED",
+            "verification_status": "DEITY_VERIFIED" if _is_item_verified_visual(selected_asset, deity_key, avatar) else "DEITY_UNVERIFIED",
             "provenance": selected_asset.get("provenance") or "Repository collection; curated deity asset",
             "source_path": selected_asset.get("path"),
             "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_num}",
@@ -996,11 +1132,11 @@ def build_landscape_visual_timeline(
     if avatar:
         repo_images = [
             img for img in repo_images
-            if img.get("avatar") == avatar and img.get("verification_status") == "verified_visual"
+            if _is_matching_avatar(img.get("avatar"), avatar) and _is_item_verified_visual(img, deity_key, avatar)
         ]
         repo_videos = [
             vid for vid in repo_videos
-            if vid.get("avatar") == avatar and vid.get("verification_status") == "verified_visual"
+            if _is_matching_avatar(vid.get("avatar"), avatar) and _is_item_verified_visual(vid, deity_key, avatar)
         ]
         if not repo_images and not repo_videos:
             folder_path = Path(gods_dir) / deity_key
@@ -1065,7 +1201,7 @@ def build_landscape_visual_timeline(
             "deity": deity_key,
             "canonical_deity": deity_key,
             "avatar": avatar or asset_item.get("avatar", deity_key),
-            "verification_status": "DEITY_VERIFIED" if (asset_item.get("verification_status") == "verified_visual") else "DEITY_UNVERIFIED",
+            "verification_status": "DEITY_VERIFIED" if _is_item_verified_visual(asset_item, deity_key, avatar) else "DEITY_UNVERIFIED",
             "provenance": asset_item.get("provenance") or "Repository collection; curated deity asset",
             "source_path": asset_item["path"],
             "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_idx}",

@@ -39,6 +39,18 @@ def generate_asset_manifest(
     return manifest
 
 
+def _enrich_manifest_dict(manifest: dict[str, Any]) -> dict[str, Any]:
+    """Enriches loaded manifest in memory with trusted narrative & verification metadata."""
+    from src.assets.scanner import _enrich_asset_metadata
+    for deity_key, data in manifest.get("deities", {}).items():
+        for category in ("images", "videos"):
+            for item in data.get(category, []):
+                p_str = item.get("path", "")
+                stem = Path(p_str).stem if p_str else ""
+                _enrich_asset_metadata(item, stem, deity_key)
+    return manifest
+
+
 def load_asset_manifest(
     manifest_path: str | Path = MANIFEST_PATH,
     gods_dir: str | Path = "assets/gods",
@@ -47,15 +59,20 @@ def load_asset_manifest(
     """
     Load asset_manifest.json. If missing, empty, or force_rescan is True,
     generates a fresh manifest by scanning assets/gods/.
+    Enriches loaded records in memory with visual verification and provenance metadata.
     """
     p = Path(manifest_path)
+    manifest = None
     if not force_rescan and p.exists() and p.stat().st_size > 0:
         try:
-            return json.loads(p.read_text(encoding="utf-8"))
+            manifest = json.loads(p.read_text(encoding="utf-8"))
         except Exception:
             pass
 
-    return generate_asset_manifest(gods_dir=gods_dir, output_manifest_path=manifest_path)
+    if manifest is None:
+        manifest = generate_asset_manifest(gods_dir=gods_dir, output_manifest_path=manifest_path)
+
+    return _enrich_manifest_dict(manifest)
 
 
 def generate_landscape_asset_manifest(
@@ -92,15 +109,20 @@ def load_landscape_asset_manifest(
     """
     Load landscape_asset_manifest.json. If missing, empty, or force_rescan is True,
     generates a fresh manifest by scanning assets/gods_landscape_long_video/.
+    Enriches loaded records in memory with visual verification and provenance metadata.
     """
     if str(gods_dir) != "assets/gods_landscape_long_video":
         return generate_landscape_asset_manifest(gods_dir=gods_dir, output_manifest_path=None)
 
     m_path = Path(manifest_path or LANDSCAPE_MANIFEST_PATH)
+    manifest = None
     if not force_rescan and m_path.exists() and m_path.stat().st_size > 0:
         try:
-            return json.loads(m_path.read_text(encoding="utf-8"))
+            manifest = json.loads(m_path.read_text(encoding="utf-8"))
         except Exception:
             pass
 
-    return generate_landscape_asset_manifest(gods_dir=gods_dir, output_manifest_path=m_path)
+    if manifest is None:
+        manifest = generate_landscape_asset_manifest(gods_dir=gods_dir, output_manifest_path=m_path)
+
+    return _enrich_manifest_dict(manifest)

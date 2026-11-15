@@ -271,6 +271,8 @@ def scan_gods_assets(
                     try:
                         meta = validate_video_asset(item)
                         meta["deity"] = deity_key
+                        stem = item.stem
+                        meta = _enrich_asset_metadata(meta, stem, deity_key)
                         if not any(v.get("path") == meta.get("path") for v in videos):
                             videos.append(meta)
                             total_videos += 1

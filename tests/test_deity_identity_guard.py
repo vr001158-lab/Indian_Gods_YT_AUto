@@ -862,6 +862,174 @@ class TestDeityIdentityConsistency(unittest.TestCase):
         self.assertIn("varaha", detail.lower())
         self.assertIn("kurma", detail.lower())
 
+    def test_26_verified_shiva_scene_from_manifest_passes_final_qa(self):
+        """26. Verified Shiva scene from manifest receives DEITY_VERIFIED and passes final QA."""
+        from src.assets.manifest import load_asset_manifest
+        manifest = load_asset_manifest()
+        script = {
+            "title": "Secrets of Shiva Snake",
+            "approval_metadata": {"selected_topic": "Why Lord Shiva Wears a Snake Around His Neck", "deity": "lord_shiva"},
+            "scene_scripts": [
+                {"scene": 1, "visual_reference": "Lord Shiva with snake around neck", "duration_seconds": 15},
+            ],
+            "content_type": "short",
+        }
+        decisions = select_scene_assets(
+            deity_key="lord_shiva",
+            scene_scripts=script["scene_scripts"],
+            manifest=manifest,
+            content_type="short",
+        )
+        self.assertEqual(len(decisions), 1)
+        self.assertEqual(decisions[0]["verification_status"], "DEITY_VERIFIED")
+        self.assertEqual(decisions[0]["canonical_deity"], "lord_shiva")
+        self.assertIn("curated deity asset", decisions[0]["provenance"])
+
+        decision = {"selected_topic": "Why Lord Shiva Wears a Snake Around His Neck", "deity": "lord_shiva"}
+        visual_map = {"visual_scenes": decisions}
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+        )
+        self.assertTrue(ok, f"Expected PASS for verified Shiva scene, got: {detail}")
+        self.assertEqual(detail, "OK")
+
+    def test_27_verified_ganesha_scene_from_manifest_passes_final_qa(self):
+        """27. Verified Ganesha scene from manifest receives DEITY_VERIFIED and passes final QA."""
+        from src.assets.manifest import load_asset_manifest
+        manifest = load_asset_manifest()
+        script = {
+            "title": "The Mystery of Lord Ganesha Single Tusk",
+            "approval_metadata": {"selected_topic": "The Mystery of Lord Ganesha Single Tusk", "deity": "ganesha"},
+            "scene_scripts": [
+                {"scene": 1, "visual_reference": "Lord Ganesha smiling with modak", "duration_seconds": 15},
+            ],
+            "content_type": "short",
+        }
+        decisions = select_scene_assets(
+            deity_key="ganesha",
+            scene_scripts=script["scene_scripts"],
+            manifest=manifest,
+            content_type="short",
+        )
+        self.assertEqual(len(decisions), 1)
+        self.assertEqual(decisions[0]["verification_status"], "DEITY_VERIFIED")
+        self.assertEqual(decisions[0]["canonical_deity"], "ganesha")
+
+        decision = {"selected_topic": "The Mystery of Lord Ganesha Single Tusk", "deity": "ganesha"}
+        visual_map = {"visual_scenes": decisions}
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+        )
+        self.assertTrue(ok, f"Expected PASS for verified Ganesha scene, got: {detail}")
+        self.assertEqual(detail, "OK")
+
+    def test_28_generic_unverified_vishnu_scene_from_manifest_rejected(self):
+        """28. Generic unverified Vishnu scene from manifest receives DEITY_UNVERIFIED and fails QA."""
+        from src.assets.manifest import load_asset_manifest
+        manifest = load_asset_manifest()
+        script = {
+            "title": "The Mystery of Lord Vishnu Cosmic Sleep",
+            "approval_metadata": {"selected_topic": "The Mystery of Lord Vishnu Cosmic Sleep", "deity": "lord_vishnu"},
+            "scene_scripts": [
+                {"scene": 1, "visual_reference": "Vishnu reclining on Shesha", "duration_seconds": 15},
+            ],
+            "content_type": "short",
+        }
+        decisions = select_scene_assets(
+            deity_key="lord_vishnu",
+            scene_scripts=script["scene_scripts"],
+            manifest=manifest,
+            content_type="short",
+        )
+        self.assertEqual(len(decisions), 1)
+        self.assertEqual(decisions[0]["verification_status"], "DEITY_UNVERIFIED")
+
+        decision = {"selected_topic": "The Mystery of Lord Vishnu Cosmic Sleep", "deity": "lord_vishnu"}
+        visual_map = {"visual_scenes": decisions}
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+        )
+        self.assertFalse(ok)
+        self.assertIn("DEITY_UNVERIFIED", detail)
+
+    def test_29_unapproved_chatgpt_draft_from_manifest_rejected(self):
+        """29. Unapproved ChatGPT draft from manifest receives DEITY_UNVERIFIED and fails QA."""
+        from src.assets.selector import _is_item_verified_visual
+        draft_item = {
+            "path": "assets/gods/lord_shiva/ChatGPT Image May 29, 2026, 11_43_12 AM.png",
+            "type": "image",
+            "deity": "lord_shiva",
+        }
+        self.assertFalse(_is_item_verified_visual(draft_item, "lord_shiva"))
+        self.assertEqual(draft_item.get("verification_status"), "unverified")
+
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": draft_item["path"],
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_UNVERIFIED",
+                    "provenance": "Existing repository collection",
+                }
+            ]
+        }
+        decision = {"selected_topic": "Why Lord Shiva Wears a Snake Around His Neck", "deity": "lord_shiva"}
+        script = {"title": "శివుని మెడలోని పాము రహస్యం"}
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+        )
+        self.assertFalse(ok)
+        self.assertIn("DEITY_UNVERIFIED", detail)
+
+    def test_30_scene_metadata_preservation_through_asset_plan_and_qa(self):
+        """30. Complete Scene Asset Plan generation preserves identity metadata through QA."""
+        from src.assets.resolver import create_scene_asset_plan
+        script = {
+            "title": "Secrets of Shiva Snake",
+            "approval_metadata": {"selected_topic": "Why Lord Shiva Wears a Snake Around His Neck", "deity": "lord_shiva"},
+            "scene_scripts": [
+                {"scene": 1, "visual_reference": "Lord Shiva with snake around neck", "duration_seconds": 15},
+                {"scene": 2, "visual_reference": "Lord Shiva meditating in Himalayas", "duration_seconds": 15},
+            ],
+            "content_type": "short",
+        }
+        plan = create_scene_asset_plan(script)
+        self.assertEqual(plan["canonical_deity"], "lord_shiva")
+        for sc in plan["scenes"]:
+            self.assertEqual(sc["canonical_deity"], "lord_shiva")
+            self.assertEqual(sc["verification_status"], "DEITY_VERIFIED")
+            self.assertIn("curated deity asset", sc["provenance"])
+
+        decision = {"selected_topic": "Why Lord Shiva Wears a Snake Around His Neck", "deity": "lord_shiva"}
+        visual_map = {"visual_scenes": plan["scenes"]}
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+        )
+        self.assertTrue(ok, f"Expected PASS for asset plan, got: {detail}")
+        self.assertEqual(detail, "OK")
+
 
 if __name__ == "__main__":
     unittest.main()
