@@ -9,12 +9,15 @@ from src.visual.schemas import validate_script_input, validate_visual_map_output
 from src.visual.planner import plan_visuals
 from src.visual.providers import (
     FluxProvider,
+    LocalVisualProvider,
     MockVisualProvider,
     PollinationsVisualProvider,
     StableDiffusionProvider,
 )
 
 PROVIDERS = {
+    "local":              LocalVisualProvider,
+    "repository":         LocalVisualProvider,
     "flux":               FluxProvider,
     "stable_diffusion":   StableDiffusionProvider,
     "pollinations":       PollinationsVisualProvider,
@@ -88,7 +91,7 @@ def _find_genuine_deity_image(deity_key: str, scene_num: int = 1, content_type: 
 
 def generate_visual_mapping(
     script: dict,
-    provider_name: str = "mock",
+    provider_name: str = "local",
     style_preset: str = "Devotional Cinematic Painting, 8k, divine golden glow",
     output_dir: Path = Path("data/visuals"),
     format: str | None = None,
@@ -197,6 +200,15 @@ def generate_visual_mapping(
 
         v_prompt = f"{visual_ref} (Scene #{scene_num}: {asset_type} asset from {source})" if visual_ref else f"Scene #{scene_num}: {asset_type} asset from {source}"
 
+        source_asset_path = scene_item.get("source_asset_path") or scene_item.get("source_path") or asset_path
+        source_asset_type = scene_item.get("source_asset_type") or asset_type
+        source_deity = scene_item.get("source_deity") or scene_item.get("canonical_deity") or asset_plan.get("deity")
+        source_avatar = scene_item.get("source_avatar") or scene_item.get("avatar") or asset_plan.get("avatar")
+        source_approval = scene_item.get("source_approval_status") or ("APPROVED" if scene_item.get("verification_status") in ("DEITY_VERIFIED", "verified_visual") else "UNAPPROVED")
+        source_integrity = scene_item.get("source_integrity_status", "VALID")
+        source_verification = scene_item.get("source_verification_status") or ("verified_visual" if scene_item.get("verification_status") in ("DEITY_VERIFIED", "verified_visual") else "unverified")
+        provenance = scene_item.get("provenance") or "Repository collection; curated deity asset"
+
         visual_scenes.append({
             "scene": scene_num,
             "visual_prompt": v_prompt,
@@ -209,8 +221,15 @@ def generate_visual_mapping(
             "canonical_deity": scene_item.get("canonical_deity", asset_plan.get("deity")),
             "avatar": scene_item.get("avatar", asset_plan.get("avatar")),
             "verification_status": scene_item.get("verification_status", "DEITY_UNVERIFIED"),
-            "provenance": scene_item.get("provenance", source),
-            "source_path": scene_item.get("source_path", asset_path),
+            "provenance": provenance,
+            "source_path": source_asset_path,
+            "source_asset_path": source_asset_path,
+            "source_asset_type": source_asset_type,
+            "source_deity": source_deity,
+            "source_avatar": source_avatar,
+            "source_approval_status": source_approval,
+            "source_integrity_status": source_integrity,
+            "source_verification_status": source_verification,
             "scene_identity": scene_item.get("scene_identity", f"{asset_plan.get('deity')}:{asset_plan.get('avatar') or asset_plan.get('deity')}:scene_{scene_num}"),
         })
 
@@ -239,7 +258,7 @@ def generate_visual_mapping(
 
 def process_script_file(
     script_path: Path,
-    provider_name: str = "mock",
+    provider_name: str = "local",
     style_preset: str = "Devotional Cinematic Painting, 8k, divine golden glow",
     output_dir: Path = Path("data/visuals"),
     format: str | None = None,

@@ -263,7 +263,7 @@ class PipelineRunner:
             raise ValueError(f"Missing or invalid script input file: {script_file}")
 
         start_time = time.time()
-        provider = "mock" if self.dry_run else "flux"
+        provider = "mock" if self.dry_run else "local"
         cmd = [
             sys.executable, "run_visual_generator.py",
             "--input", str(script_file),

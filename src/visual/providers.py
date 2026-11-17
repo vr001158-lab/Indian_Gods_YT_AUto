@@ -212,6 +212,24 @@ class VisualProvider:
 
 
 # ---------------------------------------------------------------------------
+# Local repository provider — production standard
+# ---------------------------------------------------------------------------
+
+class LocalVisualProvider(VisualProvider):
+    """
+    Local repository visual asset provider.
+    Enforces that visual assets must come exclusively from verified repository collections.
+    Does not make network calls or external image generation requests.
+    """
+
+    def generate_image(self, prompt: str, style: str, output_path: Path) -> Path:
+        raise RuntimeError(
+            "External or AI-synthesized visual generation is strictly prohibited in production. "
+            "All visual assets must be sourced exclusively from verified local repository assets."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Production providers — all generate REAL images
 # ---------------------------------------------------------------------------
 

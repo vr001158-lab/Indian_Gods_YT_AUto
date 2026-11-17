@@ -68,7 +68,7 @@ def print_visual_map(visual_map: dict):
 
 def main():
     input_file = None
-    provider_name = "mock"
+    provider_name = "local"
     style_preset = DEFAULT_STYLE
     format_type = "narrated"
     content_type = "short"

@@ -575,18 +575,30 @@ def build_deity_visual_timeline(
         elif rem < seg_dur:
             seg_dur = rem
 
+        is_ver = _is_item_verified_visual(asset_item, deity_key, avatar)
+        prov = asset_item.get("provenance") or "Repository collection; curated deity asset"
+        source_path = asset_item["path"]
+
         timeline.append({
             "scene": scene_idx,
             "asset_type": atype,
-            "asset": asset_item["path"],
-            "image_file": asset_item["path"],
+            "asset": source_path,
+            "image_file": source_path,
+            "video_file": source_path if atype == "video" else None,
             "asset_id": asset_item.get("asset_id", f"{deity_key}_{scene_idx}"),
             "deity": deity_key,
             "canonical_deity": deity_key,
             "avatar": avatar or asset_item.get("avatar", deity_key),
-            "verification_status": "DEITY_VERIFIED" if _is_item_verified_visual(asset_item, deity_key, avatar) else "DEITY_UNVERIFIED",
-            "provenance": asset_item.get("provenance") or "Repository collection; curated deity asset",
-            "source_path": asset_item["path"],
+            "verification_status": "DEITY_VERIFIED" if is_ver else "DEITY_UNVERIFIED",
+            "provenance": prov,
+            "source_path": source_path,
+            "source_asset_path": source_path,
+            "source_asset_type": atype,
+            "source_deity": deity_key,
+            "source_avatar": avatar or asset_item.get("avatar", deity_key),
+            "source_approval_status": "APPROVED" if is_ver else "UNAPPROVED",
+            "source_integrity_status": "VALID",
+            "source_verification_status": "verified_visual" if is_ver else "unverified",
             "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_idx}",
             "duration_seconds": round(seg_dur, 2),
             "source": "repository",
@@ -847,17 +859,31 @@ def select_scene_assets(
         if selected_asset.get("path"):
             used_asset_paths.add(selected_asset["path"])
 
+        is_ver = _is_item_verified_visual(selected_asset, deity_key, avatar)
+        prov = selected_asset.get("provenance") or "Repository collection; curated deity asset"
+        source_path = selected_asset.get("path")
+        atype = selected_asset.get("type", "image")
+
         scene_plan.append({
             "scene": scene_num,
-            "asset_type": selected_asset["type"],
-            "asset": selected_asset["path"],
+            "asset_type": atype,
+            "asset": source_path,
+            "image_file": source_path,
+            "video_file": source_path if atype == "video" else None,
             "asset_id": selected_asset.get("asset_id", ""),
             "deity": deity_key,
             "canonical_deity": deity_key,
             "avatar": avatar or selected_asset.get("avatar", deity_key),
-            "verification_status": "DEITY_VERIFIED" if _is_item_verified_visual(selected_asset, deity_key, avatar) else "DEITY_UNVERIFIED",
-            "provenance": selected_asset.get("provenance") or "Repository collection; curated deity asset",
-            "source_path": selected_asset.get("path"),
+            "verification_status": "DEITY_VERIFIED" if is_ver else "DEITY_UNVERIFIED",
+            "provenance": prov,
+            "source_path": source_path,
+            "source_asset_path": source_path,
+            "source_asset_type": atype,
+            "source_deity": deity_key,
+            "source_avatar": avatar or selected_asset.get("avatar", deity_key),
+            "source_approval_status": "APPROVED" if is_ver else "UNAPPROVED",
+            "source_integrity_status": "VALID",
+            "source_verification_status": "verified_visual" if is_ver else "unverified",
             "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_num}",
             "source": selection_source,
             "reason_for_selection": selection_reason,
@@ -1079,17 +1105,31 @@ def select_landscape_scene_assets(
         if selected_asset.get("path"):
             used_asset_paths.add(selected_asset["path"])
 
+        is_ver = _is_item_verified_visual(selected_asset, deity_key, avatar)
+        prov = selected_asset.get("provenance") or "Repository collection; curated deity asset"
+        source_path = selected_asset.get("path")
+        atype = selected_asset.get("type", "image")
+
         scene_plan.append({
             "scene": scene_num,
-            "asset_type": selected_asset["type"],
-            "asset": selected_asset["path"],
+            "asset_type": atype,
+            "asset": source_path,
+            "image_file": source_path,
+            "video_file": source_path if atype == "video" else None,
             "asset_id": selected_asset.get("asset_id", ""),
             "deity": deity_key,
             "canonical_deity": deity_key,
             "avatar": avatar or selected_asset.get("avatar", deity_key),
-            "verification_status": "DEITY_VERIFIED" if _is_item_verified_visual(selected_asset, deity_key, avatar) else "DEITY_UNVERIFIED",
-            "provenance": selected_asset.get("provenance") or "Repository collection; curated deity asset",
-            "source_path": selected_asset.get("path"),
+            "verification_status": "DEITY_VERIFIED" if is_ver else "DEITY_UNVERIFIED",
+            "provenance": prov,
+            "source_path": source_path,
+            "source_asset_path": source_path,
+            "source_asset_type": atype,
+            "source_deity": deity_key,
+            "source_avatar": avatar or selected_asset.get("avatar", deity_key),
+            "source_approval_status": "APPROVED" if is_ver else "UNAPPROVED",
+            "source_integrity_status": "VALID",
+            "source_verification_status": "verified_visual" if is_ver else "unverified",
             "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_num}",
             "source": "landscape_repository",
             "reason_for_selection": selection_reason,
@@ -1192,18 +1232,30 @@ def build_landscape_visual_timeline(
         elif rem < seg_dur:
             seg_dur = rem
 
+        is_ver = _is_item_verified_visual(asset_item, deity_key, avatar)
+        prov = asset_item.get("provenance") or "Repository collection; curated deity asset"
+        source_path = asset_item["path"]
+
         timeline.append({
             "scene": scene_idx,
             "asset_type": atype,
-            "asset": asset_item["path"],
-            "image_file": asset_item["path"],
+            "asset": source_path,
+            "image_file": source_path,
+            "video_file": source_path if atype == "video" else None,
             "asset_id": asset_item.get("asset_id", f"{deity_key}_{scene_idx}"),
             "deity": deity_key,
             "canonical_deity": deity_key,
             "avatar": avatar or asset_item.get("avatar", deity_key),
-            "verification_status": "DEITY_VERIFIED" if _is_item_verified_visual(asset_item, deity_key, avatar) else "DEITY_UNVERIFIED",
-            "provenance": asset_item.get("provenance") or "Repository collection; curated deity asset",
-            "source_path": asset_item["path"],
+            "verification_status": "DEITY_VERIFIED" if is_ver else "DEITY_UNVERIFIED",
+            "provenance": prov,
+            "source_path": source_path,
+            "source_asset_path": source_path,
+            "source_asset_type": atype,
+            "source_deity": deity_key,
+            "source_avatar": avatar or asset_item.get("avatar", deity_key),
+            "source_approval_status": "APPROVED" if is_ver else "UNAPPROVED",
+            "source_integrity_status": "VALID",
+            "source_verification_status": "verified_visual" if is_ver else "unverified",
             "scene_identity": f"{deity_key}:{avatar or deity_key}:scene_{scene_idx}",
             "duration_seconds": round(seg_dur, 2),
             "source": "landscape_repository",

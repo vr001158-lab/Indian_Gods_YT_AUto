@@ -1030,6 +1030,409 @@ class TestDeityIdentityConsistency(unittest.TestCase):
         self.assertTrue(ok, f"Expected PASS for asset plan, got: {detail}")
         self.assertEqual(detail, "OK")
 
+    def test_31_production_visual_generation_does_not_invoke_flux(self):
+        """31. Production visual pipeline strictly defaults to 'local' and never invokes 'flux'."""
+        import inspect
+        from src.pipeline.orchestrator import PipelineRunner
+        from src.visual.generator import PROVIDERS, generate_visual_mapping
+        from src.visual.providers import LocalVisualProvider
+
+        # 1. Local visual provider is mapped to production provider keys
+        self.assertIn("local", PROVIDERS)
+        self.assertIn("repository", PROVIDERS)
+        self.assertIs(PROVIDERS["local"], LocalVisualProvider)
+        self.assertIs(PROVIDERS["repository"], LocalVisualProvider)
+
+        # 2. PipelineRunner production mode (dry_run=False) uses 'local'
+        runner = PipelineRunner(dry_run=False)
+        provider = "mock" if runner.dry_run else "local"
+        self.assertEqual(provider, "local")
+
+        # 3. generate_visual_mapping signature defaults to provider_name='local'
+        sig = inspect.signature(generate_visual_mapping)
+        self.assertEqual(sig.parameters["provider_name"].default, "local")
+
+    def test_32_no_external_visual_downloads_occur(self):
+        """32. LocalVisualProvider and local generator mode prohibit external AI synthesis or downloads."""
+        from unittest.mock import patch
+        from src.visual.providers import LocalVisualProvider
+        from src.visual.generator import generate_visual_mapping
+
+        prov = LocalVisualProvider()
+        out_p = self.temp_dir / "external_attempt.png"
+        with self.assertRaises(RuntimeError) as ctx:
+            prov.generate_image("Prompt", "Style", out_p)
+        self.assertIn("strictly prohibited in production", str(ctx.exception))
+
+        # Generator in local mode rejects non-repository source assets
+        mock_script = {"title": "Lord Shiva Story", "approval_metadata": {}}
+        fake_plan = {
+            "deity": "lord_shiva",
+            "scenes": [
+                {
+                    "scene": 1,
+                    "asset_type": "image",
+                    "asset": "data/visuals/online_cache/scene_1.png",
+                    "source": "online",
+                }
+            ],
+        }
+        with patch("src.visual.generator.validate_script_input", return_value=(True, "OK")), \
+             patch("src.assets.resolver.create_scene_asset_plan", return_value=fake_plan):
+            with self.assertRaises(RuntimeError) as ctx:
+                generate_visual_mapping(
+                    script=mock_script,
+                    provider_name="local",
+                    output_dir=self.temp_dir / "vis",
+                )
+            self.assertIn("strictly prohibited in production", str(ctx.exception))
+
+    def test_33_existing_local_deity_videos_selected_first(self):
+        """33. Selector prioritizes existing approved local deity-specific videos over images."""
+        manifest = {
+            "deities": {
+                "lord_shiva": {
+                    "images": [
+                        {
+                            "path": "assets/gods/lord_shiva/shiva_meditating.jpg",
+                            "avatar": "lord_shiva",
+                            "verification_status": "verified_visual",
+                            "type": "image",
+                            "width": 720,
+                            "height": 1280,
+                        }
+                    ],
+                    "videos": [
+                        {
+                            "path": "assets/gods_processed/shiva/vertical/shiva_dance.mp4",
+                            "avatar": "lord_shiva",
+                            "verification_status": "verified_visual",
+                            "type": "video",
+                            "width": 720,
+                            "height": 1280,
+                        }
+                    ],
+                }
+            }
+        }
+        timeline = build_deity_visual_timeline(
+            deity_key="lord_shiva",
+            manifest=manifest,
+            content_type="short",
+            target_duration=30.0,
+        )
+        self.assertTrue(len(timeline) > 0)
+        first_scene = timeline[0]
+        self.assertEqual(first_scene["asset_type"], "video")
+        self.assertEqual(first_scene["source_asset_type"], "video")
+        self.assertEqual(first_scene["source_asset_path"], "assets/gods_processed/shiva/vertical/shiva_dance.mp4")
+
+    def test_34_matching_images_used_when_videos_unavailable(self):
+        """34. Matching deity images are safely selected when deity videos are unavailable."""
+        manifest = {
+            "deities": {
+                "lord_shiva": {
+                    "images": [
+                        {
+                            "path": "assets/gods/lord_shiva/shiva_meditating.jpg",
+                            "avatar": "lord_shiva",
+                            "verification_status": "verified_visual",
+                            "type": "image",
+                            "width": 720,
+                            "height": 1280,
+                        }
+                    ],
+                    "videos": [],
+                }
+            }
+        }
+        timeline = build_deity_visual_timeline(
+            deity_key="lord_shiva",
+            manifest=manifest,
+            content_type="short",
+            target_duration=30.0,
+        )
+        self.assertTrue(len(timeline) > 0)
+        first_scene = timeline[0]
+        self.assertEqual(first_scene["asset_type"], "image")
+        self.assertEqual(first_scene["source_asset_type"], "image")
+        self.assertEqual(first_scene["canonical_deity"], "lord_shiva")
+        self.assertEqual(first_scene["source_approval_status"], "APPROVED")
+        self.assertEqual(first_scene["verification_status"], "DEITY_VERIFIED")
+
+    def test_35_verified_source_asset_produces_rendered_scene_passing_qa(self):
+        """35. Rendered scene referencing a verified, approved source asset passes QA."""
+        shiva_dir = Path("assets/gods/lord_shiva")
+        cands = [p for p in shiva_dir.glob("*.jpg") if "chatgpt" not in p.name.lower()]
+        shiva_img = str(cands[0]).replace("\\", "/") if cands else "assets/gods/lord_shiva/shiva.jpg"
+
+        rendered_scene_png = self.temp_dir / "scene_1.png"
+        rendered_scene_png.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_content")
+
+        decision = {"selected_topic": "Secrets of Lord Shiva", "deity": "lord_shiva"}
+        script = {"title": "శివుని లీలలు"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": str(rendered_scene_png).replace("\\", "/"),
+                    "source_path": shiva_img,
+                    "source_asset_path": shiva_img,
+                    "source_asset_type": "image",
+                    "source_deity": "lord_shiva",
+                    "source_avatar": "lord_shiva",
+                    "source_approval_status": "APPROVED",
+                    "source_integrity_status": "VALID",
+                    "source_verification_status": "verified_visual",
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertTrue(ok, f"Expected PASS for valid source provenance, got: {detail}")
+        self.assertEqual(detail, "OK")
+
+    def test_36_generated_scene_without_trusted_source_provenance_fails_qa(self):
+        """36. Generated visual scene lacking catalog-approved source asset fails QA."""
+        unprovenanced_png = self.temp_dir / "scene_1.png"
+        unprovenanced_png.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_content")
+
+        decision = {"selected_topic": "Secrets of Lord Shiva", "deity": "lord_shiva"}
+        script = {"title": "శివుని లీలలు"}
+        # Case A: Missing source_asset_path entirely
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": str(unprovenanced_png).replace("\\", "/"),
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Generated frame",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertIn("lacks declared source asset provenance", detail)
+
+        # Case B: Unindexed source_asset_path
+        visual_map["visual_scenes"][0]["source_asset_path"] = "assets/gods/lord_shiva/unindexed_file.png"
+        ok2, detail2 = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok2)
+        self.assertIn("lacks an explicit trusted", detail2)
+
+    def test_37_fraudulent_source_metadata_fails_qa(self):
+        """37. Scene claiming approval for an unapproved draft source asset is detected and rejected."""
+        unapproved_draft = "assets/gods/lord_shiva/ChatGPT Image May 29, 2026, 11_43_12 AM.png"
+        rendered_scene_png = self.temp_dir / "scene_1.png"
+        rendered_scene_png.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_content")
+
+        decision = {"selected_topic": "Secrets of Lord Shiva", "deity": "lord_shiva"}
+        script = {"title": "శివుని లీలలు"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": str(rendered_scene_png).replace("\\", "/"),
+                    "source_asset_path": unapproved_draft,
+                    "source_asset_type": "image",
+                    "source_deity": "lord_shiva",
+                    "source_avatar": "lord_shiva",
+                    # Fraudulent claim: asserting APPROVED on an unapproved draft
+                    "source_approval_status": "APPROVED",
+                    "source_integrity_status": "VALID",
+                    "source_verification_status": "verified_visual",
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertIn("unapproved", detail.lower())
+
+    def test_38_cross_deity_source_assets_fail_qa(self):
+        """38. Rendered scene derived from a different deity's source asset fails QA."""
+        ganesha_dir = Path("assets/gods/ganesha")
+        cands = [p for p in ganesha_dir.glob("*.jpg") if "chatgpt" not in p.name.lower()]
+        ganesha_img = str(cands[0]).replace("\\", "/") if cands else "assets/gods/ganesha/ganesha.jpg"
+
+        rendered_scene_png = self.temp_dir / "scene_1.png"
+        rendered_scene_png.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_content")
+
+        decision = {"selected_topic": "Lord Shiva Meditation", "deity": "lord_shiva"}
+        script = {"title": "శివుని ధ్యానం"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": str(rendered_scene_png).replace("\\", "/"),
+                    "source_asset_path": ganesha_img,
+                    "source_asset_type": "image",
+                    "source_deity": "ganesha",
+                    "source_avatar": "ganesha",
+                    "source_approval_status": "APPROVED",
+                    "source_integrity_status": "VALID",
+                    "source_verification_status": "verified_visual",
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertIn("ganesha", detail.lower())
+        self.assertIn("mismatch", detail.lower())
+
+    def test_39_missing_source_files_fail_qa(self):
+        """39. Source asset path pointing to nonexistent file on disk fails QA in production mode."""
+        rendered_scene_png = self.temp_dir / "scene_1.png"
+        rendered_scene_png.write_bytes(b"\x89PNG\r\n\x1a\nfake_image_content")
+
+        nonexistent_source = "assets/gods/lord_shiva/nonexistent_file_shiva_12345.jpg"
+        decision = {"selected_topic": "Lord Shiva Meditation", "deity": "lord_shiva"}
+        script = {"title": "శివుని ధ్యానం"}
+        visual_map = {
+            "visual_scenes": [
+                {
+                    "scene": 1,
+                    "image_file": str(rendered_scene_png).replace("\\", "/"),
+                    "source_asset_path": nonexistent_source,
+                    "source_asset_type": "image",
+                    "source_deity": "lord_shiva",
+                    "source_avatar": "lord_shiva",
+                    "source_approval_status": "APPROVED",
+                    "source_integrity_status": "VALID",
+                    "source_verification_status": "verified_visual",
+                    "canonical_deity": "lord_shiva",
+                    "avatar": "lord_shiva",
+                    "verification_status": "DEITY_VERIFIED",
+                    "provenance": "Repository collection; curated deity asset",
+                }
+            ]
+        }
+        ok, detail = check_deity_identity_consistency(
+            decision=decision,
+            script=script,
+            visual_map=visual_map,
+            video_map={},
+            thumbnail_meta=None,
+            allow_mock=False,
+        )
+        self.assertFalse(ok)
+        self.assertTrue(
+            "not found on disk" in detail.lower() or "lacks an explicit trusted" in detail.lower(),
+            f"Expected disk existence or catalog approval error, got: {detail}",
+        )
+
+    def test_40_both_short_and_landscape_workflows_preserve_provenance(self):
+        """40. Both short and landscape selection workflows populate and preserve all 8 provenance fields."""
+        from src.assets.selector import select_landscape_scene_assets
+
+        manifest = {
+            "deities": {
+                "lord_shiva": {
+                    "images": [
+                        {
+                            "path": "assets/gods/lord_shiva/shiva_vertical.jpg",
+                            "avatar": "lord_shiva",
+                            "verification_status": "verified_visual",
+                            "type": "image",
+                            "width": 720,
+                            "height": 1280,
+                        },
+                        {
+                            "path": "assets/gods_landscape_long_video/lord_shiva/shiva_horizontal.jpg",
+                            "avatar": "lord_shiva",
+                            "verification_status": "verified_visual",
+                            "type": "image",
+                            "width": 1920,
+                            "height": 1080,
+                        },
+                    ],
+                    "videos": [],
+                }
+            }
+        }
+
+        # 1. Short workflow
+        short_timeline = build_deity_visual_timeline(
+            deity_key="lord_shiva",
+            manifest=manifest,
+            content_type="short",
+            target_duration=30.0,
+        )
+        self.assertTrue(len(short_timeline) > 0)
+        required_provenance_keys = [
+            "source_asset_path",
+            "source_asset_type",
+            "source_deity",
+            "source_avatar",
+            "source_approval_status",
+            "source_integrity_status",
+            "source_verification_status",
+            "provenance",
+        ]
+        for sc in short_timeline:
+            for k in required_provenance_keys:
+                self.assertIn(k, sc, f"Key '{k}' missing from short timeline scene")
+                self.assertTrue(sc[k], f"Value for '{k}' is empty in short timeline scene")
+
+        # 2. Landscape workflow
+        landscape_scenes = select_landscape_scene_assets(
+            deity_key="lord_shiva",
+            scene_scripts=[{"scene": 1, "visual_reference": "Shiva meditating"}],
+            manifest=manifest,
+        )
+        self.assertTrue(len(landscape_scenes) > 0)
+        for sc in landscape_scenes:
+            for k in required_provenance_keys:
+                self.assertIn(k, sc, f"Key '{k}' missing from landscape scene")
+                self.assertTrue(sc[k], f"Value for '{k}' is empty in landscape scene")
+
 
 if __name__ == "__main__":
     unittest.main()

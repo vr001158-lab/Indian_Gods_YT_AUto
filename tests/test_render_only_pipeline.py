@@ -53,8 +53,8 @@ class TestRenderOnlyPipeline(unittest.TestCase):
         self.assertEqual(mode, "production")
 
         # Check visual provider resolution
-        vis_provider = "mock" if runner.dry_run else "flux"
-        self.assertEqual(vis_provider, "flux")
+        vis_provider = "mock" if runner.dry_run else "local"
+        self.assertEqual(vis_provider, "local")
 
         # Check video composer resolution
         composer = "mock" if runner.dry_run else "ffmpeg"

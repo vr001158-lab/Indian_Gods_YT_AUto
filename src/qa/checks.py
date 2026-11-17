@@ -908,29 +908,47 @@ def check_deity_identity_consistency(
                 if not sc_prov or not str(sc_prov).strip() or str(sc_prov).strip().lower() in ("unverified", "unknown", "none"):
                     return False, f"Scene #{sc_num} missing or invalid asset provenance"
 
-                # 1e. Inspect every populated visual asset field: image_file, video_file, source_path
-                visual_assets: list[tuple[str, str]] = []
+                # 1e. Source Provenance & Visual Asset Verification
                 sc_img = str(sc.get("image_file") or "").strip()
                 sc_vid = str(sc.get("video_file") or "").strip()
-                sc_src = str(sc.get("source_path") or "").strip()
+                sc_src = str(sc.get("source_asset_path") or sc.get("source_path") or "").strip()
 
-                if sc_img:
-                    visual_assets.append(("image_file", sc_img))
-                if sc_vid:
-                    visual_assets.append(("video_file", sc_vid))
-                if sc_src and sc_src != sc_img and sc_src != sc_vid:
-                    visual_assets.append(("source_path", sc_src))
-
-                if not visual_assets:
-                    return False, f"Scene #{sc_num} missing visual asset (image_file, video_file, or source_path)"
+                if not sc_img and not sc_vid and not sc_src:
+                    return False, f"Scene #{sc_num} missing visual asset (image_file, video_file, or source_asset_path)"
 
                 cur_target_deity = (expected_deity or sc_deity_clean).strip().lower()
 
-                for asset_field, asset_path in visual_assets:
-                    norm_asset_path = asset_path.replace("\\", "/").lower()
-                    stem = Path(norm_asset_path).stem.lower()
+                # Step 1: Resolve the declared source asset
+                declared_source = sc_src
+                if not declared_source:
+                    for cand in (sc_vid, sc_img):
+                        if cand and any(repo in cand.replace("\\", "/").lower() for repo in ("assets/gods", "assets/gods_landscape_long_video", "assets/gods_processed")):
+                            declared_source = cand
+                            break
+                if not declared_source:
+                    declared_source = sc_src or sc_vid or sc_img
 
-                    # Check for cross-deity directory or filename indication
+                # If the scene is a rendered output (e.g. data/visuals/run_... or data/render_only/ or tmp)
+                # and lacks a declared repository source asset, REJECT immediately!
+                is_rendered_output = sc_img and any(out_dir in sc_img.replace("\\", "/").lower() for out_dir in ("data/visuals", "data/render_only", "temp", "tmp"))
+                if not allow_mock and is_rendered_output and not sc_src and not sc_vid:
+                    return False, f"Scene #{sc_num} rendered scene '{sc_img}' lacks declared source asset provenance (source_asset_path)"
+
+                if not declared_source and not allow_mock:
+                    return False, f"Scene #{sc_num} lacks declared source asset provenance"
+
+                # Step 2: Verify Source Assets against Authoritative Catalog (DeityAssetIndex / KNOWN_NARRATIVE_METADATA)
+                source_assets_to_verify = [declared_source] if declared_source else []
+                if sc_vid and any(repo in sc_vid.replace("\\", "/").lower() for repo in ("assets/gods", "assets/gods_landscape_long_video", "assets/gods_processed")) and sc_vid != declared_source:
+                    source_assets_to_verify.append(sc_vid)
+                if sc_img and any(repo in sc_img.replace("\\", "/").lower() for repo in ("assets/gods", "assets/gods_landscape_long_video", "assets/gods_processed")) and sc_img != declared_source:
+                    source_assets_to_verify.append(sc_img)
+
+                for s_path in source_assets_to_verify:
+                    norm_src = s_path.replace("\\", "/").lower()
+                    src_stem = Path(norm_src).stem.lower()
+
+                    # Check for cross-deity directory or filename indication in declared source
                     for other_deity, aliases in CANONICAL_DEITIES.items():
                         if other_deity == cur_target_deity:
                             continue
@@ -941,24 +959,108 @@ def check_deity_identity_consistency(
                         for alias in [other_deity] + aliases:
                             if not alias or len(alias) < 4:
                                 continue
-                            if f"/{alias}/" in norm_asset_path or f"/{alias}_" in norm_asset_path:
-                                return False, f"Scene #{sc_num} {asset_field} '{asset_path}' belongs to different deity '{other_deity}', expected '{cur_target_deity}' (DEITY_MISMATCH)"
+                            if f"/{alias}/" in norm_src or f"/{alias}_" in norm_src:
+                                return False, f"Scene #{sc_num} source asset '{s_path}' belongs to different deity '{other_deity}', expected '{cur_target_deity}' (DEITY_MISMATCH)"
 
-                    # If expected_avatar is set, check stem does not depict another avatar
+                    # If expected_avatar is set, check source stem does not depict another avatar
                     if expected_avatar:
                         for other_av in ("kurma", "narasimha", "krishna", "vamana", "trivikrama", "matsya", "varaha", "parashurama", "kalki"):
-                            if other_av != expected_avatar.lower() and other_av in stem:
-                                return False, f"Scene #{sc_num} asset mismatch: {asset_field} '{asset_path}' depicts '{other_av}', but topic is '{expected_avatar}'"
+                            if other_av != expected_avatar.lower() and other_av in src_stem:
+                                return False, f"Scene #{sc_num} asset mismatch: source asset '{s_path}' depicts '{other_av}', but topic is '{expected_avatar}'"
 
-                    # Anti-Bypass Guard: Verify asset is backed by trusted approval records
+                    # Anti-Bypass Guard: Verify source asset is backed by trusted approval records
                     trusted_ok, trusted_detail = _is_trusted_approved_asset(
-                        img_path=asset_path,
+                        img_path=s_path,
                         deity=cur_target_deity,
                         avatar=expected_avatar,
                         allow_mock=allow_mock,
                     )
                     if not trusted_ok:
-                        return False, f"Scene #{sc_num} {asset_field} '{asset_path}' failed approval verification: {trusted_detail}"
+                        return False, f"Scene #{sc_num} source asset '{s_path}' failed approval verification: {trusted_detail}"
+
+                # Step 3: Verify declared source metadata fields consistency
+                src_deity = sc.get("source_deity")
+                if src_deity:
+                    src_deity_clean = str(src_deity).strip().lower()
+                    valid_parents = {cur_target_deity}
+                    if cur_target_deity == "lord_vishnu":
+                        valid_parents.update({"ram", "rama", "krishna", "narasimha", "varaha", "kurma", "vamana", "trivikrama", "matsya", "kalki", "parashurama"})
+                    parent = AVATAR_TO_PARENT_DEITY.get(src_deity_clean)
+                    if parent:
+                        valid_parents.add(parent.lower())
+                    if src_deity_clean not in valid_parents and cur_target_deity not in valid_parents:
+                        return False, f"Scene #{sc_num} source_deity '{src_deity}' does not match expected deity '{cur_target_deity}' (DEITY_MISMATCH)"
+
+                src_avatar = sc.get("source_avatar")
+                if expected_avatar and src_avatar:
+                    s_av = str(src_avatar).strip().lower()
+                    exp_av = expected_avatar.lower()
+                    RAMA_ALIASES = {"ram", "rama"}
+                    VAMANA_ALIASES = {"vamana", "vamana_trivikrama", "trivikrama"}
+                    av_match = (s_av == exp_av) or \
+                               (s_av in RAMA_ALIASES and exp_av in RAMA_ALIASES) or \
+                               (s_av in VAMANA_ALIASES and exp_av in VAMANA_ALIASES)
+                    if not av_match:
+                        return False, f"Scene #{sc_num} source_avatar '{src_avatar}' does not match expected avatar '{expected_avatar}'"
+
+                src_approval = sc.get("source_approval_status")
+                if src_approval and str(src_approval).strip().upper() in ("UNAPPROVED", "REJECTED", "DEITY_UNVERIFIED"):
+                    return False, f"Scene #{sc_num} source asset has rejected approval status: '{src_approval}'"
+
+                src_integrity = sc.get("source_integrity_status")
+                if src_integrity and str(src_integrity).strip().upper() in ("CORRUPT", "INVALID"):
+                    return False, f"Scene #{sc_num} source asset has corrupt integrity status: '{src_integrity}'"
+
+                # Step 4: Verify Derivation of Rendered Scene from Source Asset
+                if sc_vid and declared_source:
+                    norm_vid = sc_vid.replace("\\", "/").lower()
+                    norm_src = declared_source.replace("\\", "/").lower()
+                    if not (norm_vid == norm_src or norm_vid.endswith(norm_src) or norm_src.endswith(norm_vid)):
+                        vid_ok, vid_detail = _is_trusted_approved_asset(
+                            img_path=sc_vid,
+                            deity=cur_target_deity,
+                            avatar=expected_avatar,
+                            allow_mock=allow_mock,
+                        )
+                        if not vid_ok:
+                            return False, f"Scene #{sc_num} video_file '{sc_vid}' not derived from approved source: {vid_detail}"
+
+                if sc_img and declared_source:
+                    norm_img = sc_img.replace("\\", "/").lower()
+                    norm_src = declared_source.replace("\\", "/").lower()
+                    if any(repo in norm_img for repo in ("assets/gods", "assets/gods_landscape_long_video", "assets/gods_processed")):
+                        if not (norm_img == norm_src or norm_img.endswith(norm_src) or norm_src.endswith(norm_img)):
+                            img_ok, img_detail = _is_trusted_approved_asset(
+                                img_path=sc_img,
+                                deity=cur_target_deity,
+                                avatar=expected_avatar,
+                                allow_mock=allow_mock,
+                            )
+                            if not img_ok:
+                                return False, f"Scene #{sc_num} image_file '{sc_img}' does not match declared source: {img_detail}"
+
+                # Step 5: Verify Files on Disk (when not allow_mock)
+                if not allow_mock:
+                    if declared_source:
+                        src_p = Path(declared_source)
+                        if not src_p.exists():
+                            return False, f"Scene #{sc_num} source asset not found on disk: '{declared_source}'"
+                        if src_p.stat().st_size == 0:
+                            return False, f"Scene #{sc_num} source asset is zero bytes: '{declared_source}'"
+
+                    if sc_img:
+                        img_p = Path(sc_img)
+                        if not img_p.exists():
+                            return False, f"Scene #{sc_num} image file not found on disk: '{sc_img}'"
+                        if img_p.stat().st_size == 0:
+                            return False, f"Scene #{sc_num} image file is zero bytes: '{sc_img}'"
+
+                    if sc_vid:
+                        vid_p = Path(sc_vid)
+                        if not vid_p.exists():
+                            return False, f"Scene #{sc_num} video file not found on disk: '{sc_vid}'"
+                        if vid_p.stat().st_size == 0:
+                            return False, f"Scene #{sc_num} video file is zero bytes: '{sc_vid}'"
 
         # 2. Check thumbnail
         if thumbnail_meta:
