@@ -13,6 +13,9 @@
 from __future__ import annotations
 
 import sys
+import subprocess
+import tempfile
+import time
 from pathlib import Path
 from typing import Optional, Any
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -160,8 +163,45 @@ def compose_reused_thumbnail(
     active_theme = theme or get_thumbnail_theme(language_code=language_code)
 
     # 1. Load and prepare background canvas
-    with Image.open(background_path) as raw_img:
-        bg = prepare_background_canvas(raw_img, 1280, 720)
+    # CRITICAL SAFEGUARD: Never pass video files (.mp4, .mov, etc.) directly to PIL Image.open
+    bg_p = Path(background_path)
+    if not bg_p.exists():
+        raise FileNotFoundError(f"Thumbnail background asset does not exist: {bg_p}")
+
+    temp_frame_path: Optional[Path] = None
+    if bg_p.suffix.lower() in (".mp4", ".mov", ".mkv", ".webm", ".avi"):
+        temp_dir = Path("data/thumbnails/temp_frames")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        temp_frame_path = temp_dir / f"frame_{bg_p.stem}_{int(time.time() * 1000)}.png"
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", "00:00:02",
+            "-i", str(bg_p),
+            "-vframes", "1",
+            "-q:v", "2",
+            str(temp_frame_path),
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+        if res.returncode != 0 or not temp_frame_path.exists() or temp_frame_path.stat().st_size == 0:
+            # Fallback to start timestamp 00:00:00
+            cmd[2] = "00:00:00"
+            subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+
+        if not temp_frame_path.exists() or temp_frame_path.stat().st_size == 0:
+            raise RuntimeError(f"Failed to extract frame from video file '{bg_p}' using FFmpeg.")
+        source_image_path = temp_frame_path
+    else:
+        source_image_path = bg_p
+
+    try:
+        with Image.open(source_image_path) as raw_img:
+            bg = prepare_background_canvas(raw_img, 1280, 720)
+    finally:
+        if temp_frame_path and temp_frame_path.exists():
+            try:
+                temp_frame_path.unlink()
+            except Exception:
+                pass
 
     # 2. Apply left-side atmospheric gradient overlay
     img = _apply_left_gradient_overlay(bg, max_x=510, max_alpha=180)

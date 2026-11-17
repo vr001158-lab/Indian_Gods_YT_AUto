@@ -87,9 +87,18 @@ class ThumbnailAssetSelector:
 
         # ── Priority 1: Approved Deity-Specific Artwork ────────────────────────
         approved_assets = self.asset_index.find_approved_assets(deity=deity, avatar=avatar)
-        if approved_assets:
-            best = approved_assets[0]
-            audit_trail.append(f"Priority 1 SUCCESS: Found {len(approved_assets)} approved assets for {deity} (avatar={avatar}). Selected {best.asset_id}.")
+        approved_images = [
+            a for a in approved_assets
+            if a.file_format.lower() in ("png", "jpg", "jpeg", "webp")
+        ]
+        approved_videos = [
+            a for a in approved_assets
+            if a.file_format.lower() in ("mp4", "mov", "webm", "avi", "mkv")
+        ]
+
+        if approved_images:
+            best = approved_images[0]
+            audit_trail.append(f"Priority 1 SUCCESS (IMAGE): Found {len(approved_images)} approved images for {deity} (avatar={avatar}). Selected {best.asset_id}.")
             return SelectedThumbnailAsset(
                 asset_path=best.file_path,
                 priority_level=1,
@@ -101,6 +110,39 @@ class ThumbnailAssetSelector:
                 quality_score=best.quality_score,
                 metadata={"asset_record": best.to_dict(), "audit_trail": audit_trail},
             )
+        elif approved_videos:
+            # Fallback to approved repository video: extract high-quality candidate frame
+            v_dir = (temp_dir or Path("data/thumbnails/frames")) / "extracted_approved_video"
+            v_dir.mkdir(parents=True, exist_ok=True)
+            for vid_asset in approved_videos:
+                frames = extract_candidate_frames(
+                    video_path=Path(vid_asset.file_path),
+                    output_dir=v_dir,
+                    timestamps_seconds=[2.0, 1.0, 0.5, 3.0, 5.0],
+                    deity=deity,
+                    avatar=avatar,
+                    source_verified=True,
+                )
+                if frames:
+                    best_f = frames[0]
+                    audit_trail.append(f"Priority 1 SUCCESS (VIDEO FRAME): Extracted approved frame from {vid_asset.file_path}.")
+                    return SelectedThumbnailAsset(
+                        asset_path=best_f["frame_path"],
+                        priority_level=1,
+                        priority_name="APPROVED_LOCAL_VIDEO_FRAME",
+                        deity=deity,
+                        avatar=avatar,
+                        verification_status="VERIFIED",
+                        selection_reason=f"Frame extracted from approved repository video {vid_asset.asset_id}",
+                        quality_score=vid_asset.quality_score,
+                        metadata={
+                            "asset_record": vid_asset.to_dict(),
+                            "source_video": vid_asset.file_path,
+                            "frame_timestamp": best_f["timestamp_seconds"],
+                            "audit_trail": audit_trail,
+                        },
+                    )
+            audit_trail.append(f"Priority 1 SKIPPED: Approved videos found for deity '{deity}', but frame extraction yielded no suitable frames.")
         else:
             audit_trail.append(f"Priority 1 SKIPPED: No approved local artwork for deity '{deity}' with avatar '{avatar}'.")
 

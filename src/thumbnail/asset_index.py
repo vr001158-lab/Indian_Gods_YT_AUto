@@ -54,8 +54,52 @@ CANONICAL_DEITIES: dict[str, list[str]] = {
         "లక్ష్మి", "లక్ష్మీ", "మహాలక్ష్మి"
     ],
     "parvathi": [
-        "parvathi", "parvati", "durga", "gauri", "shakti", "kali", "ambika",
-        "పార్వతి", "దుర్గ", "గౌరి", "శక్తి", "కాళి"
+        "parvathi", "parvati", "gauri", "shakti", "ambika",
+        "పార్వతి", "గౌరి", "శక్తి", "అంబిక"
+    ],
+    "durga": [
+        "durga", "durgama", "durga_devi", "shakti",
+        "దుర్గ", "దుర్గాదేవి"
+    ],
+    "kali": [
+        "kali", "mahakali", "bhadrakali",
+        "కాలిక", "కాళి", "మహాకాళి"
+    ],
+    "chandra": [
+        "chandra", "chandra_deva", "chandradeva", "soma",
+        "చంద్ర", "చంద్రుడు"
+    ],
+    "kaal_bhairav": [
+        "kaal_bhairav", "kalabhairav", "kalabhairava", "bhairav",
+        "కాలభైరవ", "భైరవ"
+    ],
+    "shani": [
+        "shani", "shanidev", "shaneshwara",
+        "శని", "శనీశ్వరుడు"
+    ],
+    "budha": [
+        "budha", "budhadev", "budha_deva",
+        "బుధ", "బుధుడు"
+    ],
+    "vithal": [
+        "vithal", "vitthal", "vithoba", "panduranga",
+        "విఠల్", "విఠోబా", "పాండురంగ"
+    ],
+    "brihaspati": [
+        "brihaspati", "guru_brihaspati",
+        "బృహస్పతి"
+    ],
+    "santoshi_ma": [
+        "santoshi_ma", "santoshima",
+        "సంతోషీమాత"
+    ],
+    "annapurneshwari": [
+        "annapurneshwari", "annapurna",
+        "అన్నపూర్ణేశ్వరి", "అన్నపూర్ణ"
+    ],
+    "surya": [
+        "surya", "suryadev", "aditya",
+        "భాస్కరుడు", "సూర్య", "సూర్యుడు", "ఆదిత్య"
     ],
     "saraswati": [
         "saraswati", "sharada", "vani", "veena",
@@ -90,8 +134,8 @@ AVATAR_TO_PARENT_DEITY: dict[str, str] = {
     "krishna": "krishna",      # Also distinct top-level deity
     "buddha": "lord_vishnu",
     "kalki": "lord_vishnu",
-    "durga": "parvathi",
-    "kali": "parvathi",
+    "durga": "durga",
+    "kali": "kali",
     "venkateswara": "7kondala_swami",
     "hanuman": "hanuman",
 }
@@ -108,13 +152,18 @@ def resolve_deity_and_avatar(text: str) -> tuple[Optional[str], Optional[str]]:
     t_lower = text.strip().lower()
 
     # Detect avatar first
+    import re
     detected_avatar = None
     for av in [
         "varaha", "kurma", "vamana_trivikrama", "vamana", "trivikrama",
-        "narasimha", "krishna", "rama", "ram", "matsya", "parashurama",
-        "kalki", "durga", "kali", "venkateswara", "hanuman"
+        "narasimha", "krishna", "parashurama", "kalki", "durga", "kali",
+        "venkateswara", "hanuman", "matsya", "rama", "ram",
     ]:
-        if av in t_lower:
+        if len(av) <= 3:
+            if re.search(r"\b" + re.escape(av) + r"\b", t_lower):
+                detected_avatar = av
+                break
+        elif av in t_lower:
             detected_avatar = av
             break
 
@@ -144,7 +193,12 @@ def resolve_deity_and_avatar(text: str) -> tuple[Optional[str], Optional[str]]:
     else:
         for deity, aliases in CANONICAL_DEITIES.items():
             for alias in aliases:
-                if alias.lower() in t_lower or alias in text:
+                a_lower = alias.lower()
+                if len(a_lower) <= 3:
+                    if re.search(r"\b" + re.escape(a_lower) + r"\b", t_lower) or alias in text:
+                        detected_deity = deity
+                        break
+                elif a_lower in t_lower or alias in text:
                     detected_deity = deity
                     break
             if detected_deity:

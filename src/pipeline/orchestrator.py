@@ -339,6 +339,8 @@ class PipelineRunner:
             provider = "mock"
         elif self.render_only or os.environ.get("THUMBNAIL_PROVIDER") == "reuse":
             provider = "reuse"
+        elif os.environ.get("THUMBNAIL_PROVIDER"):
+            provider = os.environ.get("THUMBNAIL_PROVIDER")
         else:
             provider = "pollinations"
         cmd = [

@@ -70,19 +70,62 @@ def run_decision_pipeline(
     # ── 1. Validate ───────────────────────────────────────────────────────────
     valid, rejected = validate_candidates(candidates, min_score=min_score)
 
-    # ── 2. Select ─────────────────────────────────────────────────────────────
+    # ── 2. Select with Weekday Deity Constraint ──────────────────────────────
     if (format or "").lower() == "old":
         candidates_to_select = apply_old_format_topic_preferences(valid)
     elif language_code:
         candidates_to_select = apply_content_intelligence_preferences(valid, language_code=language_code)
     else:
         candidates_to_select = valid
-    result = select_topic(candidates_to_select)
+
+    from src.decision.weekday_deity import select_weekday_deity, DEITY_CANONICAL_ALIASES
+    weekday_context = select_weekday_deity()
+    scheduled_deity = weekday_context["scheduled_deity"].lower()
+    eligible_deities = [d.lower() for d in weekday_context["eligible_deities"]]
+
+    from src.assets.selector import resolve_deity
+    scheduled_pool = []
+    eligible_pool = []
+    for c in candidates_to_select:
+        cand_hint = (c.get("deity") or "").strip().lower()
+        d_key = resolve_deity(c.get("topic", ""), deity_hint=cand_hint, default=cand_hint or "unknown").lower()
+        canon_d_key = DEITY_CANONICAL_ALIASES.get(d_key, d_key)
+        canon_hint = DEITY_CANONICAL_ALIASES.get(cand_hint, cand_hint)
+
+        matched_deities = {d_key, canon_d_key, cand_hint, canon_hint} - {"", "unknown"}
+
+        if scheduled_deity in matched_deities:
+            scheduled_pool.append(c)
+        elif any(e in matched_deities for e in eligible_deities):
+            eligible_pool.append(c)
+
+    controlled_exception_applied = False
+    exception_reason = None
+
+    if scheduled_pool:
+        # Primary constraint: Scheduled deity of the day wins
+        result = select_topic(scheduled_pool)
+    elif eligible_pool:
+        # Secondary constraint: Eligible deities of the weekday win
+        result = select_topic(eligible_pool)
+    else:
+        # Controlled Exception: When research pool has no candidates matching the day's deities
+        controlled_exception_applied = True
+        exception_reason = (
+            f"Controlled Exception: No validated candidates available for scheduled deity "
+            f"'{scheduled_deity}' or eligible deities {eligible_deities}."
+        )
+        result = select_topic(candidates_to_select)
+
+    weekday_context["controlled_exception_applied"] = controlled_exception_applied
+    weekday_context["exception_reason"] = exception_reason
+
     selected = result["selected"]
     ranked   = result["ranked"]
     dedup_removed = result["dedup_removed"]
 
     # ── 3. Build decision object ──────────────────────────────────────────────
+
     if selected is not None:
         decision = {
             "approved_for_generation": True,
@@ -98,6 +141,7 @@ def run_decision_pipeline(
             "content_gap":      selected["content_gap"],
             "selection_reason": _build_selection_reason(selected, ranked),
             "intelligence_factors": selected.get("intelligence_factors"),
+            "weekday_deity_context": weekday_context,
             "rejected_candidates": [
                 {"topic": r["topic"], "reasons": r["reasons"]}
                 for r in rejected

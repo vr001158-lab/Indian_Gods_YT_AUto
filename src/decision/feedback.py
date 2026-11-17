@@ -100,35 +100,15 @@ def calculate_deity_fatigue_penalty(
 
 def get_day_of_week_deity_bonus(deity_key: str | None, now_dt: datetime | None = None) -> float:
     """
-    Returns a cultural calendar bonus based on traditional Hindu devotional days of the week:
-    - Monday: Lord Shiva
-    - Tuesday: Lord Hanuman / Subrahmanya
-    - Wednesday: Lord Ganesha / Lord Krishna
-    - Thursday: Lord Vishnu / Guru / Dattatreya / Sai
-    - Friday: Goddess Lakshmi / Parvati / Durga
-    - Saturday: Lord Venkateswara / Balaji / Shani / Hanuman
-    - Sunday: Surya Bhagavan
+    Returns a cultural calendar bonus based on traditional Hindu devotional days of the week
+    in Asia/Kolkata timezone:
+    - Monday (Somvar): Lord Shiva, Parvati, Chandra
+    - Tuesday (Mangalvar): Lord Hanuman, Ganesha, Durga, Kali, Subramanya
+    - Wednesday (Budhvar): Budha, Ganesha, Krishna, Vithal
+    - Thursday (Guruvar): Lord Vishnu, Brihaspati, Krishna
+    - Friday (Shukravar): Mahalakshmi, Santoshi Ma, Annapurneshwari, Durga
+    - Saturday (Shaniwar): Lord Shani, Hanuman
+    - Sunday (Ravivar): Surya, Kaal Bhairav
     """
-    if not deity_key:
-        return 0.0
-
-    if now_dt is None:
-        now_dt = datetime.now(timezone.utc)
-
-    # 0 = Monday, 1 = Tuesday, ..., 6 = Sunday
-    weekday = now_dt.weekday()
-
-    DAY_AFFINITY: dict[int, list[str]] = {
-        0: ["lord_shiva"],
-        1: ["hanuman", "subramanya"],
-        2: ["ganesha", "krishna"],
-        3: ["lord_vishnu"],
-        4: ["lakshmi_devi", "parvathi"],
-        5: ["7Kondala_Swami", "hanuman"],
-        6: ["surya"],
-    }
-
-    matching_deities = DAY_AFFINITY.get(weekday, [])
-    if deity_key in matching_deities:
-        return 5.0
-    return 0.0
+    from src.decision.weekday_deity import get_day_of_week_deity_bonus as _calc_bonus
+    return _calc_bonus(deity_key=deity_key, now_dt=now_dt)

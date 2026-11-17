@@ -36,6 +36,7 @@ from src.thumbnail.generator import (
     FluxThumbnailGenerator,
     ThumbnailReuseGenerator,
 )
+from src.thumbnail.local_generator import LocalThumbnailGenerator
 from src.thumbnail.analyzer import analyze_thumbnail_file
 from src.thumbnail.schemas import validate_metadata_output
 
@@ -44,10 +45,11 @@ SCRIPTS_DIR = Path("data/scripts")
 THUMBNAIL_DIR = Path("data/thumbnails")
 
 PROVIDERS = {
-    "reuse":        ThumbnailReuseGenerator,
-    "pollinations": PollinationsThumbnailGenerator,
+    "local":        LocalThumbnailGenerator,
+    "reuse":        LocalThumbnailGenerator,
     "pil":          PILThumbnailGenerator,
     "mock":         MockThumbnailGenerator,
+    "pollinations": PollinationsThumbnailGenerator,
     "flux":         FluxThumbnailGenerator,
 }
 
@@ -63,7 +65,7 @@ def _find_latest_file(directory: Path, pattern: str) -> Path:
 def main():
     input_file = None
     script_file = None
-    provider_name = "pollinations"
+    provider_name = "local"
     bg_image = None
     save_output = True
     language_code = None
@@ -182,7 +184,7 @@ def main():
 
     print("==================================================")
     print("DIVINE DHARSHANAM DAILY")
-    print("THUMBNAIL GENERATOR (POLLINATIONS EXCLUSIVE)")
+    print("THUMBNAIL GENERATOR (LOCAL REPOSITORY ASSETS)")
     print("==================================================")
     print(f"Main Title:  {main_title}")
     print(f"Subtitle:    {subtitle}")
