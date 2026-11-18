@@ -869,5 +869,22 @@
     "kolkata_date": "2026-11-18",
     "video_file_name": "video_short_20261117_213151.mp4",
     "success": true
+  },
+  {
+    "youtube_video_id": "IK16V762IR8",
+    "topic": "The Legend of Chandra Curse Why Ganesha Punished the Moon",
+    "title": "చంద్రుడికి వినాయకుడి శాపం ఎందుకు వచ్చింది? సంపూర్ణ పౌరాణిక కథ",
+    "content_type": "short",
+    "language_code": "te-IN",
+    "experiment_tag": "",
+    "aspect_ratio": "9:16",
+    "resolution": "1080x1920",
+    "duration_seconds": 38.24,
+    "published_at": "20261118_081410",
+    "published_at_utc": "2026-11-18T08:14:10.689647+00:00",
+    "published_at_kolkata": "2026-11-18 13:44:10 +0530",
+    "kolkata_date": "2026-11-18",
+    "video_file_name": "video_short_20261118_081330.mp4",
+    "success": true
   }
 ]
