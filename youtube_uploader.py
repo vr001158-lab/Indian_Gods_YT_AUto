@@ -26,8 +26,12 @@ def upload_to_youtube(
     Raises exception on failure.
     """
     import os
-    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes") or os.environ.get("YOUTUBE_PUBLISH_AUTHORIZED", "").lower() != "true":
-        raise PermissionError("CRITICAL SAFETY BLOCK: YouTube API upload is blocked. RENDER_ONLY is active or YOUTUBE_PUBLISH_AUTHORIZED is not 'true'.")
+    if os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
+        raise PermissionError("CRITICAL SAFETY BLOCK: YouTube API upload is blocked. RENDER_ONLY is active.")
+    if os.environ.get("YOUTUBE_PUBLISH", "").strip().lower() not in ("true", "1", "yes"):
+        raise PermissionError("CRITICAL SAFETY BLOCK: YouTube API upload is blocked. YOUTUBE_PUBLISH must be explicitly 'true', '1', or 'yes'.")
+    if os.environ.get("YOUTUBE_PUBLISH_AUTHORIZED", "").strip().lower() not in ("true", "1", "yes"):
+        raise PermissionError("CRITICAL SAFETY BLOCK: YouTube API upload is blocked. YOUTUBE_PUBLISH_AUTHORIZED is not 'true'.")
 
     if not video_path.exists():
         raise FileNotFoundError(f"❌ Video file not found: {video_path}")

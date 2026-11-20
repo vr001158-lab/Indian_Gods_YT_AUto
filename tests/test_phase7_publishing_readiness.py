@@ -89,6 +89,7 @@ class TestPhase7PublishingReadiness(unittest.TestCase):
             validate_qa_for_publishing(bad_qa)
 
     # 5. Non-fatal thumbnail handling
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false"})
     def test_05_thumbnail_handling_non_fatal(self):
         creds = MagicMock()
         ok = upload_thumbnail(creds, "dummy_video_id", "non_existent_thumbnail.png")

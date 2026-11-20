@@ -1,8 +1,10 @@
 name: God Channel Automation
 
 env:
+  RENDER_ONLY: "true"
   YOUTUBE_PUBLISH: "false"
-  ENABLE_GOOGLE_DRIVE: "true"
+  YOUTUBE_PUBLISH_AUTHORIZED: "false"
+  ENABLE_GOOGLE_DRIVE: "false"
 
 # Scheduled triggers disabled in favor of divine-dharshanam-daily.yml to eliminate duplicate-upload hazards.
 # Use workflow_dispatch below for manual execution if required.
@@ -32,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,33 +62,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-conformed-assets-v2.1-
 
-      - name: Write credentials
-        run: |
-          echo '${{ secrets.TOKEN_JSON }}' > token.json
-
       - name: Prepare assets
         run: python prepare_assets.py
 
-      - name: Generate & upload Short A (multi_image)
+      - name: Generate Short A (multi_image, dry-run validation)
         env:
           PYTHONUNBUFFERED: "1"
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-          ENABLE_GOOGLE_DRIVE: ${{ env.ENABLE_GOOGLE_DRIVE }}
+          RENDER_ONLY: "true"
+          YOUTUBE_PUBLISH: "false"
+          YOUTUBE_PUBLISH_AUTHORIZED: "false"
+          ENABLE_GOOGLE_DRIVE: "false"
         run: |
-          PRIVACY="private"
-          if [ "${{ env.YOUTUBE_PUBLISH }}" = "true" ]; then
-            PRIVACY="public"
-          fi
-          python uploader.py --mode multi_image --privacy $PRIVACY
-
-      - name: Commit manifest + archive
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git add manifest.json uploaded_archive/ || true
-          git commit -m "Auto: multi_image short [skip ci]" || echo "Nothing to commit"
-          git push origin main
+          python uploader.py --mode multi_image --dry-run
 
   upload_short_b:
     name: Short B — Single Image (7 PM IST)
@@ -94,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -122,33 +109,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-conformed-assets-v2.1-
 
-      - name: Write credentials
-        run: |
-          echo '${{ secrets.TOKEN_JSON }}' > token.json
-
       - name: Prepare assets
         run: python prepare_assets.py
 
-      - name: Generate & upload Short B (single_image)
+      - name: Generate Short B (single_image, dry-run validation)
         env:
           PYTHONUNBUFFERED: "1"
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-          ENABLE_GOOGLE_DRIVE: ${{ env.ENABLE_GOOGLE_DRIVE }}
+          RENDER_ONLY: "true"
+          YOUTUBE_PUBLISH: "false"
+          YOUTUBE_PUBLISH_AUTHORIZED: "false"
+          ENABLE_GOOGLE_DRIVE: "false"
         run: |
-          PRIVACY="private"
-          if [ "${{ env.YOUTUBE_PUBLISH }}" = "true" ]; then
-            PRIVACY="public"
-          fi
-          python uploader.py --mode single_image --privacy $PRIVACY
-
-      - name: Commit manifest + archive
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git add manifest.json uploaded_archive/ || true
-          git commit -m "Auto: single_image short [skip ci]" || echo "Nothing to commit"
-          git push origin main
+          python uploader.py --mode single_image --dry-run
 
   upload_long_video:
     name: Long Video — Landscape (12 PM IST)
@@ -156,7 +128,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -184,30 +156,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-conformed-assets-v2.1-
 
-      - name: Write credentials
-        run: |
-          echo '${{ secrets.TOKEN_JSON }}' > token.json
-
       - name: Prepare assets
         run: python prepare_assets.py
 
-      - name: Generate & upload Long Video
+      - name: Generate Long Video (dry-run validation)
         env:
           PYTHONUNBUFFERED: "1"
-          GOOGLE_DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
-          ENABLE_GOOGLE_DRIVE: ${{ env.ENABLE_GOOGLE_DRIVE }}
+          RENDER_ONLY: "true"
+          YOUTUBE_PUBLISH: "false"
+          YOUTUBE_PUBLISH_AUTHORIZED: "false"
+          ENABLE_GOOGLE_DRIVE: "false"
         run: |
-          PRIVACY="private"
-          if [ "${{ env.YOUTUBE_PUBLISH }}" = "true" ]; then
-            PRIVACY="public"
-          fi
-          python uploader.py --mode long_video --privacy $PRIVACY
-
-      - name: Commit manifest + archive
-        run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "actions@github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-          git add manifest.json uploaded_archive/ || true
-          git commit -m "Auto: long_video [skip ci]" || echo "Nothing to commit"
-          git push origin main
+          python uploader.py --mode long_video --dry-run

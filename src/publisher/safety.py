@@ -59,17 +59,29 @@ def validate_production_environment(
         (is_valid: bool, error_message: str)
     """
     import os
-    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+    # 1. RENDER_ONLY check: RENDER_ONLY=true strictly forbids publishing
+    if os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
         return False, "Production upload blocked: RENDER_ONLY mode is active. Live publishing is strictly forbidden."
 
     if allow_dry_run:
         return True, ""
-    auth_val = (
-        os.environ.get("YOUTUBE_PUBLISH_AUTHORIZED")
-        or os.environ.get("YOUTUBE_PUBLISH")
-        or os.environ.get("PRODUCTION_PUBLISH_AUTHORIZED")
-        or ""
-    ).strip().lower()
+
+    # 2. YOUTUBE_PUBLISH check: must be explicitly affirmative ('true', '1', 'yes')
+    yt_pub = os.environ.get("YOUTUBE_PUBLISH", "").strip().lower()
+    if not yt_pub:
+        return False, (
+            "Production upload blocked: YOUTUBE_PUBLISH is missing or empty. "
+            "Set YOUTUBE_PUBLISH='true' to enable publishing."
+        )
+    if yt_pub not in ("true", "1", "yes"):
+        return False, (
+            f"Production upload blocked: YOUTUBE_PUBLISH is disabled or invalid ('{yt_pub}'). "
+            "Must be explicitly 'true', '1', or 'yes'."
+        )
+
+    # 3. YOUTUBE_PUBLISH_AUTHORIZED check: must be explicitly 'true', '1', or 'yes'.
+    # Legacy aliases (e.g. PRODUCTION_PUBLISH_AUTHORIZED alone) are strictly forbidden from substituting.
+    auth_val = os.environ.get("YOUTUBE_PUBLISH_AUTHORIZED", "").strip().lower()
 
     if not auth_val:
         return False, (

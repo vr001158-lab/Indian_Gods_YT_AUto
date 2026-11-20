@@ -49,8 +49,13 @@ def upload_thumbnail(creds: Any, video_id: str, thumbnail_file: str | Path) -> b
 
     Never logs credential values.
     """
-    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+    if os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
         raise PublishError("CRITICAL SAFETY VIOLATION: upload_thumbnail() invoked in RENDER_ONLY mode! Upload is blocked.")
+
+    from .safety import validate_production_environment
+    is_env_ok, env_err = validate_production_environment(allow_dry_run=False)
+    if not is_env_ok:
+        raise PublishError(f"CRITICAL SAFETY VIOLATION: upload_thumbnail() denied by production safety gate: {env_err}")
 
     tf = Path(thumbnail_file)
     if not tf.exists() or tf.stat().st_size == 0:
@@ -118,8 +123,13 @@ def publish_video(
     -------
     dict — the publishing manifest (without credential values).
     """
-    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+    if os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
         raise PublishError("CRITICAL SAFETY VIOLATION: publish_video() invoked in RENDER_ONLY mode! Live YouTube upload is forbidden.")
+
+    from .safety import validate_production_environment
+    is_env_ok, env_err = validate_production_environment(allow_dry_run=False)
+    if not is_env_ok:
+        raise PublishError(f"CRITICAL SAFETY VIOLATION: publish_video() denied by production safety gate: {env_err}")
 
     import youtube_uploader as _yt_uploader
 

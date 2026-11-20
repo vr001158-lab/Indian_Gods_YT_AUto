@@ -294,7 +294,7 @@ class TestPublisherUpload(unittest.TestCase):
                              f"uploader.py must not log: {forbidden}")
 
     # ── Test 10: Successful upload mocked ────────────────────────────────
-    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "RENDER_ONLY": "false"})
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false"})
     def test_10_successful_upload_mocked(self):
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
@@ -328,7 +328,7 @@ class TestPublisherUpload(unittest.TestCase):
             self.assertIn("FAKE_VIDEO_ID_001", manifest["youtube_url"])
 
     # ── Test 11: Failed upload handled ───────────────────────────────────
-    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "RENDER_ONLY": "false"})
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false"})
     def test_11_failed_upload_handled(self):
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
@@ -358,7 +358,7 @@ class TestPublisherUpload(unittest.TestCase):
                 self.assertIn("upload failed", str(ctx.exception).lower())
 
     # ── Test 12: Video ID captured ────────────────────────────────────────
-    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "RENDER_ONLY": "false"})
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false"})
     def test_12_video_id_captured(self):
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
@@ -391,7 +391,7 @@ class TestPublisherUpload(unittest.TestCase):
             )
 
     # ── Test 13: Thumbnail failure handled safely ─────────────────────────
-    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "RENDER_ONLY": "false"})
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false"})
     def test_13_thumbnail_failure_handled_safely(self):
         """Thumbnail upload failure must NOT abort the pipeline."""
         with tempfile.TemporaryDirectory() as td:
@@ -428,7 +428,7 @@ class TestPublisherUpload(unittest.TestCase):
             self.assertIn("Thumbnail API error", manifest["thumbnail_error"])
 
     # ── Test 14: Publishing manifest schema ───────────────────────────────
-    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "RENDER_ONLY": "false"})
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false"})
     def test_14_publishing_manifest_schema(self):
         with tempfile.TemporaryDirectory() as td:
             tmp = Path(td)
@@ -478,6 +478,7 @@ class TestPublisherUpload(unittest.TestCase):
         self.assertEqual(am.get("data_source"), "youtube_api")
 
     # ── Test 15: Controlled test privacy override ────────────────────────
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false"})
     def test_15_controlled_test_privacy_override(self):
         """Setting YOUTUBE_PRIVACY_STATUS overrides privacy status for controlled test uploads."""
         import os

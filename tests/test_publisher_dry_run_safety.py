@@ -220,6 +220,7 @@ class TestPublisherDryRunSafety(unittest.TestCase):
 
         with patch.dict(os.environ, {
             "YOUTUBE_PUBLISH_AUTHORIZED": "true",
+            "YOUTUBE_PUBLISH": "true",
             "TOKEN_JSON": valid_token_json,
         }, clear=True), \
              patch("google_auth_config.get_google_credentials", return_value=mock_creds), \

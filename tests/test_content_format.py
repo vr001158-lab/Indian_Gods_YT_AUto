@@ -2,6 +2,7 @@
 # Phase 12 — End-to-End Content Format Architecture Tests (SHORT vs LONG)
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -289,6 +290,7 @@ class TestPublisherManifestAndThumbnail(unittest.TestCase):
     def tearDown(self):
         self.tmpdir_obj.cleanup()
 
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false"})
     @patch("youtube_uploader.upload_to_youtube", return_value="MOCK_VIDEO_ID_123")
     @patch("src.publisher.uploader.upload_thumbnail", return_value=True)
     @patch("src.publisher.safety.verify_video_with_ffprobe")

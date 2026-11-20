@@ -259,9 +259,14 @@ def main():
         print("ℹ️  Note: Google Drive backup is disabled/removed from the core production path. Skipping backup.", file=sys.stderr)
 
 
-    # 2. Check Credentials (unless dry-run)
+    # 2. Check Publishing Authorization & Credentials (unless dry-run)
     creds = None
     if not dry_run:
+        from src.publisher.safety import validate_production_environment
+        is_auth, auth_err = validate_production_environment(allow_dry_run=False)
+        if not is_auth:
+            print(f"❌ BLOCKED: YouTube upload authorization denied:\n  {auth_err}", file=sys.stderr)
+            sys.exit(1)
         try:
             creds = google_auth_config.get_google_credentials()
         except Exception as e:
