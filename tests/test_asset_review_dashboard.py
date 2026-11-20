@@ -115,11 +115,40 @@ class TestAssetReviewDashboard(unittest.TestCase):
             dec_path.unlink()
 
     def test_06_approval_registry_remains_unmodified(self):
-        """Security invariant: proposed assets cannot enter trusted registry without explicit human approval."""
+        """Security invariant: dashboard operations are read-only and registry contains exactly 346 approved records."""
         registry = get_trusted_registry()
-        # Strictly 0 built-ins and 0 unreviewed/proposed records in active trusted store
-        self.assertEqual(len(registry.get_builtin_records()), 0)
-        self.assertEqual(len(registry._records_by_path), 0)
+
+        # 1. Registry contains exactly 346 migrated records and zero built-ins
+        self.assertEqual(len(registry.get_builtin_records()), 0, "Built-in catalog must remain empty")
+        self.assertEqual(len(registry._records_by_path), 346, "Expected exactly 346 approved records in trusted registry")
+
+        # 2. All records have APPROVED status, reviewer provenance, and review timestamps
+        for norm_path, record in registry._records_by_path.items():
+            self.assertEqual(record.approval_status, "APPROVED", f"Record {record.record_id} status must be APPROVED")
+            self.assertTrue(record.reviewer and str(record.reviewer).strip(), f"Record {record.record_id} missing reviewer")
+            self.assertTrue(record.review_timestamp and str(record.review_timestamp).strip(), f"Record {record.record_id} missing timestamp")
+            self.assertTrue(record.provenance and "Retrospectively attested" in record.provenance, f"Record {record.record_id} missing provenance")
+
+        # 3. No rejected or built-in records have been promoted
+        dec_path = Path("data/review/human_review_decisions.json")
+        if dec_path.exists():
+            dec_data = json.loads(dec_path.read_text(encoding="utf-8"))
+            non_accepted = {
+                k: v for k, v in dec_data.get("decisions", {}).items()
+                if v.get("decision") != "PROPOSED_FOR_APPROVAL"
+            }
+            self.assertEqual(len(non_accepted), 68, "Expected exactly 68 non-accepted decisions")
+            from src.assets.approval_registry import normalize_repo_path
+            for na_path in non_accepted.keys():
+                norm_na = normalize_repo_path(na_path)
+                if norm_na:
+                    self.assertNotIn(norm_na.lower(), registry._records_by_path, f"Rejected asset {norm_na} was unexpectedly promoted")
+
+        # 4. Dashboard read-only behavior does not mutate the registry
+        count_before = len(registry._records_by_path)
+        generate_dashboard_file()
+        registry_after = get_trusted_registry()
+        self.assertEqual(len(registry_after._records_by_path), count_before, "Dashboard generation must not mutate approval registry")
 
 
 if __name__ == "__main__":

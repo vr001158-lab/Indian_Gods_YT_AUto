@@ -694,42 +694,42 @@ class TestDeityIdentityConsistency(unittest.TestCase):
         self.assertIn("mismatch", detail.lower())
 
     def test_20_correct_deity_and_matching_video_passes_with_catalog_evidence(self):
-        """20. Adversarial 5: Correct deity and matching video -> PASS with valid catalog evidence."""
+        """20. Adversarial 5: Correct deity and matching asset -> PASS with valid catalog evidence."""
         import subprocess
 
-        ram_vid = "assets/gods_processed/ram/vertical/1116118720173406492__img.mp4"
+        ram_asset = "assets/gods/ram/ram.jpg"
 
         # Verify that this canonical asset is tracked in Git
         tracked_check = subprocess.run(
-            ["git", "ls-files", ram_vid],
+            ["git", "ls-files", ram_asset],
             capture_output=True,
             text=True,
             check=False,
         )
         self.assertIn(
-            ram_vid,
+            ram_asset,
             tracked_check.stdout.replace("\\", "/"),
-            f"Expected canonical Ram video '{ram_vid}' to be tracked in Git",
+            f"Expected canonical Ram asset '{ram_asset}' to be tracked in Git",
         )
 
         # Check if the file is physically hydrated on disk (may be absent under local sparse checkout)
-        if not Path(ram_vid).exists():
+        if not Path(ram_asset).exists():
             self.skipTest(
-                f"Canonical Git-tracked video '{ram_vid}' is not hydrated on disk (sparse checkout active)"
+                f"Canonical Git-tracked asset '{ram_asset}' is not hydrated on disk (sparse checkout active)"
             )
 
-        # In environments where the video is hydrated (such as GitHub Actions CI), verify DeityAssetIndex
+        # In environments where the asset is hydrated, verify DeityAssetIndex
         from src.thumbnail.asset_index import DeityAssetIndex
 
         idx = DeityAssetIndex()
-        norm_ram_vid = ram_vid.replace("\\", "/")
+        norm_ram_asset = ram_asset.replace("\\", "/")
         matching_recs = [
             r for r in (idx.records if idx else [])
-            if r.file_path == norm_ram_vid or norm_ram_vid.endswith(r.file_path)
+            if r.file_path == norm_ram_asset or norm_ram_asset.endswith(r.file_path)
         ]
         self.assertTrue(
             len(matching_recs) > 0,
-            f"Expected canonical Ram video '{ram_vid}' to be discovered by DeityAssetIndex",
+            f"Expected canonical Ram asset '{ram_asset}' to be discovered by DeityAssetIndex",
         )
         rec = matching_recs[0]
         self.assertEqual(rec.deity, "ram")
@@ -742,7 +742,7 @@ class TestDeityIdentityConsistency(unittest.TestCase):
             "visual_scenes": [
                 {
                     "scene": 1,
-                    "video_file": ram_vid,
+                    "image_file": ram_asset,
                     "canonical_deity": "ram",
                     "avatar": "ram",
                     "verification_status": "DEITY_VERIFIED",
@@ -758,7 +758,7 @@ class TestDeityIdentityConsistency(unittest.TestCase):
             thumbnail_meta=None,
             allow_mock=False,
         )
-        self.assertTrue(ok, f"Expected PASS for valid indexed Ram video, got: {detail}")
+        self.assertTrue(ok, f"Expected PASS for valid indexed Ram asset, got: {detail}")
         self.assertEqual(detail, "OK")
 
     def test_21_missing_video_identity_evidence_rejected(self):
