@@ -25,13 +25,15 @@ class TestRenderOnlyPipeline(unittest.TestCase):
         self.temp_dir = tempfile.mkdtemp()
         self.data_dir = Path(self.temp_dir) / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        # Clean environment before each test
-        os.environ.pop("RENDER_ONLY", None)
-        os.environ.pop("YOUTUBE_PUBLISH_AUTHORIZED", None)
+        env_patch = patch.dict(os.environ, {
+            "RENDER_ONLY": "false",
+            "YOUTUBE_PUBLISH": "false",
+            "YOUTUBE_PUBLISH_AUTHORIZED": "false",
+        })
+        env_patch.start()
+        self.addCleanup(env_patch.stop)
 
     def tearDown(self):
-        os.environ.pop("RENDER_ONLY", None)
-        os.environ.pop("YOUTUBE_PUBLISH_AUTHORIZED", None)
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def test_01_render_only_selects_real_providers(self):
@@ -297,6 +299,45 @@ class TestRenderOnlyPipeline(unittest.TestCase):
         self.assertEqual(composer, "ffmpeg")
         self.assertEqual(thumb_provider, "pil")
         self.assertFalse(allow_mock)
+
+    def test_11_packaging_ignores_empty_unset_and_directory_outputs(self):
+        """Packaging skips invalid source paths instead of copying the current directory."""
+        import contextlib
+
+        with tempfile.TemporaryDirectory() as working_dir:
+            root = Path(working_dir)
+            directory_output = root / "directory-output"
+            directory_output.mkdir()
+            state = PipelineState(
+                pipeline_id="invalid_output_paths",
+                render_only=True,
+                format="narrated",
+                language_code="te-IN",
+            )
+            state.outputs = {
+                "content_brief_output": "",
+                "script_output": None,
+                "audio_map_output": "",
+                "visual_map_output": str(directory_output),
+                "video_output": None,
+                "thumbnail_output": "   ",
+                "qa_output": str(directory_output),
+            }
+            runner = PipelineRunner(state=state, render_only=True)
+
+            with contextlib.chdir(root), \
+                 patch("src.pipeline.state.STATE_DIR", root / "pipeline"), \
+                 patch(
+                     "src.pipeline.orchestrator.validate_render_only_output",
+                     return_value=(False, {}, ["required render inputs missing"]),
+                 ) as validate_output, \
+                 patch("shutil.copy2") as copy_file:
+                with self.assertRaises(ValueError):
+                    runner.package_and_validate_render_only()
+
+            copy_file.assert_not_called()
+            for path in validate_output.call_args.kwargs["artifacts"].values():
+                self.assertNotEqual(Path(path), Path("."))
 
 
 if __name__ == "__main__":

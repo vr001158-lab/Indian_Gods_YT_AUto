@@ -32,6 +32,7 @@ class TestPublisherDryRunSafety(unittest.TestCase):
         self.td.cleanup()
 
     # ── Test 1: Negative Guard - Dry-Run fails if real upload API is called ──
+    @patch.dict(os.environ, {"RENDER_ONLY": "true", "YOUTUBE_PUBLISH": "false", "YOUTUBE_PUBLISH_AUTHORIZED": "false"})
     def test_01_negative_test_fails_if_real_upload_invoked_during_dry_run(self):
         """
         Negative test: If any real YouTube upload function is invoked during dry-run,
@@ -55,6 +56,7 @@ class TestPublisherDryRunSafety(unittest.TestCase):
             self.assertEqual(exit_code, 0)
 
     # ── Test 2: QA approval does not bypass dry-run ──────────────────────────
+    @patch.dict(os.environ, {"RENDER_ONLY": "true", "YOUTUBE_PUBLISH": "false", "YOUTUBE_PUBLISH_AUTHORIZED": "false"})
     def test_02_final_qa_approval_does_not_bypass_dry_run_restriction(self):
         """
         Even with a 100% approved QA result with valid production tags,
@@ -114,7 +116,11 @@ class TestPublisherDryRunSafety(unittest.TestCase):
         are completely absent from the environment and disk.
         """
         test_args = ["run_publisher.py", "--qa", str(self.qa_file), "--dry-run"]
-        with patch.dict(os.environ, {}, clear=True), \
+        with patch.dict(os.environ, {
+            "RENDER_ONLY": "true",
+            "YOUTUBE_PUBLISH": "false",
+            "YOUTUBE_PUBLISH_AUTHORIZED": "false",
+        }, clear=True), \
              patch.object(sys, "argv", test_args), \
              patch("google_auth_config.get_google_credentials") as mock_creds:
             exit_code = run_publisher.main()
@@ -315,15 +321,24 @@ class TestPublisherDryRunSafety(unittest.TestCase):
         """
         Verify that environment variable state remains strictly isolated across tests.
         """
-        # Ensure that no prior test leaked production authorization into os.environ
-        self.assertNotIn("YOUTUBE_PUBLISH_AUTHORIZED", os.environ)
+        keys = (
+            "RENDER_ONLY",
+            "YOUTUBE_PUBLISH",
+            "YOUTUBE_PUBLISH_AUTHORIZED",
+            "YOUTUBE_PRIVACY_STATUS",
+        )
+        original_environment = {key: os.environ.get(key) for key in keys}
 
         # Run with isolated un-authorized environment
         test_args = ["run_publisher.py", "--qa", str(self.qa_file)]
         with patch.dict(os.environ, {}, clear=True), \
              patch.object(sys, "argv", test_args):
+            self.assertNotIn("YOUTUBE_PUBLISH_AUTHORIZED", os.environ)
             exit_code = run_publisher.main()
             self.assertEqual(exit_code, 1)
+
+        for key, value in original_environment.items():
+            self.assertEqual(os.environ.get(key), value, f"{key} leaked across the scoped test environment")
 
     # ── Test 13: Reject access-token-only credentials ───────────────────────
     def test_13_production_mode_rejects_access_token_only_credentials(self):

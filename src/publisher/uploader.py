@@ -27,9 +27,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# PUBLIC is the authorized production privacy status for YouTube uploads.
-# This value is hard-coded and cannot be overridden by callers.
-REQUIRED_PRIVACY = "public"
+# Production uploads default to private; an explicitly configured privacy
+# status may still be selected through YOUTUBE_PRIVACY_STATUS.
+REQUIRED_PRIVACY = "private"
 
 
 class PublishError(RuntimeError):
@@ -167,7 +167,7 @@ def publish_video(
         upload_privacy = REQUIRED_PRIVACY
 
     # ── Step 1: Upload video ────────────────────────────────────────────────
-    # Privacy is set by upload_privacy (defaults to REQUIRED_PRIVACY = 'public').
+    # Privacy is set by upload_privacy (defaults to REQUIRED_PRIVACY = 'private').
     print(f"  Uploading to YouTube [{upload_privacy.upper()}]...")
     print(f"  File:  {vp.name} ({vp.stat().st_size / 1024 / 1024:.2f} MB)")
     print(f"  Title: {title[:80]}")

@@ -15,7 +15,7 @@ def upload_to_youtube(
     title: str,
     description: str,
     tags: list,
-    privacy_status: str = "public",
+    privacy_status: str = "private",
     category_id: str = "22",  # "22" represents "People & Blogs"
     default_language: str | None = None,
     default_audio_language: str | None = None,

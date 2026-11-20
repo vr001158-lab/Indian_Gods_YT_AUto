@@ -290,7 +290,7 @@ class TestPublisherManifestAndThumbnail(unittest.TestCase):
     def tearDown(self):
         self.tmpdir_obj.cleanup()
 
-    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false"})
+    @patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "true", "YOUTUBE_PUBLISH": "true", "RENDER_ONLY": "false", "YOUTUBE_PRIVACY_STATUS": "public"})
     @patch("youtube_uploader.upload_to_youtube", return_value="MOCK_VIDEO_ID_123")
     @patch("src.publisher.uploader.upload_thumbnail", return_value=True)
     @patch("src.publisher.safety.verify_video_with_ffprobe")

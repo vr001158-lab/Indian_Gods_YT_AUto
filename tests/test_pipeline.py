@@ -183,6 +183,7 @@ class TestPipelineOrchestrator(unittest.TestCase):
         runner = PipelineRunner(state, dry_run=True)
         self.assertTrue(runner.dry_run)
 
+    @patch.dict(os.environ, {"RENDER_ONLY": "true", "YOUTUBE_PUBLISH": "false", "YOUTUBE_PUBLISH_AUTHORIZED": "false"})
     def test_20_resume_loading_skips(self):
         state = PipelineState("resume_skip_run")
         state.completed_stages = ["RESEARCH", "DECISION"]
@@ -204,6 +205,7 @@ class TestPipelineOrchestrator(unittest.TestCase):
                                         mock_content.assert_called_once()
                                         mock_script.assert_called_once()
 
+    @patch.dict(os.environ, {"RENDER_ONLY": "true", "YOUTUBE_PUBLISH": "false", "YOUTUBE_PUBLISH_AUTHORIZED": "false"})
     def test_21_successful_full_pipeline_mock_execution(self):
         state = PipelineState("full_mock_run")
 

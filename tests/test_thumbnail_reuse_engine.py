@@ -402,6 +402,7 @@ class TestOrchestratorThumbnailIntegration(unittest.TestCase):
             p_idx = cmd.index("--provider")
             self.assertEqual(cmd[p_idx + 1], "mock")
 
+    @patch.dict(os.environ, {"RENDER_ONLY": "false"})
     def test_orchestrator_selects_pollinations_in_default_mode(self):
         from unittest.mock import patch
         from src.pipeline.orchestrator import PipelineRunner

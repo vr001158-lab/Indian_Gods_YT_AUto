@@ -452,6 +452,35 @@ class TestPublishingSecurityGates(unittest.TestCase):
                             mock_build.assert_not_called()
                             mock_youtube.thumbnails.return_value.set.assert_not_called()
 
+    def test_19_publish_video_denied_without_all_production_safeguards(self):
+        """Direct publishing rejects missing, false, or invalid authorization before upload."""
+        unauthorized_environments = [
+            {},
+            {"RENDER_ONLY": "false", "YOUTUBE_PUBLISH": "true"},
+            {"RENDER_ONLY": "false", "YOUTUBE_PUBLISH": "false", "YOUTUBE_PUBLISH_AUTHORIZED": "true"},
+            {"RENDER_ONLY": "false", "YOUTUBE_PUBLISH": "true", "YOUTUBE_PUBLISH_AUTHORIZED": "false"},
+            {"RENDER_ONLY": "false", "YOUTUBE_PUBLISH": "arbitrary", "YOUTUBE_PUBLISH_AUTHORIZED": "true"},
+            {"RENDER_ONLY": "true", "YOUTUBE_PUBLISH": "true", "YOUTUBE_PUBLISH_AUTHORIZED": "true"},
+        ]
+        from src.publisher.uploader import publish_video
+
+        for env_case in unauthorized_environments:
+            with self.subTest(env=env_case), \
+                 patch.dict(os.environ, env_case, clear=True), \
+                 patch("youtube_uploader.upload_to_youtube") as mock_upload:
+                with self.assertRaises(PublishError):
+                    publish_video(
+                        creds=MagicMock(),
+                        video_file=Path("missing.mp4"),
+                        title="Test",
+                        description="Test",
+                        tags=[],
+                        category_id="22",
+                        thumbnail_file=None,
+                        qa={},
+                    )
+                mock_upload.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

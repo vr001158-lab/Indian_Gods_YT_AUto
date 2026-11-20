@@ -5,7 +5,7 @@
 # Usage:
 #   python run_publisher.py --qa data/qa/final_qa_YYYYMMDD_HHMMSS.json
 #
-# This script uploads with PUBLIC privacy (authorized production behavior).
+# Production uploads default to PRIVATE privacy.
 # STOP: Do NOT call this until explicitly authorized for a real upload.
 #
 # Safety rules enforced:
@@ -14,7 +14,7 @@
 #  - confidence must be high
 #  - approved_for_generation must be true
 #  - video must exist and be non-zero .mp4
-#  - Privacy is ALWAYS "public" — cannot be changed via CLI
+#  - Privacy defaults to "private"; YOUTUBE_PRIVACY_STATUS controls overrides.
 
 import argparse
 import os
@@ -46,7 +46,7 @@ def _print_banner():
     print()
     print(LINE)
     print("DIVINE DHARSHANAM DAILY")
-    print("YOUTUBE PUBLISHER  [PUBLIC]")
+    print("YOUTUBE PUBLISHER  [PRIVATE BY DEFAULT]")
     print(LINE)
     print()
 
@@ -75,7 +75,7 @@ def main() -> int:
     _print_banner()
 
     # ── Step -1: Immediate Render-Only Fail-Closed Safety Gate ───────────────
-    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+    if not args.dry_run and os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
         print("\n[BLOCKED] Publisher execution rejected: Pipeline is in RENDER_ONLY mode.", file=sys.stderr)
         print("  Live publishing and YouTube upload operations are strictly forbidden in render-only mode.", file=sys.stderr)
         print("APPROVED FOR PUBLISHING: NO", file=sys.stderr)
@@ -159,7 +159,7 @@ def main() -> int:
 
     # ── Step 4: Publish ──────────────────────────────────────────────────────
     print(THIN)
-    print("UPLOADING TO YOUTUBE [PUBLIC]")
+    print(f"UPLOADING TO YOUTUBE [{active_privacy.upper()}]")
     print(THIN)
     try:
         manifest = publish_video(
@@ -189,7 +189,7 @@ def main() -> int:
     print()
     print(f"Manifest saved: {manifest.get('_manifest_path', args.output_dir)}")
     print()
-    print("UPLOAD COMPLETE: PUBLIC")
+    print(f"UPLOAD COMPLETE: {manifest['privacy_status'].upper()}")
     print()
     return 0
 
