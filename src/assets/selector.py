@@ -12,7 +12,7 @@ from src.assets.exceptions import NoMatchingDeityAssetError, DeityIdentityMismat
 DEITY_ALIASES: dict[str, list[str]] = {
     "lord_shiva": [
         "shiva", "mahadev", "bholenath", "snake", "vasuki", "trishul", "kailash", "somnath", "mahakal", "shivling", "nataraja", "arunachalam", "kedarnath",
-        "शिव", "महादेव", "भोलेनाथ", "वासुकी", "कैलाश", "सोमनाथ", "नीलकंठ", "శివ", "శివుడు", "మహాదేవుడు", "వాసుకి", "కైలాస", "నీలకంఠ", "నటరాజ"
+        "शिव", "महादेव", "भोलेनाथ", "वासुकी", "कैलाश", "सोमनाथ", "नीलकंठ", "केदारनाथ", "శివ", "శివుడు", "మహాదేవుడు", "వాసుకి", "కైలాస", "నీలకంఠ", "నటరాజ", "కేదారనాథ్", "కేదార్‌నాథ్", "కేదార్నాథ్", "భీమ్ శిల", "భీమ శిల"
     ],
     "lord_vishnu": [
         "vishnu", "narayana", "dashavatar", "viku", "kurma", "vamana", "trivikrama", "matsya", "varaha", "parashurama", "kalki", "gajendra", "makara",
@@ -112,6 +112,10 @@ def resolve_deity(topic: str, deity_hint: str = "", default: str | None = "lord_
 
 
 TELUGU_NARRATIVE_CONCEPTS: dict[str, list[str]] = {
+    "కేదారనాథ్": ["kedarnath", "temple", "himalayan", "flood"],
+    "కేదార్‌నాథ్": ["kedarnath", "temple", "himalayan", "flood"],
+    "భీమ్ శిల": ["bhim shila", "boulder", "rock", "flood", "kedarnath"],
+    "భీమశిల": ["bhim shila", "boulder", "rock", "flood", "kedarnath"],
     "కైలాస": ["kailash", "mountain", "snow"],
     "పాము": ["snake", "cobra", "serpent", "vasuki"],
     "సర్పం": ["snake", "cobra", "serpent", "vasuki"],

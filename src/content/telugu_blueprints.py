@@ -1164,18 +1164,14 @@ def synthesize_telugu_brief(topic: str, deity_hint: str = "") -> dict[str, Any]:
             blueprint = json.loads(json.dumps(TELUGU_DEITY_BRIEFS[k], ensure_ascii=False))
             return blueprint
 
-    # Strict Deity Isolation: If a candidate deity was resolved or hinted, use that
-    # deity's blueprint directly rather than falling through to unrelated deities.
-    if candidate_keys:
-        k = candidate_keys[0]
-        blueprint = json.loads(json.dumps(TELUGU_DEITY_BRIEFS[k], ensure_ascii=False))
-        return blueprint
-
-    # Check other blueprints in case topic directly names them without a candidate hint
-    for k, keywords in TELUGU_BLUEPRINT_KEYWORDS.items():
-        if any(kw in topic_lower or kw in topic for kw in keywords):
-            blueprint = json.loads(json.dumps(TELUGU_DEITY_BRIEFS[k], ensure_ascii=False))
-            return blueprint
+    # If a candidate deity was resolved or hinted, do not fall through to unrelated deities' blueprints;
+    # if the topic is a distinct story for this deity, proceed to dynamic synthesis.
+    if not candidate_keys:
+        # Check other blueprints in case topic directly names them without a candidate hint
+        for k, keywords in TELUGU_BLUEPRINT_KEYWORDS.items():
+            if any(kw in topic_lower or kw in topic for kw in keywords):
+                blueprint = json.loads(json.dumps(TELUGU_DEITY_BRIEFS[k], ensure_ascii=False))
+                return blueprint
 
     # 3. Dynamic synthesis for unlisted deities (e.g. Dattatreya, Surya, Yamaraj)
     subject_te = "శ్రీ భగవానుడు"

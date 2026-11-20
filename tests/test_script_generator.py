@@ -641,6 +641,102 @@ class TestScriptCLI(unittest.TestCase):
         )
         self.assertTrue(ok)
 
+    def test_kedarnath_and_telugu_semantic_alignment_regression(self):
+        """
+        Phase 5H Regression Tests:
+        Validates cross-lingual semantic matching for Kedarnath Temple and Bhim Shila,
+        ensuring authentic Telugu spellings and transliterations match correctly while
+        strictly rejecting generic-only titles, unrelated deities, and incorrect transliterations.
+        """
+        from src.script.generator import check_title_topic_semantic_alignment
+
+        # 1. Exact Kedarnath Telugu title and English topic (Phase 5H reported incident)
+        ok, reason = check_title_topic_semantic_alignment(
+            "The Mystery of Kedarnath Temple Surviving Himalayan Flood",
+            "కేదారనాథ్ ప్రళయం: భీమ్ శిల రక్షించిన అద్భుత రహస్యం",
+            deity_hint="shiva",
+        )
+        self.assertTrue(ok, f"Expected exact Kedarnath Telugu title to match topic, got: {reason}")
+        self.assertIn("specific subject", reason.lower())
+
+        # 2. Telugu title with matching English subject (Kedarnath + Bhim Shila)
+        ok, reason = check_title_topic_semantic_alignment(
+            "The Miracle of Kedarnath and Bhim Shila",
+            "కేదారనాథ్ భీమ్ శిల దివ్య రహస్యం",
+            deity_hint="shiva",
+        )
+        self.assertTrue(ok, f"Expected matching Kedarnath & Bhim Shila title to pass, got: {reason}")
+        self.assertIn("specific subject", reason.lower())
+
+        # 3. English title with matching Telugu topic
+        ok, reason = check_title_topic_semantic_alignment(
+            "కేదారనాథ్ ఆలయ దివ్య రహస్యాలు",
+            "The Sacred Mystery of Kedarnath Temple",
+            deity_hint="shiva",
+        )
+        self.assertTrue(ok, f"Expected English title to match Telugu Kedarnath topic, got: {reason}")
+        self.assertIn("specific subject", reason.lower())
+
+        # 4. Generic mystery title without a specific subject — MUST REJECT
+        ok, reason = check_title_topic_semantic_alignment(
+            "The Mystery of Kedarnath Temple Surviving Himalayan Flood",
+            "ఆలయాల అద్భుత రహస్యాలు మరియు కథ",
+            deity_hint="shiva",
+        )
+        self.assertFalse(ok, "Generic temple mystery title lacking deity/subject must be rejected")
+        self.assertIn("shares only broad generic concept", reason)
+
+        # 5. Unrelated deity/title — MUST REJECT
+        ok, reason = check_title_topic_semantic_alignment(
+            "The Mystery of Kedarnath Temple Surviving Himalayan Flood",
+            "వినాయకుడి ఏకదంత రహస్యం మరియు పూజా విధానం",
+            deity_hint="shiva",
+        )
+        self.assertFalse(ok, "Unrelated deity (Ganesha) title on Kedarnath topic must be rejected")
+        self.assertTrue("conflicting" in reason.lower() or "rejected" in reason.lower())
+
+        # 6. Incorrect transliteration — must NOT create a false match
+        ok, reason = check_title_topic_semantic_alignment(
+            "The Mystery of Kedarnath Temple Surviving Himalayan Flood",
+            "కేదరి కొండల అద్భుత రహస్యం",
+            deity_hint="shiva",
+        )
+        self.assertFalse(ok, "Incorrect transliteration must not create a false match")
+
+        # 7. Existing valid Telugu titles continue passing
+        # Ganesha broken tusk
+        ok, reason = check_title_topic_semantic_alignment(
+            "Why Lord Ganesha Has One Broken Tusk",
+            "గణపతి ఏకదంత రహస్యం మరియు దివ్య లీలలు",
+        )
+        self.assertTrue(ok)
+        # Golden deer
+        ok, reason = check_title_topic_semantic_alignment(
+            "The Lesson of Golden Deer Why Illusion Traps the Mind",
+            "మాయా లేడి రహస్యం: భ్రమలలో చిక్కుకున్న మనసు",
+        )
+        self.assertTrue(ok)
+        # Raas leela
+        ok, reason = check_title_topic_semantic_alignment(
+            "The Sacred Mystery of Raas Leela Pure Soul Devotion",
+            "గోపికల రాసలీలల అంతరార్థం: శ్రీకృష్ణుని దివ్య ప్రేమ రహస్యం",
+            deity_hint="krishna",
+        )
+        self.assertTrue(ok)
+
+        # 8. Existing unrelated-title rejection tests continue passing
+        ok, reason = check_title_topic_semantic_alignment(
+            "Why We Perform Aarti and Ring Bells in Temples",
+            "भगवान शिव और नाग वासुकि की कथा",
+        )
+        self.assertFalse(ok)
+        ok, reason = check_title_topic_semantic_alignment(
+            "How Matsya Avatar Saved Manu from the Great Deluge",
+            "भगवान विष्णु के कल्कि अवतार का रहस्य",
+        )
+        self.assertFalse(ok)
+        self.assertIn("conflicting story subjects", reason.lower())
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -529,7 +529,8 @@ SPECIFIC_SUBJECT_GROUPS: list[set[str]] = [
     {"kailash", "कैलाश", "కైలాస"},
     {"nataraja", "नटराज", "నటరాజ"},
     {"somnath", "सोमनाथ", "సోమనాథ్"},
-    {"kedarnath", "केदारनाथ", "కేదార్‌నాథ్"},
+    {"kedarnath", "केदारनाथ", "కేదార్‌నాథ్", "కేదారనాథ్", "కేదారనాథ", "కేదార్నాథ్", "కేదారనాథుని", "కేదారనాథుడి", "కేదారక్షేత్రం", "కేదారేశ్వర", "కేదారేశ్వరుడు"},
+    {"bhim shila", "bhima shila", "bheema shila", "bhimashila", "bhim rock", "भीम शिला", "भीमशिला", "భీమ్ శిల", "భీమ శిల", "భీమశిల"},
     {"damru", "डमरू", "డమరుకం"},
     {"ganga", "ganges", "गंगा", "గంగ"},
 
@@ -623,10 +624,12 @@ def check_title_topic_semantic_alignment(
     STOP = {"a", "an", "the", "of", "in", "on", "at", "to", "and", "or", "for", "is", "it", "its", "why", "how", "what", "does"}
 
     def _tokenize(text: str) -> set[str]:
+        # Strip invisible formatting controls (ZWNJ \u200c, ZWJ \u200d) without splitting Indic words
+        text_clean = text.replace("\u200c", "").replace("\u200d", "")
         # Preserve Unicode letters (L), combining marks (M), and numbers (N) while stripping punctuation/symbols
         cleaned = "".join(
             ch if not unicodedata.category(ch).startswith(("P", "S", "Z", "C")) else " "
-            for ch in text
+            for ch in text_clean
         )
         return {w for w in cleaned.lower().split() if w not in STOP and len(w) >= 2}
 
@@ -642,13 +645,14 @@ def check_title_topic_semantic_alignment(
     if len(specific_direct_overlap) > 0:
         return True, f"Direct specific keyword overlap: {specific_direct_overlap}"
 
-    canon_text = canonical_topic.lower()
-    title_text = script_title.lower()
+    canon_text = canonical_topic.lower().replace("\u200c", "").replace("\u200d", "")
+    title_text = script_title.lower().replace("\u200c", "").replace("\u200d", "")
 
     def _match_kw(kw: str, words: set[str], text: str) -> bool:
-        if any(ord(c) > 127 for c in kw):
-            return kw in words or kw in text
-        return kw in words or (" " in kw and kw in text)
+        norm_kw = kw.lower().replace("\u200c", "").replace("\u200d", "")
+        if any(ord(c) > 127 for c in norm_kw):
+            return norm_kw in words or norm_kw in text
+        return norm_kw in words or (" " in norm_kw and norm_kw in text)
 
     # 2. Specific subject / entity group overlap
     canon_subjects = [g for g in SPECIFIC_SUBJECT_GROUPS if any(_match_kw(kw, canon_words, canon_text) for kw in g)]
