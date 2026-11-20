@@ -34,10 +34,48 @@ from src.thumbnail.composer import (
 )
 from src.thumbnail.reuse_engine import ThumbnailReuseEngine
 from src.thumbnail.analyzer import analyze_thumbnail_file
+from src.thumbnail.asset_index import reset_asset_index_cache
+
+
+def _seed_thumbnail_test_records():
+    from src.assets.approval_registry import get_trusted_registry, TrustedAssetApprovalRecord
+    reg = get_trusted_registry()
+    seeds = [
+        ("assets/gods/lord_vishnu/kurma_avatar_mandara_mountain_samudra_manthan.png", "lord_vishnu", "kurma"),
+        ("assets/gods/narasimha/downloaded-file.png", "narasimha", "narasimha"),
+    ]
+    for p, d, av in seeds:
+        reg.register_record(
+            TrustedAssetApprovalRecord(
+                record_id=f"APPR-THUMB-TEST-{d.upper()}-{av.upper()}",
+                exact_rel_path=p,
+                canonical_deity=d,
+                avatar=av,
+                approval_status="APPROVED",
+                provenance="Thumbnail test seed record",
+                aspect_ratio="9:16",
+                content_type="image",
+                reviewer="REV-TEST-01",
+                review_timestamp="2026-11-20T10:00:00Z",
+            )
+        )
+    reset_asset_index_cache()
+
+
+def _cleanup_thumbnail_test_records():
+    from src.assets.approval_registry import get_trusted_registry
+    get_trusted_registry().reset_to_builtins()
+    reset_asset_index_cache()
 
 
 class TestThumbnailAssetIndex(unittest.TestCase):
     """Tests for deity asset indexing, alias resolution, corrupt rejection, and approval filtering."""
+
+    def setUp(self):
+        _seed_thumbnail_test_records()
+
+    def tearDown(self):
+        _cleanup_thumbnail_test_records()
 
     def test_alias_and_avatar_resolution(self):
         # Varaha
@@ -138,7 +176,11 @@ class TestAssetSelectorPriority(unittest.TestCase):
     """Tests the strict 4-priority selection order and anti-cross-deity enforcement."""
 
     def setUp(self):
+        _seed_thumbnail_test_records()
         self.selector = ThumbnailAssetSelector()
+
+    def tearDown(self):
+        _cleanup_thumbnail_test_records()
 
     def test_priority_1_selected_when_approved_exists(self):
         # For kurma, approved landscape artwork exists in repository
@@ -236,6 +278,12 @@ class TestThumbnailComposer(unittest.TestCase):
 
 class TestThumbnailReuseEngine(unittest.TestCase):
     """End-to-end tests for the complete ₹0 Thumbnail Reuse Engine."""
+
+    def setUp(self):
+        _seed_thumbnail_test_records()
+
+    def tearDown(self):
+        _cleanup_thumbnail_test_records()
 
     def test_successful_approved_artwork_reuse(self):
         with tempfile.TemporaryDirectory() as td:

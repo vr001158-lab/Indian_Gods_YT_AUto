@@ -10,8 +10,32 @@ from pathlib import Path
 from src.decision.validator import validate_candidates
 from src.decision.selector  import select_topic
 from src.decision.strategy  import apply_old_format_topic_preferences, apply_content_intelligence_preferences
+from src.decision.weekday_deity import (
+    select_weekday_deity,
+    DEITY_CANONICAL_ALIASES,
+    NoApprovedWeekdayDeityAssetsError,
+    get_weekday_info,
+    get_current_kolkata_datetime,
+)
 
 OUTPUT_DIR = Path("data/decision")
+
+
+def save_decision_report(decision: dict) -> Path | None:
+    """Persists decision dictionary to a timestamped JSON file in OUTPUT_DIR."""
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_file = OUTPUT_DIR / f"decision_{timestamp}.json"
+    try:
+        out_file.write_text(
+            json.dumps(decision, indent=2, ensure_ascii=False),
+            encoding="utf-8"
+        )
+        print(f"\n📂 Decision saved → {out_file}", file=sys.stderr)
+        return out_file
+    except Exception as e:
+        print(f"⚠️  Warning: Failed to save decision: {e}", file=sys.stderr)
+        return None
 
 
 def _build_selection_reason(candidate: dict, ranked: list) -> str:
@@ -78,10 +102,64 @@ def run_decision_pipeline(
     else:
         candidates_to_select = valid
 
-    from src.decision.weekday_deity import select_weekday_deity, DEITY_CANONICAL_ALIASES
-    weekday_context = select_weekday_deity()
+    from src.decision.weekday_deity import (
+        select_weekday_deity,
+        DEITY_CANONICAL_ALIASES,
+        NoApprovedWeekdayDeityAssetsError,
+        get_weekday_info,
+        get_current_kolkata_datetime,
+    )
+    try:
+        weekday_context = select_weekday_deity()
+    except NoApprovedWeekdayDeityAssetsError as exc:
+        now_dt = get_current_kolkata_datetime()
+        day_info = get_weekday_info(now_dt)
+        weekday_context = {
+            "weekday_index": now_dt.weekday(),
+            "english_day": day_info["english_day"],
+            "sanskrit_day": day_info["sanskrit_day"],
+            "scheduled_deity": None,
+            "display_name": None,
+            "repository_folder": None,
+            "eligible_deities": list(day_info["primary_deities"]),
+            "available_deities": [],
+            "unavailable_deities": list(day_info["primary_deities"]),
+            "generation_skipped": True,
+            "skip_reason": str(exc),
+            "significance": list(day_info["significance"]),
+            "visual_and_offering_context": dict(day_info["visual_and_offering_context"]),
+            "kolkata_date": now_dt.strftime("%Y-%m-%d"),
+        }
+        decision = {
+            "approved_for_generation": False,
+            "format": (format or "narrated").lower(),
+            "language_code": language_code,
+            "selected_topic": None,
+            "score": None,
+            "confidence": None,
+            "data_source": None,
+            "category": None,
+            "deity": None,
+            "suggested_angle": None,
+            "content_gap": None,
+            "selection_reason": f"Generation skipped: {exc}",
+            "reason": f"Generation skipped: {exc}",
+            "intelligence_factors": None,
+            "weekday_deity_context": weekday_context,
+            "rejected_candidates": [{"topic": r["topic"], "reasons": r["reasons"]} for r in rejected],
+            "dedup_removed_topics": [],
+            "total_input_candidates": len(candidates),
+            "total_valid_candidates": len(valid),
+            "total_rejected_candidates": len(rejected),
+            "min_score_threshold": min_score,
+            "selected_at": now_iso,
+        }
+        if save:
+            save_decision_report(decision)
+        return decision
+
     scheduled_deity = weekday_context["scheduled_deity"].lower()
-    eligible_deities = [d.lower() for d in weekday_context["eligible_deities"]]
+    eligible_deities = [d.lower() for d in weekday_context.get("available_deities", weekday_context["eligible_deities"])]
 
     from src.assets.selector import resolve_deity
     scheduled_pool = []
@@ -180,17 +258,7 @@ def run_decision_pipeline(
 
     # ── 4. Persist ────────────────────────────────────────────────────────────
     if save:
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        out_file = OUTPUT_DIR / f"decision_{timestamp}.json"
-        try:
-            out_file.write_text(
-                json.dumps(decision, indent=2, ensure_ascii=False),
-                encoding="utf-8"
-            )
-            print(f"\n📂 Decision saved → {out_file}", file=sys.stderr)
-        except Exception as e:
-            print(f"⚠️  Warning: Failed to save decision: {e}", file=sys.stderr)
+        save_decision_report(decision)
 
     return decision
 
@@ -228,7 +296,8 @@ def print_decision(decision: dict):
         print(f"\n{'─' * 50}")
         print("❌  NO TOPIC SELECTED")
         print(f"{'─' * 50}")
-        print(f"\n   Reason: {decision['reason']}")
+        fail_reason = decision.get("reason") or decision.get("selection_reason") or "No research candidate passed production safety gates"
+        print(f"\n   Reason: {fail_reason}")
 
     if decision["rejected_candidates"]:
         print(f"\n{'─' * 50}")

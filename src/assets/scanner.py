@@ -123,56 +123,59 @@ KNOWN_NARRATIVE_METADATA: dict[str, dict[str, Any]] = {
 
 
 def _enrich_asset_metadata(meta: dict[str, Any], stem: str, deity_key: str) -> dict[str, Any]:
-    """Enriches asset metadata with narrative and verification fields."""
-    stem_lower = stem.lower()
-    matched_entry = None
-    # Check longest pattern keys first (e.g. landscape variants before vertical)
-    for pattern_key, entry in sorted(KNOWN_NARRATIVE_METADATA.items(), key=lambda x: len(x[0]), reverse=True):
-        if pattern_key in stem_lower:
-            matched_entry = entry
-            break
+    """
+    Enriches asset metadata with narrative and verification fields.
+    Security Invariant:
+      Files under deity folders, landscape folders, and processed video folders
+      strictly default to UNVERIFIED. Filenames, folder names, and generated manifests
+      never establish approval. Approval requires an explicit trusted asset approval record.
+    """
+    from src.assets.approval_registry import get_trusted_registry, normalize_repo_path
+
+    path_str = meta.get("path") or meta.get("file_path") or meta.get("source_path") or ""
+    rel_path = normalize_repo_path(path_str)
 
     w = meta.get("width", 0)
     h = meta.get("height", 0)
     measured_ar = "16:9" if (w and h and w >= h) else "9:16"
+    meta["aspect_ratio"] = measured_ar
 
-    if matched_entry:
-        meta["avatar"] = matched_entry["avatar"]
-        meta["narrative_event"] = matched_entry["narrative_event"]
-        meta["scene_description"] = matched_entry["scene_description"]
-        meta["semantic_keywords"] = matched_entry["semantic_keywords"]
-        meta["aspect_ratio"] = measured_ar
-        meta["source"] = matched_entry["source"]
-        meta["provenance"] = matched_entry["provenance"]
-        meta["verification_status"] = matched_entry["verification_status"]
-        # Merge semantic keywords into tags so legacy tag matching also finds them
-        existing_tags = set(meta.get("tags", []))
-        existing_tags.update(matched_entry["semantic_keywords"])
-        meta["tags"] = sorted(existing_tags)
+    registry = get_trusted_registry()
+    appr_rec = registry.get_approval_record(rel_path)
+    if appr_rec and appr_rec.approval_status == "APPROVED":
+        target_deity = appr_rec.canonical_deity
+        target_avatar = appr_rec.avatar
+        is_approved, reason, record = registry.is_asset_approved(rel_path, deity=target_deity, avatar=target_avatar)
     else:
-        # Detect avatar from stem if present
-        detected_avatar = deity_key
-        for av in ("varaha", "kurma", "vamana", "trivikrama", "narasimha", "krishna", "rama", "matsya", "kalki"):
-            if av in stem_lower:
-                detected_avatar = "vamana_trivikrama" if av in ("vamana", "trivikrama") else av
-                break
+        is_approved, reason, record = registry.is_asset_approved(rel_path, deity=deity_key)
 
-        # In lord_vishnu, only vetted narrative assets are verified; generic vishnu images without avatar are unverified
-        is_unverified_vishnu = (deity_key.lower() == "lord_vishnu" and detected_avatar == deity_key)
-        # Any file explicitly tagged or named unverified, or raw unvetted draft
-        is_unapproved_draft = ("chatgpt" in stem_lower) or ("unverified" in stem_lower)
-
-        is_verified_curated = not is_unverified_vishnu and not is_unapproved_draft
-
-        meta["avatar"] = detected_avatar
-        meta["narrative_event"] = "general_deity_portrait"
-        meta["scene_description"] = f"Curated repository asset for {deity_key} (avatar={detected_avatar})"
-        meta["semantic_keywords"] = meta.get("tags", [])
-        meta["aspect_ratio"] = measured_ar
+    if is_approved and record is not None:
+        meta["approval_status"] = "APPROVED"
+        meta["verification_status"] = "verified_visual"
+        meta["approval_record_id"] = record.record_id
+        meta["avatar"] = record.avatar or record.canonical_deity
+        meta["canonical_deity"] = record.canonical_deity
+        meta["deity"] = record.canonical_deity
         meta["source"] = "repository_collection"
-        meta["provenance"] = "Repository collection; curated deity asset" if is_verified_curated else "Existing repository collection"
-        meta["verification_status"] = "verified_visual" if is_verified_curated else "unverified"
+        meta["provenance"] = record.provenance
+        if record.narrative_event:
+            meta["narrative_event"] = record.narrative_event
+        if record.scene_description:
+            meta["scene_description"] = record.scene_description
+    else:
+        # Default to UNVERIFIED for any asset lacking an explicit trusted approval record
+        meta["approval_status"] = "UNAPPROVED"
+        meta["verification_status"] = "unverified"
+        meta["approval_record_id"] = None
+        meta["avatar"] = deity_key
+        meta["canonical_deity"] = deity_key
+        meta["deity"] = deity_key
+        meta["source"] = "repository_collection"
+        meta["provenance"] = "Unverified repository asset"
+        meta["narrative_event"] = "general_deity_portrait"
+        meta["scene_description"] = f"Unverified asset in {deity_key} collection"
 
+    meta["semantic_keywords"] = meta.get("tags", [])
     return meta
 
 
@@ -211,14 +214,17 @@ def scan_gods_assets(
     total_images = 0
     total_videos = 0
 
+    # Pre-populate all discovered folders so folder keys are preserved
+    for folder in sorted(base_path.iterdir()):
+        if folder.is_dir():
+            deities[folder.name.lower()] = {"images": [], "videos": []}
+
     # Scan deity directories
     for folder in sorted(base_path.iterdir()):
         if not folder.is_dir():
             continue
 
         deity_key = folder.name.lower()
-        images: list[dict] = []
-        videos: list[dict] = []
 
         # Recursively find all files inside deity directory
         for item in sorted(folder.rglob("*")):
@@ -244,7 +250,10 @@ def scan_gods_assets(
                     meta["deity"] = deity_key
                     meta["tags"] = tags
                     meta = _enrich_asset_metadata(meta, stem, deity_key)
-                    images.append(meta)
+                    target_bucket = meta.get("canonical_deity") or deity_key
+                    if target_bucket not in deities:
+                        deities[target_bucket] = {"images": [], "videos": []}
+                    deities[target_bucket]["images"].append(meta)
                     total_images += 1
                 except AssetValidationError as exc:
                     rejected_files.append({"file": str(item), "reason": str(exc)})
@@ -255,7 +264,10 @@ def scan_gods_assets(
                     meta["deity"] = deity_key
                     meta["tags"] = tags
                     meta = _enrich_asset_metadata(meta, stem, deity_key)
-                    videos.append(meta)
+                    target_bucket = meta.get("canonical_deity") or deity_key
+                    if target_bucket not in deities:
+                        deities[target_bucket] = {"images": [], "videos": []}
+                    deities[target_bucket]["videos"].append(meta)
                     total_videos += 1
                 except AssetValidationError as exc:
                     rejected_files.append({"file": str(item), "reason": str(exc)})
@@ -273,16 +285,14 @@ def scan_gods_assets(
                         meta["deity"] = deity_key
                         stem = item.stem
                         meta = _enrich_asset_metadata(meta, stem, deity_key)
-                        if not any(v.get("path") == meta.get("path") for v in videos):
-                            videos.append(meta)
+                        target_bucket = meta.get("canonical_deity") or deity_key
+                        if target_bucket not in deities:
+                            deities[target_bucket] = {"images": [], "videos": []}
+                        if not any(v.get("path") == meta.get("path") for v in deities[target_bucket]["videos"]):
+                            deities[target_bucket]["videos"].append(meta)
                             total_videos += 1
                     except AssetValidationError as exc:
                         rejected_files.append({"file": str(item), "reason": str(exc)})
-
-        deities[deity_key] = {
-            "images": images,
-            "videos": videos,
-        }
 
     return {
         "deities": deities,

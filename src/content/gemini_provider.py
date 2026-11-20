@@ -478,6 +478,20 @@ def generate_brief_with_gemini(
     if language_code not in ("hi-IN", "te-IN"):
         raise GeminiProviderError(f"Unsupported language code '{language_code}'. Must be 'hi-IN' or 'te-IN'.")
 
+    # For Telugu (te-IN), check if a verified rich blueprint exists for the deity/topic when offline / no API key
+    if language_code == "te-IN" and not os.environ.get("GEMINI_API_KEY", "").strip():
+        from src.content.telugu_blueprints import synthesize_telugu_brief, TELUGU_DEITY_BRIEFS
+        from src.assets.selector import resolve_deity
+        selected_topic = decision.get("selected_topic", "Hindu Deity Devotional Story")
+        deity = decision.get("deity", "")
+        resolved_key = resolve_deity(selected_topic, deity_hint=deity, default=None)
+        if (resolved_key and resolved_key in TELUGU_DEITY_BRIEFS) or (deity and deity in TELUGU_DEITY_BRIEFS):
+            brief_data = synthesize_telugu_brief(topic=selected_topic, deity_hint=deity)
+            brief_data["language_code"] = language_code
+            brief_data["generation_source"] = "template_fallback"
+            logger.info("Content brief generated via verified Telugu rich blueprint (%s, topic: %s)", language_code, selected_topic)
+            return brief_data
+
     lang_name = "Hindi in Devanagari script (हिन्दी)" if language_code == "hi-IN" else "Telugu in Telugu script (తెలుగు)"
     selected_topic = decision.get("selected_topic", "Hindu Deity Devotional Story")
     deity = decision.get("deity", "Lord Shiva")
@@ -604,6 +618,19 @@ def generate_script_with_gemini(
     if language_code not in ("hi-IN", "te-IN"):
         raise GeminiProviderError(f"Unsupported language code '{language_code}'. Must be 'hi-IN' or 'te-IN'.")
 
+    # For Telugu (te-IN), check if a verified rich blueprint exists or if brief has calibrated scenes when offline / no API key
+    if language_code == "te-IN" and not os.environ.get("GEMINI_API_KEY", "").strip():
+        from src.content.telugu_blueprints import synthesize_telugu_script_from_brief, TELUGU_DEITY_BRIEFS
+        from src.assets.selector import resolve_deity
+        p_title = brief.get("primary_title", "")
+        resolved_key = resolve_deity(p_title, default=None)
+        if (resolved_key and resolved_key in TELUGU_DEITY_BRIEFS) or (len(brief.get("visual_plan", [])) == 3 and (content_type or "short").lower() == "short"):
+            script_data = synthesize_telugu_script_from_brief(brief, content_type=content_type)
+            script_data["language_code"] = language_code
+            script_data["generation_source"] = "template_fallback"
+            logger.info("Script generated via verified Telugu rich blueprint (%s, title: %s)", language_code, p_title)
+            return script_data
+
     lang_name = "Hindi in Devanagari script (हिन्दी)" if language_code == "hi-IN" else "Telugu in Telugu script (తెలుగు)"
     primary_title = brief.get("primary_title", "Divine Story")
     hook = brief.get("hook", "")
@@ -620,8 +647,13 @@ Hook: "{hook}"
 Story Arc: {json.dumps(story_arc, ensure_ascii=False)}
 
 Requirements:
-1. Language: Strictly {lang_name}. The spoken narration and voice text MUST be completely in {lang_name} using standard native script.
-2. Structure:
+1. Language: Strictly {lang_name}. The spoken narration and voice text MUST be completely in {lang_name} using standard native script. DO NOT include foreign Indic scripts (e.g. Odia U+0B00-U+0B7F, Devanagari letters in Telugu, Bengali, Tamil, etc.). Every character must strictly belong to the native {lang_name} alphabet or standard punctuation.
+2. Narrative Completeness (Ganesha / ఏకదంతం): For stories of Lord Ganesha's single tusk (ఏకదంతం), explicitly articulate the complete dramatic arc across scenes:
+   - Scene 1: Introduce Lord Ganesha and His single tusk (ఏకదంతం) as the divine symbol of wisdom and sacrifice.
+   - Scene 2: Describe Maharshi Veda Vyasa reciting Mahabharata verses at high speed, Ganesha's vow to write without pause, and the critical turning point: Ganesha's writing pen/instrument suddenly breaks.
+   - Scene 3: Without halting the sacred recitation for a single second, Ganesha instantly breaks His own tusk to use as a stylus and continues writing, establishing the supreme ideal of unshakeable duty.
+3. Narration Length & Pacing: For Short format (target 35 to 45 seconds), provide substantial spoken narration (~80-110 words, 450-600 characters in native script) distributed across scenes (25-35 words per scene) so natural speech pacing genuinely lasts at least 35 to 45 seconds without brevity or artificial gaps.
+4. Structure:
    - "title": Title in {lang_name}.
    - "duration_seconds": Total duration in seconds (for 'short': 35 to 55 seconds, target ~45s; for 'long': 180 to 360 seconds).
    - "narration": Complete continuous voice narration text in {lang_name}.
@@ -683,7 +715,13 @@ Output must be ONLY valid JSON matching this schema:
             script_data = json.loads(cleaned)
             ok, err = validate_script_output(script_data, content_type=ct)
             if ok:
-                # Ensure output is genuinely in the target Indic script
+                # Ensure output is genuinely in the target Indic script and free of foreign Indic glyphs
+                from src.script.generator import validate_script_language_integrity
+                ok_lang, lang_err = validate_script_language_integrity(script_data, language_code)
+                if not ok_lang:
+                    raise GeminiProviderError(
+                        f"Gemini script failed language integrity for {language_code}: {lang_err}"
+                    )
                 narration = script_data.get("narration", "")
                 if not validate_indic_script(narration, language_code):
                     raise GeminiProviderError(

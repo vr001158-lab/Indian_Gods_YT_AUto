@@ -34,8 +34,8 @@ CANONICAL_DEITIES: dict[str, list[str]] = {
         "కృష్ణ", "కృష్ణుడు", "గోపాల", "గోవింద"
     ],
     "ram": [
-        "ram", "rama", "ramachandra", "raghava", "ayodhya", "sita",
-        "రామ", "రాముడు", "శ్రీరామ", "అయోధ్య"
+        "ram", "rama", "ramachandra", "raghava", "ayodhya", "sita", "ramayana", "ramayan",
+        "రామ", "రాముడు", "శ్రీరామ", "అయోధ్య", "రామాయణం"
     ],
     "lord_shiva": [
         "shiva", "lord_shiva", "mahadev", "bholenath", "rudra", "nataraja", "kedarnath",
@@ -159,7 +159,13 @@ def resolve_deity_and_avatar(text: str) -> tuple[Optional[str], Optional[str]]:
         "narasimha", "krishna", "parashurama", "kalki", "durga", "kali",
         "venkateswara", "hanuman", "matsya", "rama", "ram",
     ]:
-        if len(av) <= 3:
+        if av in ("ram", "rama"):
+            # Word-boundary matching for Rama/Ram to prevent substring collision inside "subramanya"
+            # Support explicit Ramayana keywords
+            if re.search(r"\b" + re.escape(av) + r"\b", t_lower) or "ramayan" in t_lower:
+                detected_avatar = av
+                break
+        elif len(av) <= 3:
             if re.search(r"\b" + re.escape(av) + r"\b", t_lower):
                 detected_avatar = av
                 break
@@ -194,8 +200,15 @@ def resolve_deity_and_avatar(text: str) -> tuple[Optional[str], Optional[str]]:
         for deity, aliases in CANONICAL_DEITIES.items():
             for alias in aliases:
                 a_lower = alias.lower()
-                if len(a_lower) <= 3:
-                    if re.search(r"\b" + re.escape(a_lower) + r"\b", t_lower) or alias in text:
+                if a_lower in ("ram", "rama") or len(a_lower) <= 4:
+                    if re.search(r"\b" + re.escape(a_lower) + r"\b", t_lower) or (a_lower in ("ram", "rama") and "ramayan" in t_lower):
+                        detected_deity = deity
+                        break
+                    elif not a_lower.isascii() and alias in text:
+                        detected_deity = deity
+                        break
+                elif a_lower.isascii() and a_lower.isalnum():
+                    if re.search(r"\b" + re.escape(a_lower) + r"\b", t_lower):
                         detected_deity = deity
                         break
                 elif a_lower in t_lower or alias in text:
@@ -231,6 +244,12 @@ class ThumbnailAssetRecord:
 _CACHED_INDEX_RECORDS: Optional[list[ThumbnailAssetRecord]] = None
 
 
+def reset_asset_index_cache() -> None:
+    """Resets the process-wide cached asset index records."""
+    global _CACHED_INDEX_RECORDS
+    _CACHED_INDEX_RECORDS = None
+
+
 class DeityAssetIndex:
     """
     Indexes, verifies, and provides query access to local deity visual assets.
@@ -247,6 +266,9 @@ class DeityAssetIndex:
 
     def _build_index(self):
         """Discovers and indexes assets from verified landscape manifests and repository collections."""
+        from src.assets.approval_registry import get_trusted_registry
+        registry = get_trusted_registry()
+
         # 1. Index curated landscape repository assets (Priority 1 Candidates)
         landscape_dir = Path("assets/gods_landscape_long_video")
         if landscape_dir.exists():
@@ -254,10 +276,22 @@ class DeityAssetIndex:
                 if f.name.endswith(".gitkeep") or f.name.endswith(".keep") or not f.is_file():
                     continue
                 if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".mp4", ".mov", ".webm", ".avi", ".mkv"):
+                    rel_p = str(f).replace("\\", "/")
+                    appr_record = registry.get_approval_record(rel_p)
+                    if appr_record and appr_record.approval_status == "APPROVED":
+                        approval = "APPROVED"
+                        avatar = appr_record.avatar
+                        deity = appr_record.canonical_deity
+                    else:
+                        approval = "UNAPPROVED"
+                        avatar = None
+                        deity = None
                     record = self._inspect_file(
                         f,
-                        default_source="approved_landscape_artwork",
-                        default_approval="APPROVED"
+                        default_source="approved_landscape_artwork" if approval == "APPROVED" else "unverified_landscape_artwork",
+                        default_approval=approval,
+                        force_avatar=avatar,
+                        force_deity=deity,
                     )
                     if record:
                         self.records.append(record)
@@ -270,34 +304,26 @@ class DeityAssetIndex:
                     continue
                 if f.suffix.lower() in (".png", ".jpg", ".jpeg", ".mp4", ".mov", ".webm", ".avi", ".mkv"):
                     folder_name = f.parent.name.lower()
-                    fname_lower = f.name.lower()
+                    if folder_name in ("horizontal", "vertical"):
+                        folder_name = f.parent.parent.name.lower()
 
-                    if folder_name == "lord_vishnu":
-                        # In lord_vishnu, only curated named assets with explicit avatars are approved
-                        if "kurma_avatar" in fname_lower:
-                            approval = "APPROVED"
-                            avatar = "kurma"
-                        elif "vamana_trivikrama" in fname_lower:
-                            approval = "APPROVED"
-                            avatar = "vamana_trivikrama"
-                        else:
-                            approval = "UNAPPROVED"  # Generic unverified Vishnu download
-                            avatar = None
+                    rel_p = str(f).replace("\\", "/")
+                    appr_record = registry.get_approval_record(rel_p)
+                    if appr_record and appr_record.approval_status == "APPROVED":
+                        approval = "APPROVED"
+                        avatar = appr_record.avatar
+                        deity = appr_record.canonical_deity
                     else:
-                        # For other curated repository deity folders
-                        if "chatgpt" in fname_lower or "unverified" in fname_lower:
-                            approval = "UNAPPROVED"
-                            avatar = None
-                        else:
-                            approval = "APPROVED"
-                            _, detected_av = resolve_deity_and_avatar(f.name + " " + folder_name)
-                            avatar = detected_av or folder_name
+                        approval = "UNAPPROVED"
+                        avatar = None
+                        deity = folder_name
 
                     record = self._inspect_file(
                         f,
                         default_source="repository_collection",
                         default_approval=approval,
                         force_avatar=avatar,
+                        force_deity=deity,
                     )
                     if record:
                         self.records.append(record)
@@ -309,19 +335,29 @@ class DeityAssetIndex:
                 if not f.is_file() or f.name.endswith(".gitkeep") or f.name.endswith(".keep"):
                     continue
                 if f.suffix.lower() in (".mp4", ".mov", ".webm", ".avi", ".mkv"):
-                    parts = f.parts
-                    deity_part = None
-                    for idx, part in enumerate(parts):
-                        if part == "gods_processed" and idx + 1 < len(parts):
-                            deity_part = parts[idx + 1].lower()
-                            break
-                    folder_deity = deity_part or f.parent.name.lower()
+                    rel_p = str(f).replace("\\", "/")
+                    appr_record = registry.get_approval_record(rel_p)
+                    if appr_record and appr_record.approval_status == "APPROVED":
+                        approval = "APPROVED"
+                        avatar = appr_record.avatar
+                        deity = appr_record.canonical_deity
+                    else:
+                        approval = "UNAPPROVED"
+                        parts = f.parts
+                        deity_part = None
+                        for idx, part in enumerate(parts):
+                            if part == "gods_processed" and idx + 1 < len(parts):
+                                deity_part = parts[idx + 1].lower()
+                                break
+                        deity = deity_part or f.parent.name.lower()
+                        avatar = None
+
                     record = self._inspect_file(
                         f,
                         default_source="curated_processed_video",
-                        default_approval="APPROVED",
-                        force_avatar=folder_deity,
-                        force_deity=folder_deity,
+                        default_approval=approval,
+                        force_avatar=avatar,
+                        force_deity=deity,
                     )
                     if record:
                         self.records.append(record)
@@ -447,11 +483,15 @@ class DeityAssetIndex:
         """
         Finds approved assets strictly matching the requested deity and avatar.
         Does not substitute unrelated avatars or deities.
+        Double-checks against explicit trusted approval registry.
         """
         matches = []
         c_deity, c_avatar = resolve_deity_and_avatar(deity + " " + (avatar or ""))
         req_deity = c_deity or deity.lower()
         req_avatar = avatar.lower() if avatar else c_avatar
+
+        from src.assets.approval_registry import get_trusted_registry
+        registry = get_trusted_registry()
 
         for rec in self.records:
             if rec.integrity_status != "VALID" or rec.approval_status != "APPROVED":
@@ -459,14 +499,10 @@ class DeityAssetIndex:
             if rec.quality_score < min_quality:
                 continue
 
-            # Strict Deity match
-            if rec.deity.lower() != req_deity:
+            # Strict verification against trusted approval registry
+            is_appr, _, appr_rec = registry.is_asset_approved(rec.file_path, deity=req_deity, avatar=req_avatar)
+            if not is_appr:
                 continue
-
-            # Strict Avatar match if an avatar is requested
-            if req_avatar:
-                if not rec.avatar or rec.avatar.lower() != req_avatar:
-                    continue
 
             matches.append(rec)
 

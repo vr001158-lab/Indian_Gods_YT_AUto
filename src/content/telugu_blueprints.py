@@ -171,32 +171,32 @@ TELUGU_DEITY_BRIEFS: dict[str, dict[str, Any]] = {
             "మూడవ భాగం: కర్తవ్య నిర్వహణలో ఎలాంటి ఆటంకాలకు లొంగకూడదనే ఆధ్యాత్మిక సందేశం."
         ],
         "script_structure": {
-            "act_1_opening": "విఘ్న నాయకుడైన శ్రీ గణేశుని ఏకదంత దివ్య రూపం జ్ఞానానికి, పరిపూర్ణ ఏకాగ్రతకు నిదర్శనం.",
-            "act_2_explanation": "వ్యాస మహర్షి చెబుతున్న మహాభారతాన్ని లిఖిస్తూ కలం విరిగిపోగా, స్వామి తన దంతాన్ని విరిచి లేఖినిగా మార్చాడు.",
-            "act_3_message": "జ్ఞాన సముపార్జన కోసం దేహ సౌందర్యాన్ని త్యాగం చేసిన స్వామి భక్తి మార్గం మనకు ఆదర్శం."
+            "act_1_opening": "విఘ్న నాయకుడైన శ్రీ గణేశుని ఏకదంత దివ్య రూపం వెనుక అపారమైన జ్ఞానం, పరిపూర్ణ ఏకాగ్రత మరియు పవిత్ర త్యాగ రహస్యం దాగి ఉన్నాయి.",
+            "act_2_explanation": "వ్యాస మహర్షి వేగంగా చెబుతున్న మహాభారతాన్ని లిఖిస్తూ లేఖిని విరిగిపోగా, ఆటంకం రాకూడదని స్వామి తన దంతాన్ని విరిచి కలంగా మార్చాడు.",
+            "act_3_message": "కర్తవ్య నిర్వహణలో ఎన్ని అడ్డంకులు ఎదురైనా దృఢ సంకల్పంతో పూర్తి చేయాలన్నదే ఏకదంతుడు మనకు అందించే పరమ సందేశం."
         },
         "visual_plan": [
             {
                 "scene_number": 1,
                 "duration_seconds": 15,
                 "description": "శ్రీ గణేశుని దివ్య ముఖారవిందం, ఏకదంతం ప్రస్ఫుటంగా కనిపిస్తున్న దృశ్యం.",
-                "voice_text": "విఘ్న నాయకుడైన శ్రీ గణేశుని ఏకదంత దివ్య రూపం జ్ఞానానికి, పరిపూర్ణ ఏకాగ్రతకు నిదర్శనం.",
+                "voice_text": "సమస్త లోకాల విఘ్నాలను తొలగించే శ్రీ గణేశుని ఏకదంత దివ్య స్వరూపం వెనుక అపారమైన జ్ఞానం, పరిపూర్ణ త్యాగ రహస్యం దాగి ఉన్నాయి.",
                 "image_prompt": "Cinematic close up of Lord Ganesha showing single broken tusk, divine temple diya lights, golden ornaments, 8k",
                 "video_prompt": "Camera slowly moving to reveal Lord Ganesha face highlighting the single broken tusk and gentle eyes"
             },
             {
                 "scene_number": 2,
-                "duration_seconds": 20,
+                "duration_seconds": 15,
                 "description": "వ్యాస మహర్షి శ్లోకాలు చెబుతుండగా గణపతి తాళపత్రాలపై వేగంగా రాస్తున్న దృశ్యం.",
-                "voice_text": "వ్యాస మహర్షి మహాభారతాన్ని చెబుతుండగా, గణపతి ఏమాత్రం ఆగకుండా తాళపత్రాలపై లిఖిస్తూ సాగాడు.",
+                "voice_text": "వ్యాస మహర్షి మహాభారతాన్ని వేగంగా చెబుతుండగా, గణపతి ఏమాత్రం ఆగకుండా రాస్తున్న సమయంలో అనుకోకుండా ఆయన లేఖిని విరిగిపోయింది.",
                 "image_prompt": "Sage Vyasa reciting verses, young radiant Ganesha writing rapidly on palm leaves with quill, forest hermitage aura",
                 "video_prompt": "Vyasa speaking sacred Sanskrit verses as Ganesha hand glides swiftly across palm leaves"
             },
             {
                 "scene_number": 3,
-                "duration_seconds": 25,
+                "duration_seconds": 15,
                 "description": "గణపతి లేఖిని విరిగిపోవడం, తక్షణమే తన దంతాన్ని విరిచి దివ్య కాంతిలో కలంగా మార్చడం.",
-                "voice_text": "రచన మధ్యలో కలం విరిగిపోగా, ఏకాగ్రత చెదరకుండా గణపతి తన దంతాన్ని విరిచి కలంగా మార్చాడు.",
+                "voice_text": "రచన క్షణమైనా ఆగకూడదనే నిబంధన కోసం స్వామి ఏమాత్రం సంశయించకుండా తన కుడి దంతాన్ని విరిచి కలంగా మార్చి రచనను కొనసాగించారు.",
                 "image_prompt": "Lord Ganesha breaking his own right tusk to continue writing Mahabharata, divine golden spark illuminating room",
                 "video_prompt": "Dramatic close up of Ganesha snapping his right tusk without hesitation to keep writing"
             },
@@ -204,15 +204,15 @@ TELUGU_DEITY_BRIEFS: dict[str, dict[str, Any]] = {
                 "scene_number": 4,
                 "duration_seconds": 15,
                 "description": "విరిగిన దంతంతో మహాభారత గ్రంథాన్ని ఆపకుండా పూర్తి చేస్తున్న దృశ్యం.",
-                "voice_text": "ఆ పవిత్ర త్యాగంతో మహాభారత గ్రంథం పూర్తయి, లోకానికి అద్భుత ధర్మ సందేశం లభించింది.",
+                "voice_text": "ఆ దివ్య త్యాగంతో మహాభారత గ్రంథం నిరాటంకంగా పూర్తయి, సమస్త మానవాళికి అత్యున్నతమైన ధర్మ సందేశాన్ని అందించింది.",
                 "image_prompt": "Completed sacred Mahabharata manuscripts stacked with glowing aura, Ganesha smiling peacefully",
                 "video_prompt": "Ganesha placing final leaf on sacred book as divine flower petals shower from heaven"
             },
             {
                 "scene_number": 5,
-                "duration_seconds": 20,
+                "duration_seconds": 15,
                 "description": "విద్యార్థి శ్రద్ధతో విద్యను అభ్యసిస్తున్న దృశ్యం, అంకితభావానికి ప్రతీక.",
-                "voice_text": "జ్ఞాన సాధనలో ఎలాంటి అడ్డంకులు ఎదురైనా త్యాగబుద్ధితో ముందుకు సాగాలన్నదే గణపతి ఇచ్చే సందేశం. ఓం గం గణపతయే నమః.",
+                "voice_text": "జ్ఞాన సాధనలో ఎలాంటి ఆటంకాలు ఎదురైనా సంకల్ప బలంతో ముందుకు సాగాలన్నదే గణపతి ఇచ్చే సందేశం. ఓం శ్రీ గణేశాయ నమః.",
                 "image_prompt": "Modern devoted student studying under soft warm lamp, symbolic divine blessing overlay of Ganesha",
                 "video_prompt": "Transition from ancient writing to focused student, symbolizing focus and devotion"
             }
@@ -963,6 +963,136 @@ TELUGU_DEITY_BRIEFS: dict[str, dict[str, Any]] = {
             "hashtags": ["#గజేంద్రమోక్షం", "#శ్రీమహావిష్ణువు", "#భాగవతం", "#శరణాగతి", "#దివ్యదర్శనం"],
             "category": "Education"
         }
+    },
+    "lord_vishnu_sheshashayana": {
+        "title_options": [
+            "శ్రీమహావిష్ణువు క్షీరసాగరంలో శేషశయనం వెనుక ఉన్న రహస్యం ఏమిటి?",
+            "పాలకడలిలో ఆదిశేషునిపై పవళించిన శ్రీమన్నారాయణుని దివ్య తత్త్వం",
+            "శ్రీమహావిష్ణువు యోగనిద్ర: లోకాలను రక్షించే పరమ రహస్యం",
+            "ఆదిశేషుడు మరియు శ్రీమహావిష్ణువు: కాలాతీత దివ్య దర్శనం",
+            "వైకుంఠ వైభవం: భక్తుల భయాలను పోగొట్టే నారాయణ కటాక్షం"
+        ],
+        "primary_title": "శ్రీమహావిష్ణువు క్షీరసాగరంలో శేషశయనం వెనుక ఉన్న రహస్యం ఏమిటి?",
+        "hook": "భయంకరమైన కాలసర్పమైన ఆదిశేషునిపై శ్రీమహావిష్ణువు ప్రశాంతంగా ఎందుకు శేషశయనం చేస్తారో మీకు తెలుసా? అనంతమైన పాలకడలిలో భగవంతుడు నిద్రించడం కాదు, సృష్టిని నిరంతరం రక్షించే యోగనిద్ర అది.",
+        "audience": "భక్తులు, భాగవత ప్రియులు మరియు సనాతన ధర్మ సాధకులు.",
+        "story_arc": [
+            "మొదటి భాగం: క్షీరసాగరంలో ఆదిశేషుని పాన్పుపై శ్రీమహావిష్ణువు యోగనిద్ర.",
+            "రెండవ భాగం: ఆదిశేషుడు కాలానికి మరియు సంసార సాగర అలజడులకు ప్రతీకగా నిలవడం, అంతరంగిక శాంతి సందేశం.",
+            "మూడవ భాగం: లక్ష్మీ సమేతుడైన శ్రీమన్నారాయణుడు ధర్మాన్ని రక్షిస్తూ భక్తులకు అభయం ప్రసాదించడం."
+        ],
+        "script_structure": {
+            "act_1_opening": "భయంకరమైన కాలసర్పమైన ఆదిశేషునిపై శ్రీమహావిష్ణువు ప్రశాంతంగా ఎందుకు శేషశయనం చేస్తారో మీకు తెలుసా? అనంతమైన పాలకడలిలో భగవంతుడు నిద్రించడం కాదు, సృష్టిని నిరంతరం రక్షించే యోగనిద్ర అది.",
+            "act_2_explanation": "ఆదిశేషుడు కాలానికి ప్రతీక. కాలం ఎంత వేగంగా పరిగెత్తినా, సంసార సాగరంలో ఎన్ని అలజడులు వచ్చినా, అంతరంగంలో శాంతిని కోల్పోవద్దని ఈ దివ్య దర్శనం మనకు ప్రబోధిస్తుంది.",
+            "act_3_message": "లక్ష్మీ సమేతుడైన శ్రీమన్నారాయణుడు ధర్మాన్ని కాపాడుతూ సమస్త జీవులను కటాక్షిస్తాడు. శరణన్న భక్తుల భయాలను పోగొట్టి సకల శుభాలను ప్రసాదిస్తాడు. ఓం నమో నారాయణాయ."
+        },
+        "visual_plan": [
+            {
+                "scene_number": 1,
+                "duration_seconds": 15,
+                "description": "క్షీరసాగరంలో ఆదిశేషునిపై యోగనిద్రలో పవళించిన శ్రీమహావిష్ణువు దివ్య మంగళ స్వరూపం.",
+                "voice_text": "భయంకరమైన కాలసర్పమైన ఆదిశేషునిపై శ్రీమహావిష్ణువు ప్రశాంతంగా ఎందుకు శేషశయనం చేస్తారో మీకు తెలుసా? అనంతమైన పాలకడలిలో భగవంతుడు నిద్రించడం కాదు, సృష్టిని నిరంతరం రక్షించే యోగనిద్ర అది.",
+                "image_prompt": "Cinematic 8k, Lord Vishnu reclining in cosmic ocean Ksheera Sagara on multi-headed serpent Adi Shesha, serene divine expression, Sudarshana chakra, Shankha, golden Pitambara, galaxies in cosmic background",
+                "video_prompt": "Majestic camera slow pan showing Lord Vishnu reclining on coiled serpent throne upon shimmering milk ocean beneath celestial stars"
+            },
+            {
+                "scene_number": 2,
+                "duration_seconds": 14,
+                "description": "విశ్వ శక్తులను నియంత్రిస్తూ ప్రశాంత ధ్యాన ముద్రలో వెలుగులీనుతున్న పరమాత్మ దర్శనం.",
+                "voice_text": "ఆదిశేషుడు కాలానికి ప్రతీక. కాలం ఎంత వేగంగా పరిగెత్తినా, సంసార సాగరంలో ఎన్ని అలజడులు వచ్చినా, అంతరంగంలో శాంతిని కోల్పోవద్దని ఈ దివ్య దర్శనం మనకు ప్రబోధిస్తుంది.",
+                "image_prompt": "Cinematic 8k, supreme deity Vishnu seated in glowing golden cosmic palace in padmasana deep dhyana, lotus aura, peaceful enlightenment, divine atmosphere",
+                "video_prompt": "Gentle camera zoom into tranquil face of meditating Lord Vishnu radiating warm golden halo amidst sacred temple architecture"
+            },
+            {
+                "scene_number": 3,
+                "duration_seconds": 13,
+                "description": "లక్ష్మీదేవితో కొలువైన శ్రీమహావిష్ణువు, సుదర్శన చక్రం మరియు అభయ హస్తంతో భక్తులను కటాక్షిస్తున్న వైభవం.",
+                "voice_text": "లక్ష్మీ సమేతుడైన శ్రీమన్నారాయణుడు ధర్మాన్ని కాపాడుతూ సమస్త జీవులను కటాక్షిస్తాడు. శరణన్న భక్తుల భయాలను పోగొట్టి సకల శుభాలను ప్రసాదిస్తాడు. ఓం నమో నారాయణాయ.",
+                "image_prompt": "Cinematic 8k, Lord Vishnu seated majestically on golden throne with Goddess Lakshmi, holding Sudarshana Chakra, Abhaya mudra blessing, lavish Vaikuntha palace, celestial flowers",
+                "video_prompt": "Slow upward tracking shot revealing Lakshmi and Narayana in Vaikuntha with spinning Sudarshana chakra, divine golden rain"
+            }
+        ],
+        "voice_direction": {
+            "tone": "గౌరవప్రదమైన, ప్రశాంతమైన మరియు ఆధ్యాత్మిక గాంభీర్యం.",
+            "speed": "స్పష్టంగా మరియు లయబద్ధంగా (నిమిషానికి సుమారు 115 పదాలు).",
+            "emotion": "పరమ భక్తి, దైవిక శాంతి.",
+            "language_style": "తేట తెలుగు, భాగవత ఆధ్యాత్మిక శైలి."
+        },
+        "shorts_hooks": [
+            "విష్ణువు ఎందుకు భయంకరమైన పాముపై పడుకుంటాడో తెలుసా?",
+            "పాలకడలిలో విష్ణువు నిద్ర వెనుక ఉన్న అసలు రహస్యం!",
+            "శేషశయనం మన జీవితానికి ఇచ్చే అత్యంత శక్తివంతమైన సందేశం!"
+        ],
+        "seo_metadata": {
+            "description": "శ్రీమహావిష్ణువు క్షీరసాగరంలో శేషశయనం వెనుక ఉన్న రహస్యం: ఆదిశేషుడు, యోగనిద్ర మరియు వైకుంఠ వైభవం. దివ్య దర్శనంలో గురువారం విష్ణు విశేష కథనం.",
+            "keywords": ["శ్రీమహావిష్ణువు", "శేషశయనం", "ఆదిశేషుడు", "క్షీరసాగరం", "వైకుంఠం", "విష్ణు పురాణం", "దివ్య దర్శనం", "తెలుగు భక్తి"],
+            "hashtags": ["#శ్రీమహావిష్ణువు", "#శేషశయనం", "#ఆదిశేషుడు", "#వైకుంఠం", "#దివ్యదర్శనం", "#తెలుగుభక్తి"],
+            "category": "Education"
+        }
+    },
+    "lakshmi_devi": {
+        "title_options": [
+            "క్షీరసాగరం నుండి ఉద్భవించిన శ్రీ మహాలక్ష్మి: శుక్రవారం పూజా రహస్యం",
+            "పాలకడలిలో పద్మంపై అవతరించిన శ్రీ మహాలక్ష్మి దివ్య గాథ",
+            "శ్రీ మహాలక్ష్మి అనుగ్రహం: శుక్రవారం దీపారాధన విశిష్టత",
+            "అష్టలక్ష్మి వైభవం: దారిద్ర్యాన్ని పోగొట్టే జగన్మాత కరుణ",
+            "పద్మాసనంలో కొలువైన మహాలక్ష్మి: సంపూర్ణ ఐశ్వర్య రహస్యం"
+        ],
+        "primary_title": "క్షీరసాగరం నుండి ఉద్భవించిన శ్రీ మహాలక్ష్మి: శుక్రవారం పూజా రహస్యం",
+        "hook": "క్షీరసాగర మథనంలో పవిత్ర కమలంపై అవతరించిన ఐశ్వర్య దేవత ఎవరో తెలుసా? సాక్షాత్తు శ్రీ మహాలక్ష్మి అమ్మవారు. పాలకడలి నుండి ఉద్భవించి లోకాలకు శుభాలను ప్రసాదించిన కరుణామయి ఆమె.",
+        "audience": "భక్తులు, లక్ష్మీ ఉపాసకులు మరియు సనాతన ధర్మ సాధకులు.",
+        "story_arc": [
+            "మొదటి భాగం: క్షీరసాగర మథనంలో పవిత్ర కమలంపై శ్రీ మహాలక్ష్మి దివ్య అవతరణం.",
+            "రెండవ భాగం: తామర పువ్వు పవిత్రత, ధర్మం మరియు నిర్మల జీవన సందేశం.",
+            "మూడవ భాగం: శుక్రవారం దీపారాధన విశిష్టత, దారిద్ర్య నివారణ మరియు సకల సౌభాగ్య ప్రదానం."
+        ],
+        "script_structure": {
+            "act_1_opening": "క్షీరసాగర మథనంలో పవిత్ర కమలంపై అవతరించిన ఐశ్వర్య దేవత ఎవరో తెలుసా? సాక్షాత్తు శ్రీ మహాలక్ష్మి అమ్మవారు. పాలకడలి నుండి ఉద్భవించి లోకాలకు శుభాలను ప్రసాదించిన కరుణామయి ఆమె.",
+            "act_2_explanation": "తామర పువ్వు స్వచ్ఛతకు, ధర్మానికి ప్రతీక. సంసారంలో ఉంటూ కూడా నిర్మలంగా, అహంకారం లేకుండా జీవించాలని అమ్మవారి కమలవాసన మనకు పరమ సత్యాన్ని ప్రబోధిస్తుంది.",
+            "act_3_message": "శుక్రవారం నాడు దీపారాధన చేసి అమ్మవారిని పూజిస్తే, దారిద్ర్యం తొలగి సకల సౌభాగ్యాలు లభిస్తాయి. నిశ్చల భక్తితో ఆ జగన్మాతను శరణు వేడుకుందాం. ఓం శ్రీ మహాలక్ష్మ్యై నమః."
+        },
+        "visual_plan": [
+            {
+                "scene_number": 1,
+                "duration_seconds": 14,
+                "description": "క్షీరసాగర మథనంలో పాలకడలిపై పవిత్ర కమలంలో సువర్ణ కుంభంతో ఆవిర్భవించిన శ్రీ మహాలక్ష్మి దివ్య దర్శనం.",
+                "voice_text": "క్షీరసాగర మథనంలో పవిత్ర కమలంపై అవతరించిన ఐశ్వర్య దేవత ఎవరో తెలుసా? సాక్షాత్తు శ్రీ మహాలక్ష్మి అమ్మవారు. పాలకడలి నుండి ఉద్భవించి లోకాలకు శుభాలను ప్రసాదించిన కరుణామయి ఆమె.",
+                "image_prompt": "Cinematic 8k, Goddess Lakshmi emerging from the churning cosmic milk ocean Ksheera Sagara seated on radiant pink lotus, holding golden kalasha kumbha, heavenly light, celestial devas praying",
+                "video_prompt": "Majestic camera slow pan showing Goddess Mahalakshmi emerging from glistening milky waters on large pink lotus"
+            },
+            {
+                "scene_number": 2,
+                "duration_seconds": 13,
+                "description": "పద్మాసనంలో ప్రశాంత ముద్రలో కొలువై, కమలాలను మరియు బంగారు నాణేలను వర్షింపజేస్తున్న శ్రీ మహాలక్ష్మి దివ్య మంగళ స్వరూపం.",
+                "voice_text": "తామర పువ్వు స్వచ్ఛతకు, ధర్మానికి ప్రతీక. సంసారంలో ఉంటూ కూడా నిర్మలంగా, అహంకారం లేకుండా జీవించాలని అమ్మవారి కమలవాసన మనకు పరమ సత్యాన్ని ప్రబోధిస్తుంది.",
+                "image_prompt": "Cinematic 8k, Goddess Mahalakshmi seated serenely in padmasana upon pink lotus, holding pink lotuses, cascading golden coins from right hand, glowing golden aura, ornate temple sanctorum",
+                "video_prompt": "Gentle slow camera zoom on radiant smiling face of Goddess Lakshmi showering gold coins and divine blessings"
+            },
+            {
+                "scene_number": 3,
+                "duration_seconds": 13,
+                "description": "శుక్రవారం నాడు భక్తితో వెలిగించిన నేతి దీపాలు, లక్ష్మీ పూజ మరియు అష్టైశ్వర్య ప్రదాన దృశ్యం.",
+                "voice_text": "శుక్రవారం నాడు దీపారాధన చేసి అమ్మవారిని పూజిస్తే, దారిద్ర్యం తొలగి సకల సౌభాగ్యాలు లభిస్తాయి. నిశ్చల భక్తితో ఆ జగన్మాతను శరణు వేడుకుందాం. ఓం శ్రీ మహాలక్ష్మ్యై నమః.",
+                "image_prompt": "Cinematic 8k, devotional Friday Lakshmi puja ritual with traditional brass diya deepams burning brightly, fresh jasmine and lotus flowers, divine aura of Goddess Mahalakshmi blessing house",
+                "video_prompt": "Warm glowing camera track across auspicious burning deepams to divine lotus feet of Goddess Lakshmi"
+            }
+        ],
+        "voice_direction": {
+            "tone": "గౌరవప్రదమైన, ప్రశాంతమైన మరియు భక్తిపూర్వక అనుగ్రహ గాంభీర్యం.",
+            "speed": "స్పష్టంగా మరియు లయబద్ధంగా (నిమిషానికి సుమారు 115 పదాలు).",
+            "emotion": "పరమ భక్తి, దైవిక శాంతి, మంగళ ప్రదానం.",
+            "language_style": "తేట తెలుగు, శుద్ధ సంప్రదాయ ఆధ్యాత్మిక శైలి."
+        },
+        "shorts_hooks": [
+            "క్షీరసాగరం నుండి ఉద్భవించిన లక్ష్మీదేవి రహస్యం తెలుసా?",
+            "శుక్రవారం దీపారాధన చేస్తే లక్ష్మీదేవి ఎందుకు అనుగ్రహిస్తుంది?",
+            "తామర పువ్వుపై లక్ష్మీదేవి నివాసం వెనుక ఉన్న పరమ సత్యం!"
+        ],
+        "seo_metadata": {
+            "description": "క్షీరసాగరం నుండి ఉద్భవించిన శ్రీ మహాలక్ష్మి దివ్య గాథ: శుక్రవారం పూజా రహస్యం, కమలవాసన మరియు దీపారాధన విశిష్టత. దివ్య దర్శనంలో శుక్రవారం ప్రత్యేక లక్ష్మీ భక్తి కథనం.",
+            "keywords": ["శ్రీ మహాలక్ష్మి", "క్షీరసాగర మథనం", "శుక్రవారం పూజ", "దీపారాధన", "కమలం", "అష్టలక్ష్మి", "భాగవత పురాణం", "దివ్య దర్శనం", "తెలుగు భక్తి"],
+            "hashtags": ["#శ్రీమహాలక్ష్మి", "#శుక్రవారం", "#దీపారాధన", "#క్షీరసాగరం", "#లక్ష్మీపూజ", "#దివ్యదర్శనం", "#తెలుగుభక్తి"],
+            "category": "Education"
+        }
     }
 }
 
@@ -997,7 +1127,9 @@ TELUGU_BLUEPRINT_KEYWORDS: dict[str, list[str]] = {
     "kurma": ["kurma", "కూర్మ", "mandara", "మందర", "tortoise", "turtle", "తాబేలు"],
     "narasimha": ["narasimha", "నరసింహ", "pillar", "స్తంభం", "hiranyakashipu", "హిరణ్యకశిపు"],
     "7Kondala_Swami": ["tirupati", "తిరుపతి", "venkateswara", "వేంకటేశ్వర", "balaji", "బాలాజీ", "ఏడుకొండల", "7kondala", "seven hills", "శ్రీనివాస", "శ్రీనివాసుడు", "శేషాచల", "seshachala", "తిరుమల", "tirumala", "గోవింద", "గోవిందా"],
+    "lord_vishnu_sheshashayana": ["shesha", "sheshashayi", "ksheera", "ocean of milk", "శేష", "శేషశయన", "శేషశయనం", "క్షీర", "క్షీరసాగర", "పాలకడలి", "యోగనిద్ర", "ఆదిశేషు"],
     "lord_vishnu": ["gajendra", "గజేంద్ర", "moksha", "మోక్షం", "crocodile", "మొసలి", "elephant"],
+    "lakshmi_devi": ["lakshmi", "mahalakshmi", "లక్ష్మి", "మహాలక్ష్మి", "కమలం", "తామర", "శుక్రవారం", "దీపారాధన", "క్షీరసాగర", "పాలకడలి", "ఐశ్వర్య", "పద్మ"],
 }
 
 
@@ -1013,6 +1145,9 @@ def synthesize_telugu_brief(topic: str, deity_hint: str = "") -> dict[str, Any]:
 
     topic_lower = (topic or "").lower()
     resolved_key = resolve_deity(topic, deity_hint=deity_hint, default=None)
+
+    if resolved_key == "lord_vishnu" and any(kw in topic_lower or kw in topic for kw in TELUGU_BLUEPRINT_KEYWORDS.get("lord_vishnu_sheshashayana", [])):
+        return json.loads(json.dumps(TELUGU_DEITY_BRIEFS["lord_vishnu_sheshashayana"], ensure_ascii=False))
 
     # 1. Semantic story match against rich blueprints
     candidate_keys = []

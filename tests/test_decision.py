@@ -178,7 +178,7 @@ class TestDecisionSelector(unittest.TestCase):
         # Verify c2 was dropped as duplicate
         deduped_topics = [x["topic"] for x in res["dedup_removed"]]
         self.assertIn("Story of Ganesha and His Broken Tusk", deduped_topics)
-        
+
         # Verify c3 remains in unique rank candidates list implicitly via final select length
         # Unique list count can be derived from ranked minus dedup_removed
         self.assertEqual(len(res["ranked"]) - len(res["dedup_removed"]), 2)
@@ -196,8 +196,49 @@ class TestDecisionSelector(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+def _seed_decision_test_records():
+    from src.assets.approval_registry import get_trusted_registry, TrustedAssetApprovalRecord
+    reg = get_trusted_registry()
+    seeds = [
+        ("assets/gods/lakshmi_devi/test_l.jpg", "lakshmi_devi"),
+        ("assets/gods/durga/test_d.jpg", "durga"),
+        ("assets/gods/lord_shiva/test_s.jpg", "lord_shiva"),
+        ("assets/gods/ganesha/test_g.jpg", "ganesha"),
+        ("assets/gods/hanuman/test_h.jpg", "hanuman"),
+        ("assets/gods/krishna/test_k.jpg", "krishna"),
+        ("assets/gods/lord_vishnu/test_v.jpg", "lord_vishnu"),
+        ("assets/gods/santoshi_ma/test_sm.jpg", "santoshi_ma"),
+        ("assets/gods/annapurneshwari/test_ap.jpg", "annapurneshwari"),
+    ]
+    for p, d in seeds:
+        reg.register_record(
+            TrustedAssetApprovalRecord(
+                record_id=f"APPR-DEC-{d.upper()}-001",
+                exact_rel_path=p,
+                canonical_deity=d,
+                approval_status="APPROVED",
+                provenance="Decision test seed record",
+                aspect_ratio="9:16",
+                content_type="image",
+                reviewer="REV-TEST-01",
+                review_timestamp="2026-11-20T10:00:00Z",
+            )
+        )
+
+
+def _cleanup_decision_test_records():
+    from src.assets.approval_registry import get_trusted_registry
+    get_trusted_registry().reset_to_builtins()
+
+
 class TestDecisionPipeline(unittest.TestCase):
     """Test full decision pipeline output schema and edge cases."""
+
+    def setUp(self):
+        _seed_decision_test_records()
+
+    def tearDown(self):
+        _cleanup_decision_test_records()
 
     def test_valid_decision_json_generated(self):
         c1 = _make_candidate("Valid", overall_score=75)
@@ -208,7 +249,7 @@ class TestDecisionPipeline(unittest.TestCase):
             run_decision.decision_report.OUTPUT_DIR = Path(tmp_dir)
             try:
                 decision = run_decision_pipeline([c1, c2], min_score=60, save=True)
-                
+
                 # Check memory schema
                 self.assertTrue(decision["approved_for_generation"])
                 self.assertEqual(decision["selected_topic"], "Valid")
@@ -253,6 +294,7 @@ class TestDecisionCLI(unittest.TestCase):
     """Test run_decision.py CLI inputs, outputs, and auto-discovery."""
 
     def setUp(self):
+        _seed_decision_test_records()
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.research_dir = Path(self.tmp_dir.name) / "research"
         self.decision_dir = Path(self.tmp_dir.name) / "decision"
@@ -269,6 +311,7 @@ class TestDecisionCLI(unittest.TestCase):
         self.patch_research_dir.stop()
         self.patch_decision_dir.stop()
         self.tmp_dir.cleanup()
+        _cleanup_decision_test_records()
 
     def test_cli_auto_locates_latest_research_file(self):
         # Write two mock research files with chronological names

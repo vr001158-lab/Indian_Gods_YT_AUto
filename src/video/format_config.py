@@ -21,6 +21,8 @@ FORMAT_CONFIGS: dict[str, dict[str, Any]] = {
         "height":                 1920,
         "min_duration_seconds":   10,
         "max_duration_seconds":   180,   # YouTube Shorts ≤ 3 minutes
+        "target_duration_min":    30,    # Target production duration: 30-45s
+        "target_duration_max":    45,
         "publish_classification": "short",
         "audio_sample_rate":      48000,
         "audio_channels":         2,
@@ -177,4 +179,22 @@ def validate_duration_for_content_type(duration_seconds: float, content_type: st
             f"Duration {duration_seconds:.1f}s exceeds the maximum for "
             f"content_type='{content_type}' ({hi}s)"
         )
+    return True, ""
+
+
+def validate_production_short_duration(
+    duration_seconds: float,
+    min_duration: float = 30.0,
+    max_duration: float = 45.0,
+) -> tuple[bool, str]:
+    """
+    Validates that a YouTube Short meets the strict production duration quality target (30.0s to 45.0s).
+    Shorts under 30.0s lack sufficient depth, and shorts over 60s forfeit Shorts shelf eligibility.
+    """
+    if duration_seconds <= 0:
+        return False, f"Duration must be positive, got {duration_seconds}s"
+    if duration_seconds < min_duration:
+        return False, f"Duration {duration_seconds:.2f}s is below production target minimum of {min_duration:.1f}s for Shorts"
+    if duration_seconds > max_duration + 10.0:
+        return False, f"Duration {duration_seconds:.2f}s exceeds production target maximum of {max_duration:.1f}s for Shorts"
     return True, ""

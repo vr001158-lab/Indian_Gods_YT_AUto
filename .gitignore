@@ -8,16 +8,33 @@ token*.json
 .env
 .env.*
 
-# Python Cache
+# Python Virtual Environment & Cache
+.venv/
+env/
+venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Scratch & Debugging Workspace
+scratch/
 
 # Render Output & Temporary directories
 output/
 temp/
 tmp/
 uploaded_archive/
+
+# Asset Quarantine & Backups
+assets/quarantine/
+data/backup_*/
+data/review/
+data/test_*/
+data/render_only/
 
 # Ignore large media formats
 *.mp4

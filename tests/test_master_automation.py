@@ -87,6 +87,44 @@ class TestMasterAutomationSuite(unittest.TestCase):
     video-first visual assets, Hindu weekday automation, and safety gates.
     """
 
+    def setUp(self):
+        from src.assets.approval_registry import get_trusted_registry, TrustedAssetApprovalRecord
+        reg = get_trusted_registry()
+        seeds = [
+            ("assets/gods/hanuman/test_h.jpg", "hanuman"),
+            ("assets/gods/ganesha/test_g.jpg", "ganesha"),
+            ("assets/gods/lord_shiva/test_s.jpg", "lord_shiva"),
+            ("assets/gods/chandra/test_ch.jpg", "chandra"),
+            ("assets/gods/kali/test_kal.jpg", "kali"),
+            ("assets/gods/shani/test_shani.jpg", "shani"),
+            ("assets/gods/budha/test_budha.jpg", "budha"),
+            ("assets/gods/krishna/test_k.jpg", "krishna"),
+            ("assets/gods/lord_vishnu/test_v.jpg", "lord_vishnu"),
+            ("assets/gods/subramanya/test_sub.jpg", "subramanya"),
+            ("assets/gods/parvathi/test_p.jpg", "parvathi"),
+            ("assets/gods/lakshmi_devi/test_l.jpg", "lakshmi_devi"),
+            ("assets/gods/surya/test_surya.jpg", "surya"),
+            ("assets/gods/kaal_bhairav/test_kb.jpg", "kaal_bhairav"),
+        ]
+        for p, d in seeds:
+            reg.register_record(
+                TrustedAssetApprovalRecord(
+                    record_id=f"APPR-TEST-AUTO-{d.upper()}-001",
+                    exact_rel_path=p,
+                    canonical_deity=d,
+                    approval_status="APPROVED",
+                    provenance="Test suite seed record",
+                    aspect_ratio="9:16",
+                    content_type="image",
+                    reviewer="REV-TEST-01",
+                    review_timestamp="2026-11-20T10:00:00Z",
+                )
+            )
+
+    def tearDown(self):
+        from src.assets.approval_registry import get_trusted_registry
+        get_trusted_registry().reset_to_builtins()
+
     # ──────────────────────────────────────────────────────────────────────────
     # Test 1: Thumbnail generator rejects video files passed directly to Pillow
     # ──────────────────────────────────────────────────────────────────────────
@@ -530,7 +568,8 @@ class TestMasterAutomationSuite(unittest.TestCase):
         """Kaal Bhairav is distinct from Lord Shiva; Shiva gets 0.0 bonus on Sunday and cannot substitute."""
         # 2026-11-22 is Sunday. Mock rotate_deity_for_day to return kaal_bhairav
         sunday_dt = datetime(2026, 11, 22, 10, 0, tzinfo=KOLKATA_TZ)
-        with patch("src.decision.weekday_deity.rotate_deity_for_day", return_value="kaal_bhairav"):
+        with patch("src.decision.weekday_deity.rotate_deity_for_day", return_value="kaal_bhairav"), \
+             patch("src.assets.approval_registry.TrustedAssetApprovalRegistry.has_approved_assets_for_deity", return_value=True):
             # Kaal Bhairav gets +15.0; Lord Shiva is NOT eligible on Sunday (gets 0.0)
             self.assertEqual(get_day_of_week_deity_bonus("kaal_bhairav", sunday_dt), 15.0)
             self.assertEqual(get_day_of_week_deity_bonus("bhairav", sunday_dt), 15.0)

@@ -41,6 +41,14 @@ CANONICAL_SCRIPTURES: dict[str, ScriptureReference] = {
         source_tier="primary",
         verified_episodes=["govardhan_hill", "krishna_indra_pride", "surabhi_cow"],
     ),
+    "bhagavata_purana_sudama": ScriptureReference(
+        text_name="Srimad Bhagavata Purana",
+        division="Skandha 10, Adhyayas 80-81",
+        sanskrit_title="श्रीमद्भागवतपुराणम्",
+        telugu_title="శ్రీమద్భాగవత పురాణము (కుచేలోపాఖ్యానము)",
+        source_tier="primary",
+        verified_episodes=["sudama_krishna_friendship", "kuchela_flattened_rice", "krishna_sudama_blessing"],
+    ),
     "bhagavata_purana_kaliya_mardanam": ScriptureReference(
         text_name="Srimad Bhagavata Purana",
         division="Skandha 10, Adhyayas 15-17",
@@ -72,6 +80,22 @@ CANONICAL_SCRIPTURES: dict[str, ScriptureReference] = {
         telugu_title="శ్రీమద్భాగవత పురాణము (గజేంద్ర మోక్షము)",
         source_tier="primary",
         verified_episodes=["gajendra_moksham", "vishnu_surrender"],
+    ),
+    "bhagavata_purana_ksheera_sagara": ScriptureReference(
+        text_name="Srimad Bhagavata Purana & Vishnu Purana",
+        division="Skandha 1-3 / Amsha 1",
+        sanskrit_title="विष्णुपुराणम्",
+        telugu_title="శ్రీమద్భాగవతము & శ్రీ విష్ణు పురాణము (శేషశయనం)",
+        source_tier="primary",
+        verified_episodes=["sheshashayi_vishnu", "ksheera_sagara", "four_arms_shankha_chakra_gada_padma", "anantha_shesha"],
+    ),
+    "bhagavata_purana_lakshmi_avataranam": ScriptureReference(
+        text_name="Srimad Bhagavata Purana & Vishnu Purana",
+        division="Skandha 8, Adhyaya 8 / Amsha 1, Adhyaya 9",
+        sanskrit_title="श्रीमद्भागवतपुराणम् (महालक्ष्मी अवतारः)",
+        telugu_title="శ్రీమద్భాగవత పురాణము (లక్ష్మీ అవతరణము) & శ్రీ విష్ణు పురాణము",
+        source_tier="primary",
+        verified_episodes=["lakshmi_avataranam", "samudra_manthan_lakshmi", "ksheera_sagara_tanaya", "ashta_lakshmi", "shri_suktam", "lotus_seat_padmasana"],
     ),
 
     # ── Valmiki Ramayana ──────────────────────────────────────────────────────
@@ -225,6 +249,17 @@ CANONICAL_DEITY_RULES: dict[str, dict[str, Any]] = {
         "key_episodes": ["samudra_manthan", "gajendra_moksha", "dashavatara", "mohini_avatar"],
         "disallowed_episodes": ["drinking_halahala", "holding_ganga_in_hair"],
     },
+    "lakshmi_devi": {
+        "canonical_names": ["Lakshmi", "Mahalakshmi", "Sri Devi", "Padma", "Kamala", "లక్ష్మీదేవి", "మహాలక్ష్మి", "శ్రీదేవి", "కమల"],
+        "weapons_and_items": ["Lotus (Padma / Kamala)", "Golden Kumbha (Kalasha)", "Abhaya Hasta", "Varada Hasta", "Gold Coins", "పద్మం", "కమలం", "కుంభం", "కలశం", "దీపారాధన"],
+        "forbidden_weapons": ["Trishula", "Damaru", "Pinaka Bow", "త్రిశూలం"],
+        "vahanas": ["Lotus (Seat / Asana)", "White Elephant (Gaja / Gaja Lakshmi)", "Owl (Uluka)", "పద్మము", "గజము", "ఏనుగు"],
+        "forbidden_vahanas": ["Nandi", "Mushika", "నంది", "ఎలుక"],
+        "consort": ["Lord Vishnu", "Narayana", "శ్రీమహావిష్ణువు", "నారాయణుడు"],
+        "forbidden_consorts": ["Shiva", "Brahma"],
+        "key_episodes": ["samudra_manthan_lakshmi_emergence", "ksheera_sagara_manthan", "padmasana", "friday_deeparadhana_puja", "granting_ashtaaishwarya"],
+        "disallowed_episodes": ["drinking_halahala", "killing_mahishasura", "breaking_tusk"],
+    },
     "krishna": {
         "canonical_names": ["Krishna", "Govinda", "Gopala", "Vasudeva", "కృష్ణుడు", "గోవిందుడు", "గోపాలుడు"],
         "weapons_and_items": ["Flute (Murali)", "Sudarshana Chakra", "Peacock Feather", "మురళి", "సుదర్శన చక్రం", "నెమలి పించం"],
@@ -337,8 +372,14 @@ def get_scripture_reference_for_topic(topic: str, deity: str = "") -> ScriptureR
         return CANONICAL_SCRIPTURES["shiva_purana_rudra_samhita"]
     if any(k in t_clean for k in ["govardhan", "mountain", "hill"]):
         return CANONICAL_SCRIPTURES["bhagavata_purana_govardhan"]
+    if any(k in t_clean for k in ["sudama", "kuchela", "friendship", "poha", "flattened rice", "అటుకులు", "సుదామ", "కుచేల"]):
+        return CANONICAL_SCRIPTURES["bhagavata_purana_sudama"]
     if any(k in t_clean for k in ["kaliya", "snake dance", "yamuna"]):
         return CANONICAL_SCRIPTURES["bhagavata_purana_kaliya_mardanam"]
+    if any(k in t_clean for k in ["shesha", "sheshashayi", "ksheera", "ocean of milk", "anantha", "four arms", "shankha", "chakra", "శేషశయన"]):
+        return CANONICAL_SCRIPTURES["bhagavata_purana_ksheera_sagara"]
+    if any(k in t_clean for k in ["lakshmi", "mahalakshmi", "లక్ష్మి", "మహాలక్ష్మి", "కమలం", "తామర", "దీపారాధన"]):
+        return CANONICAL_SCRIPTURES["bhagavata_purana_lakshmi_avataranam"]
     if any(k in t_clean for k in ["vamana", "mahabali", "bali", "three strides"]):
         return CANONICAL_SCRIPTURES["bhagavata_purana_vamana"]
     if any(k in t_clean for k in ["narasimha", "prahlada", "hiranyakashipu"]):
@@ -367,6 +408,10 @@ def get_scripture_reference_for_topic(topic: str, deity: str = "") -> ScriptureR
         return CANONICAL_SCRIPTURES["valmiki_ramayana_bala_kanda"]
     if "ganesha" in d_clean:
         return CANONICAL_SCRIPTURES["mahabharata_adi_parva"]
+    if "vishnu" in d_clean:
+        return CANONICAL_SCRIPTURES["bhagavata_purana_ksheera_sagara"]
+    if "lakshmi" in d_clean or "sridevi" in d_clean:
+        return CANONICAL_SCRIPTURES["bhagavata_purana_lakshmi_avataranam"]
     if "durga" in d_clean:
         return CANONICAL_SCRIPTURES["markandeya_purana_devi_mahatmyam"]
 

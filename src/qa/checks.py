@@ -369,6 +369,11 @@ def check_visual_map(visual_map: dict) -> tuple[bool, str]:
                 from PIL import Image
                 with Image.open(p) as img_obj:
                     img_obj.load()
+                    iw, ih = img_obj.size
+                    # Orientation verification for Shorts (strict portrait only: height > width)
+                    c_type = str(visual_map.get("content_type") or visual_map.get("format") or "short").lower()
+                    if c_type == "short" and iw >= ih:
+                        return False, f"Visual scene {scene.get('scene')} image '{p}' has non-portrait dimensions ({iw}x{ih}); Shorts strictly require portrait orientation (height > width). Square and landscape images are rejected."
             except Exception as exc:
                 return False, f"Visual scene {scene.get('scene')} image corrupt/unreadable: {exc}"
 
@@ -726,84 +731,36 @@ def _is_trusted_approved_asset(
     deity: str,
     avatar: str | None = None,
     allow_mock: bool = False,
+    allow_dual_composite: bool = False,
 ) -> tuple[bool, str]:
     """
-    Checks whether an asset is backed by an explicit trusted asset approval record,
-    ensuring that caller-assigned metadata cannot bypass the guard.
-    Approval records are derived strictly from:
-      1. KNOWN_NARRATIVE_METADATA in src.assets.scanner
-      2. DeityAssetIndex where approval_status == "APPROVED" and integrity_status == "VALID"
+    Checks whether an asset is backed by an explicit trusted asset approval record
+    in TrustedAssetApprovalRegistry, ensuring that caller-assigned metadata cannot bypass the guard.
+    Fails closed on:
+      - Any asset not explicitly registered as APPROVED
+      - Deity or avatar mismatch (no cross-deity substitution)
+      - Ambiguous, malformed, or traversal paths
     """
     if not img_path or not str(img_path).strip():
         return False, "Asset path is empty"
 
-    norm_path = img_path.replace("\\", "/").lower().strip()
-    stem = Path(norm_path).stem.lower()
+    from src.assets.approval_registry import get_trusted_registry
+    registry = get_trusted_registry()
+    is_approved, reason, record = registry.is_asset_approved(
+        img_path,
+        deity=deity,
+        avatar=avatar,
+        allow_dual_composite=allow_dual_composite,
+    )
+    if is_approved:
+        return True, reason
 
-    # 1. Match against canonical narrative-specific verified assets catalog
-    from src.assets.scanner import KNOWN_NARRATIVE_METADATA
-    for pattern_key, entry in KNOWN_NARRATIVE_METADATA.items():
-        p_clean = pattern_key.lower().replace(" ", "_")
-        stem_clean = stem.replace(" ", "_")
-        if p_clean in stem_clean or pattern_key.lower() in stem:
-            if entry.get("verification_status") != "verified_visual":
-                return False, f"Entry '{pattern_key}' in KNOWN_NARRATIVE_METADATA is not verified_visual"
-            cat_av = entry.get("avatar")
-            if cat_av:
-                from src.thumbnail.asset_index import AVATAR_TO_PARENT_DEITY
-                cat_parent = AVATAR_TO_PARENT_DEITY.get(cat_av.lower())
-                if cat_parent and deity:
-                    valid_cat_parents = {cat_parent.lower()}
-                    if cat_av.lower() in ("matsya", "kurma", "varaha", "narasimha", "vamana", "vamana_trivikrama", "trivikrama", "parashurama", "buddha", "kalki", "krishna", "ram", "rama"):
-                        valid_cat_parents.add("lord_vishnu")
-                    if deity.lower() not in valid_cat_parents:
-                        return False, f"Catalog record avatar '{cat_av}' belongs to '{cat_parent}', does not match requested deity '{deity}' (DEITY_MISMATCH)"
-            if avatar and cat_av:
-                c_av = cat_av.lower()
-                req_av = avatar.lower()
-                RAMA_ALIASES = {"ram", "rama"}
-                VAMANA_ALIASES = {"vamana", "vamana_trivikrama", "trivikrama"}
-                av_match = (c_av == req_av) or \
-                           (c_av in RAMA_ALIASES and req_av in RAMA_ALIASES) or \
-                           (c_av in VAMANA_ALIASES and req_av in VAMANA_ALIASES)
-                if not av_match:
-                    return False, f"Catalog record avatar '{cat_av}' does not match requested avatar '{avatar}'"
-            return True, "Approved via KNOWN_NARRATIVE_METADATA"
-
-    # 2. Match against DeityAssetIndex approved records
-    from src.thumbnail.asset_index import DeityAssetIndex
-    index = DeityAssetIndex()
-    for rec in index.records:
-        rec_norm = rec.file_path.replace("\\", "/").lower()
-        if rec_norm == norm_path or norm_path.endswith(rec_norm) or rec_norm.endswith(norm_path):
-            if rec.approval_status != "APPROVED":
-                return False, f"Asset is recorded with approval status '{rec.approval_status}' in DeityAssetIndex"
-            if rec.integrity_status != "VALID":
-                return False, f"Asset has integrity status '{rec.integrity_status}' in DeityAssetIndex"
-            if deity and rec.deity and rec.deity.lower() != deity.lower():
-                return False, f"Asset in index has deity '{rec.deity}', expected '{deity}' (DEITY_MISMATCH)"
-            if avatar and rec.avatar:
-                r_av = rec.avatar.lower()
-                req_av = avatar.lower()
-                RAMA_ALIASES = {"ram", "rama"}
-                VAMANA_ALIASES = {"vamana", "vamana_trivikrama", "trivikrama"}
-                av_match = (r_av == req_av) or \
-                           (r_av in RAMA_ALIASES and req_av in RAMA_ALIASES) or \
-                           (r_av in VAMANA_ALIASES and req_av in VAMANA_ALIASES)
-                if not av_match:
-                    return False, f"Asset in index has avatar '{rec.avatar}', expected '{avatar}'"
-            return True, "Approved via DeityAssetIndex"
-
-    # 3. If file path is in assets/gods, assets/gods_landscape_long_video, or assets/gods_processed, it MUST have matched above
-    if any(repo_dir in norm_path for repo_dir in ("assets/gods", "assets/gods_landscape_long_video", "assets/gods_processed")):
-        return False, f"Asset '{img_path}' is in repository collection but lacks an explicit trusted approval record"
-
-    # 4. If mock is explicitly allowed (e.g. for mock tests outside assets/gods)
-    if allow_mock:
+    # If mock is explicitly allowed for mock test fixtures outside repository visual assets
+    norm_path = str(img_path).replace("\\", "/").lower()
+    if allow_mock and not any(repo_dir in norm_path for repo_dir in ("assets/gods", "assets/gods_landscape_long_video", "assets/gods_processed")):
         return True, "Allowed via mock override for test fixtures outside repository assets"
 
-    # Fail closed for any unreviewed or unverified asset
-    return False, f"Asset '{img_path}' lacks an explicit trusted asset approval record in repository catalog"
+    return False, reason
 
 
 def check_deity_identity_consistency(
@@ -873,10 +830,20 @@ def check_deity_identity_consistency(
                         if expected_deity and expected_deity.lower() not in valid_parents:
                             return False, f"Scene #{sc_num} contradictory deity/avatar: avatar '{sc_avatar}' belongs to '{parent_deity}', but expected deity is '{expected_deity}' (DEITY_MISMATCH)"
 
-                # Avatar must be present and match when topic requires an avatar
-                if expected_avatar:
+                # Avatar must be present and match when topic requires an avatar distinct from deity
+                if expected_avatar and expected_avatar.lower() != cur_topic_deity.lower():
                     if not sc_avatar or not str(sc_avatar).strip():
                         return False, f"Scene #{sc_num} missing required avatar metadata for avatar-specific topic '{expected_avatar}'"
+                    sc_av_clean = str(sc_avatar).strip().lower()
+                    exp_av_clean = expected_avatar.lower()
+                    RAMA_ALIASES = {"ram", "rama"}
+                    VAMANA_ALIASES = {"vamana", "vamana_trivikrama", "trivikrama"}
+                    is_match = (sc_av_clean == exp_av_clean) or \
+                               (sc_av_clean in RAMA_ALIASES and exp_av_clean in RAMA_ALIASES) or \
+                               (sc_av_clean in VAMANA_ALIASES and exp_av_clean in VAMANA_ALIASES)
+                    if not is_match:
+                        return False, f"Scene #{sc_num} identity mismatch: topic is avatar '{expected_avatar}', but scene is avatar '{sc_avatar}'"
+                elif expected_avatar and sc_avatar and str(sc_avatar).strip():
                     sc_av_clean = str(sc_avatar).strip().lower()
                     exp_av_clean = expected_avatar.lower()
                     RAMA_ALIASES = {"ram", "rama"}
@@ -948,19 +915,49 @@ def check_deity_identity_consistency(
                     norm_src = s_path.replace("\\", "/").lower()
                     src_stem = Path(norm_src).stem.lower()
 
-                    # Check for cross-deity directory or filename indication in declared source
-                    for other_deity, aliases in CANONICAL_DEITIES.items():
-                        if other_deity == cur_target_deity:
-                            continue
-                        if cur_target_deity == "lord_vishnu" and other_deity in ("narasimha", "krishna", "ram"):
-                            continue
-                        if other_deity == "lord_vishnu" and cur_target_deity in ("narasimha", "krishna", "ram"):
-                            continue
-                        for alias in [other_deity] + aliases:
-                            if not alias or len(alias) < 4:
+                    # Anti-Misclassification Guard: Lord Manikanta/Ayyappa can NEVER be used for Lord Rama
+                    if cur_target_deity == "ram" or (expected_avatar and expected_avatar.lower() == "ram"):
+                        if "manikanta" in norm_src or "ayyappa" in norm_src:
+                            return False, f"Scene #{sc_num} source asset '{s_path}' depicts Lord Manikanta/Ayyappa, prohibited for Lord Rama (IDENTITY_MISCLASSIFICATION)"
+
+                    # When an explicit trusted record exists and matches target deity, its canonical_deity is authoritative.
+                    # Physical folder names (e.g. shared folders) must never override explicit approval.
+                    from src.assets.approval_registry import get_trusted_registry
+                    trusted_rec = get_trusted_registry().get_approval_record(s_path)
+                    is_authenticated_for_target = (
+                        trusted_rec is not None
+                        and trusted_rec.approval_status == "APPROVED"
+                        and trusted_rec.canonical_deity.strip().lower() == cur_target_deity
+                    )
+
+                    # Dual-deity solo compatibility guard
+                    topic_lower = topic.lower()
+                    allow_dual = False
+                    if ("lord rama with hanuman" in norm_src or (trusted_rec and not trusted_rec.allow_solo)) and cur_target_deity == "hanuman":
+                        is_dual_topic = any(k in topic_lower for k in ("rama", "ram", "sita", "raghava", "bhakthi", "bhakta", "sevaka"))
+                        if not is_dual_topic:
+                            return False, f"Scene #{sc_num} source asset '{s_path}' is a dual Hanuman-Rama depiction; prohibited for solo Hanuman scenes without explicit dual compatibility"
+                        allow_dual = True
+
+                    if ("kali and murugan" in norm_src or (trusted_rec and not trusted_rec.allow_solo)) and cur_target_deity == "kali":
+                        is_dual_topic = any(k in topic_lower for k in ("murugan", "subramanya", "kartikeya", "skanda", "parvati"))
+                        if not is_dual_topic:
+                            return False, f"Scene #{sc_num} source asset '{s_path}' is a dual Kali-Murugan depiction; prohibited for solo Kali scenes without explicit dual compatibility"
+                        allow_dual = True
+
+                    if not is_authenticated_for_target:
+                        for other_deity, aliases in CANONICAL_DEITIES.items():
+                            if other_deity == cur_target_deity:
                                 continue
-                            if f"/{alias}/" in norm_src or f"/{alias}_" in norm_src:
-                                return False, f"Scene #{sc_num} source asset '{s_path}' belongs to different deity '{other_deity}', expected '{cur_target_deity}' (DEITY_MISMATCH)"
+                            if cur_target_deity == "lord_vishnu" and other_deity in ("narasimha", "krishna", "ram"):
+                                continue
+                            if other_deity == "lord_vishnu" and cur_target_deity in ("narasimha", "krishna", "ram"):
+                                continue
+                            for alias in [other_deity] + aliases:
+                                if not alias or len(alias) < 4:
+                                    continue
+                                if f"/{alias}/" in norm_src or f"/{alias}_" in norm_src:
+                                    return False, f"Scene #{sc_num} source asset '{s_path}' belongs to different deity '{other_deity}', expected '{cur_target_deity}' (DEITY_MISMATCH)"
 
                     # If expected_avatar is set, check source stem does not depict another avatar
                     if expected_avatar:
@@ -974,6 +971,7 @@ def check_deity_identity_consistency(
                         deity=cur_target_deity,
                         avatar=expected_avatar,
                         allow_mock=allow_mock,
+                        allow_dual_composite=allow_dual,
                     )
                     if not trusted_ok:
                         return False, f"Scene #{sc_num} source asset '{s_path}' failed approval verification: {trusted_detail}"
@@ -1108,18 +1106,46 @@ def check_deity_identity_consistency(
                 if thumb_src:
                     thumb_cur_deity = (expected_deity or str(thumb_deity)).strip().lower() if (expected_deity or thumb_deity) else None
                     if thumb_cur_deity:
-                        for other_deity, aliases in CANONICAL_DEITIES.items():
-                            if other_deity == thumb_cur_deity:
-                                continue
-                            if thumb_cur_deity == "lord_vishnu" and other_deity in ("narasimha", "krishna", "ram"):
-                                continue
-                            if other_deity == "lord_vishnu" and thumb_cur_deity in ("narasimha", "krishna", "ram"):
-                                continue
-                            for alias in [other_deity] + aliases:
-                                if not alias or len(alias) < 4:
+                        from src.assets.approval_registry import get_trusted_registry
+                        thumb_trusted_rec = get_trusted_registry().get_approval_record(thumb_src)
+
+                        thumb_allow_dual = False
+                        thumb_topic_lower = (thumbnail_meta.get("topic") or thumbnail_meta.get("title") or "").lower()
+                        if thumb_trusted_rec and not thumb_trusted_rec.allow_solo:
+                            if thumb_cur_deity == "hanuman" and any(k in thumb_topic_lower for k in ("rama", "ram", "sita", "raghava", "bhakthi", "bhakta", "sevaka")):
+                                thumb_allow_dual = True
+                            elif thumb_cur_deity == "kali" and any(k in thumb_topic_lower for k in ("murugan", "subramanya", "kartikeya", "skanda", "parvati")):
+                                thumb_allow_dual = True
+
+                        trusted_ok, trusted_detail = _is_trusted_approved_asset(
+                            img_path=thumb_src,
+                            deity=thumb_cur_deity,
+                            avatar=expected_avatar,
+                            allow_mock=allow_mock,
+                            allow_dual_composite=thumb_allow_dual,
+                        )
+                        if not trusted_ok:
+                            return False, f"Thumbnail asset '{thumb_src}' failed approval verification: {trusted_detail}"
+
+                        # When an explicit trusted record exists, canonical_deity in TrustedAssetApprovalRegistry is authoritative.
+                        thumb_is_authenticated_for_target = (
+                            thumb_trusted_rec is not None
+                            and thumb_trusted_rec.approval_status == "APPROVED"
+                            and thumb_trusted_rec.canonical_deity.strip().lower() == thumb_cur_deity
+                        )
+                        if not thumb_is_authenticated_for_target:
+                            for other_deity, aliases in CANONICAL_DEITIES.items():
+                                if other_deity == thumb_cur_deity:
                                     continue
-                                if f"/{alias}/" in thumb_src or f"/{alias}_" in thumb_src:
-                                    return False, f"Thumbnail asset '{thumb_src}' belongs to different deity '{other_deity}', expected '{thumb_cur_deity}' (DEITY_MISMATCH)"
+                                if thumb_cur_deity == "lord_vishnu" and other_deity in ("narasimha", "krishna", "ram"):
+                                    continue
+                                if other_deity == "lord_vishnu" and thumb_cur_deity in ("narasimha", "krishna", "ram"):
+                                    continue
+                                for alias in [other_deity] + aliases:
+                                    if not alias or len(alias) < 4:
+                                        continue
+                                    if f"/{alias}/" in thumb_src or f"/{alias}_" in thumb_src:
+                                        return False, f"Thumbnail asset '{thumb_src}' belongs to different deity '{other_deity}', expected '{thumb_cur_deity}' (DEITY_MISMATCH)"
 
             # Check thumbnail title/topic consistency with expected deity & avatar
             thumb_topic = thumbnail_meta.get("topic") or thumbnail_meta.get("title") or ""

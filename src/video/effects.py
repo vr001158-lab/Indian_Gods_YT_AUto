@@ -1,6 +1,9 @@
 # src/video/effects.py
 # Phase 2G/Phase 4 — FFmpeg Filtergraph Effects (Ken Burns, Fades, Scaling)
 
+import os
+from pathlib import Path
+
 
 def get_ken_burns_filter(
     fps: int = 25,
@@ -196,20 +199,76 @@ def get_caption_filter(
     language_code: str = "hi-IN",
     fontsize: int = 42,
     y_position_ratio: float = 0.72,
+    total_height: int = 1920,
+    line_spacing: int = 24,
+    boxborderw: int = 12,
 ) -> str:
     """
     Returns an FFmpeg drawtext filter string for burning captions from a textfile into the video stream.
     Formats text inside YouTube Shorts safe area with a high-contrast dark background box.
+    Enables HarfBuzz text shaping (text_shaping=1) for complex Indic conjunct and vowel shaping.
+
+    When multi-line text is provided in caption_text_file, generates stacked single-line drawtext filters
+    with calculated vertical offsets. This avoids HarfBuzz newline '\\n' unmapped .notdef glyph boxes ([]),
+    while ensuring perfect Telugu conjunct shaping and individual background pill boxes.
     """
     target_font = resolve_caption_font(language_code=language_code, explicit_font_path=font_path)
     escaped_font_path = target_font.replace("\\", "/").replace(":", "\\:")
     escaped_text_path = caption_text_file.replace("\\", "/").replace(":", "\\:")
+
+    cap_path = Path(caption_text_file)
+    if cap_path.exists() and cap_path.is_file():
+        try:
+            lines = [l.strip() for l in cap_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+        except Exception:
+            lines = []
+
+        if len(lines) > 1:
+            line_height = fontsize + line_spacing
+            total_block_h = (len(lines) - 1) * line_height
+            y_start = int(total_height * y_position_ratio) - (total_block_h // 2)
+
+            filters = []
+            for idx, l_text in enumerate(lines):
+                line_file = cap_path.parent / f"{cap_path.stem}_line_{idx+1}.txt"
+                line_file.write_text(l_text, encoding="utf-8")
+                escaped_line_path = str(line_file.resolve()).replace("\\", "/").replace(":", "\\:")
+                line_y = y_start + (idx * line_height)
+                filters.append(
+                    f"drawtext=fontfile='{escaped_font_path}':"
+                    f"textfile='{escaped_line_path}':"
+                    f"fontsize={fontsize}:"
+                    f"fontcolor=white:"
+                    f"text_shaping=1:"
+                    f"box=1:boxcolor=black@0.65:boxborderw={boxborderw}:"
+                    f"x=(w-text_w)/2:y={line_y}"
+                )
+            return ",".join(filters)
+        elif len(lines) == 1:
+            # Single line: ensure no trailing newline so HarfBuzz does not generate .notdef box
+            line_file = cap_path.parent / f"{cap_path.stem}_line_1.txt"
+            line_file.write_text(lines[0], encoding="utf-8")
+            escaped_line_path = str(line_file.resolve()).replace("\\", "/").replace(":", "\\:")
+            y_pos = int(total_height * y_position_ratio)
+            return (
+                f"drawtext=fontfile='{escaped_font_path}':"
+                f"textfile='{escaped_line_path}':"
+                f"fontsize={fontsize}:"
+                f"fontcolor=white:"
+                f"text_shaping=1:"
+                f"box=1:boxcolor=black@0.65:boxborderw={boxborderw}:"
+                f"x=(w-text_w)/2:y={y_pos}"
+            )
+        elif len(lines) == 0:
+            return ""
+
     return (
         f"drawtext=fontfile='{escaped_font_path}':"
         f"textfile='{escaped_text_path}':"
         f"fontsize={fontsize}:"
         f"fontcolor=white:"
-        f"box=1:boxcolor=black@0.65:boxborderw=12:"
+        f"text_shaping=1:"
+        f"box=1:boxcolor=black@0.65:boxborderw={boxborderw}:"
         f"line_spacing=10:"
         f"x=(w-text_w)/2:y=h*{y_position_ratio}"
     )
@@ -243,15 +302,17 @@ def get_video_filtergraph_for_scene(
 
     # 4. Add captions if provided
     if caption_text_file:
-        y_ratio = 0.82 if width > height else 0.72
-        cap_size = 36 if width > height else 42
+        y_ratio = 0.82 if width > height else 0.65
+        cap_size = 36 if width > height else 44
         caption_filter = get_caption_filter(
             caption_text_file,
             language_code=language_code,
             fontsize=cap_size,
             y_position_ratio=y_ratio,
+            total_height=height,
         )
-        filter_chain += f",{caption_filter}"
+        if caption_filter:
+            filter_chain += f",{caption_filter}"
 
     return filter_chain
 

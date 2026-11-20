@@ -239,6 +239,29 @@ INDIC_SCRIPT_RANGES = {
     },
 }
 
+FOREIGN_INDIC_RANGES: dict[str, dict[str, list[tuple[int, int]]]] = {
+    "te-IN": {
+        "Odia": [(0x0B00, 0x0B7F)],
+        "Devanagari": [(0x0900, 0x0963), (0x0966, 0x097F)],  # allows danda U+0964, double danda U+0965
+        "Bengali": [(0x0980, 0x09FF)],
+        "Gurmukhi": [(0x0A00, 0x0A7F)],
+        "Gujarati": [(0x0A80, 0x0AFF)],
+        "Tamil": [(0x0B80, 0x0BFF)],
+        "Kannada": [(0x0C80, 0x0CFF)],
+        "Malayalam": [(0x0D00, 0x0D7F)],
+    },
+    "hi-IN": {
+        "Odia": [(0x0B00, 0x0B7F)],
+        "Telugu": [(0x0C00, 0x0C7F)],
+        "Bengali": [(0x0980, 0x09FF)],
+        "Gurmukhi": [(0x0A00, 0x0A7F)],
+        "Gujarati": [(0x0A80, 0x0AFF)],
+        "Tamil": [(0x0B80, 0x0BFF)],
+        "Kannada": [(0x0C80, 0x0CFF)],
+        "Malayalam": [(0x0D00, 0x0D7F)],
+    },
+}
+
 
 def validate_text_language_integrity(
     text: str,
@@ -250,6 +273,8 @@ def validate_text_language_integrity(
     Validates that a text string is genuinely in the specified Indic script.
     - Ensures non-empty content.
     - Requires native script characters for hi-IN (Devanagari) or te-IN (Telugu).
+    - Checks for and strictly rejects foreign Indic script characters (e.g. Odia U+0B00-U+0B7F,
+      Devanagari letters in Telugu, etc.), with permitted exceptions for Sanskrit danda U+0964/U+0965.
     - Requires that native script characters constitute at least min_indic_ratio (default 50%)
       of total alphabetic characters, safely tolerating legitimate proper names, numerals,
       URLs, and loanwords while blocking predominantly English or generic templates.
@@ -260,6 +285,20 @@ def validate_text_language_integrity(
 
     if not isinstance(text, str) or not text.strip():
         return False, f"Field '{field_name}' for language '{language_code}' is empty or not a valid string."
+
+    # 1. Foreign Indic script character check (fail-closed on mixed/foreign Indic glyphs)
+    foreign_rules = FOREIGN_INDIC_RANGES.get(language_code, {})
+    if foreign_rules:
+        for char in text:
+            cp = ord(char)
+            for script_title, ranges in foreign_rules.items():
+                for start, end in ranges:
+                    if start <= cp <= end:
+                        return (
+                            False,
+                            f"Field '{field_name}' contains foreign Indic character '{char}' "
+                            f"(U+{cp:04X}, script: {script_title}) not permitted in '{language_code}'.",
+                        )
 
     config = INDIC_SCRIPT_RANGES[language_code]
     script_name = config["name"]

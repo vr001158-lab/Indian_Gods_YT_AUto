@@ -43,7 +43,7 @@ def _make_brief(
     }
     # Run the real content brief generator to get a structurally sound brief
     brief = generate_content_brief(decision)
-    
+
     # Manually corrupt the approval metadata for testing script safety gates
     if not approved:
         brief["approval_metadata"]["approved_for_generation"] = False
@@ -164,13 +164,13 @@ class TestScriptSafetyGates(unittest.TestCase):
         self.assertIn("Halahala", s["narration"])
         self.assertIn("Vasuki", s["narration"])
         self.assertTrue(
-            "As we close our dharshanam today" in s["narration"] or 
+            "As we close our dharshanam today" in s["narration"] or
             "As we conclude our dharshanam today" in s["narration"]
         )
 
         # CTA verification
         self.assertTrue(
-            "Om Namah Shivaya" in s["narration"] or 
+            "Om Namah Shivaya" in s["narration"] or
             "May peace and blessings be with you always" in s["narration"]
         )
         self.assertTrue(any(short["hook"] is not None for short in s["shorts_scripts"]))
@@ -183,23 +183,23 @@ class TestScriptContentStructure(unittest.TestCase):
     def test_9_deterministic_generation(self):
         b1 = _make_brief(deity="shiva")
         b2 = _make_brief(deity="shiva")
-        
+
         s1 = generate_script(b1)
         s2 = generate_script(b2)
-        
+
         self.assertEqual(s1, s2)
 
     def test_10_script_schema_validation(self):
         b = _make_brief(deity="shiva")
         s = generate_script(b)
-        
+
         ok, err = validate_script_output(s)
         self.assertTrue(ok, f"Generated script fails schema: {err}")
 
     def test_11_long_video_duration_is_valid(self):
         b = _make_brief(deity="shiva")
         s = generate_script(b)
-        
+
         # 5-8 minutes is between 300 and 480 seconds inclusive
         self.assertTrue(300 <= s["duration_seconds"] <= 480,
                         f"Duration {s['duration_seconds']} must be 5-8 minutes (300-480s)")
@@ -207,7 +207,7 @@ class TestScriptContentStructure(unittest.TestCase):
     def test_12_narration_is_substantial(self):
         b = _make_brief(deity="shiva")
         s = generate_script(b)
-        
+
         # Devotional documentary style needs a solid word count
         words = s["narration"].split()
         self.assertTrue(len(words) >= 300, f"Narration word count {len(words)} is too short")
@@ -215,7 +215,7 @@ class TestScriptContentStructure(unittest.TestCase):
     def test_13_exactly_three_shorts_scripts_generated(self):
         b = _make_brief(deity="shiva")
         s = generate_script(b)
-        
+
         self.assertEqual(len(s["shorts_scripts"]), 3)
         for i, short in enumerate(s["shorts_scripts"], 1):
             self.assertIsInstance(short["title"], str)
@@ -226,7 +226,7 @@ class TestScriptContentStructure(unittest.TestCase):
     def test_14_scene_scripts_count_and_visuals_match(self):
         b = _make_brief(deity="shiva")
         s = generate_script(b)
-        
+
         self.assertEqual(len(s["scene_scripts"]), len(b["visual_plan"]))
         for i, scene in enumerate(s["scene_scripts"]):
             self.assertEqual(scene["scene"], i + 1)
@@ -236,14 +236,14 @@ class TestScriptContentStructure(unittest.TestCase):
 
     def test_15_script_file_writing_works(self):
         b = _make_brief(deity="shiva")
-        
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             brief_file = Path(tmp_dir) / "brief_test.json"
             brief_file.write_text(json.dumps(b), encoding="utf-8")
-            
+
             out_dir = Path(tmp_dir) / "scripts"
             out_file = process_brief_file(brief_file, out_dir)
-            
+
             self.assertTrue(out_file.exists())
             saved_script = json.loads(out_file.read_text(encoding="utf-8"))
             ok, err = validate_script_output(saved_script)
@@ -264,7 +264,7 @@ class TestScriptContentStructure(unittest.TestCase):
         }
         b = generate_content_brief(decision)
         s = generate_script(b)
-        
+
         ok, err = validate_script_output(s)
         self.assertTrue(ok, f"Fallback script output fails schema: {err}")
         self.assertTrue(s["duration_seconds"] >= 300)
@@ -433,7 +433,7 @@ class TestScriptCLI(unittest.TestCase):
         mock_unrelated_hindi = {
             "title": "भगवान शिव और नाग वासुकि की कथा",
             "duration_seconds": 45,
-            "narration": "भगवान शिव के गले में वासुकि नाग सुशोభित है।",
+            "narration": "भगवान शिव के गले में वासुकि नाग सुशोभित है।",
             "scene_scripts": [
                 {
                     "scene": 1,

@@ -295,7 +295,7 @@ def generate_voice_mapping(
         )
         music_track, sel_type = select_background_music_v2(category="devotional", script=script)
         bgm_meta = get_bgm_metadata_for_track(music_track, script=script)
-        
+
         # Determine music file path and validate in production
         if mode == "production":
             if not music_track:
@@ -542,6 +542,14 @@ def generate_voice_mapping(
     }
     if full_audio_qa:
         audio_map["audio_qa"] = full_audio_qa
+
+    from src.video.format_config import validate_production_short_duration
+    ct = (script.get("content_type") or "short").lower()
+    if ct == "short":
+        ok_dur, dur_err = validate_production_short_duration(total_duration)
+        audio_map["duration_compliant"] = ok_dur
+        if not ok_dur:
+            audio_map["duration_warning"] = dur_err
 
     ok_out, err_out = validate_audio_output(audio_map)
     if not ok_out:

@@ -162,6 +162,28 @@ TELUGU_NARRATIVE_CONCEPTS: dict[str, list[str]] = {
     "సుదర్శన": ["sudarshana", "chakra"],
     "చక్రం": ["chakra"],
     "గరుడ": ["garuda"],
+    "శేషశయనం": ["shesha", "sheshashayi", "ksheera", "ocean", "serpent", "reclining"],
+    "శేషశయన": ["shesha", "sheshashayi", "ksheera", "ocean", "serpent", "reclining"],
+    "ఆదిశేషు": ["shesha", "sheshashayi", "serpent"],
+    "ఆదిశేష": ["shesha", "sheshashayi", "serpent"],
+    "క్షీరసాగర": ["ksheera", "ocean", "milk"],
+    "పాలకడలి": ["ksheera", "ocean", "milk"],
+    "యోగనిద్ర": ["yoganidra", "reclining", "sheshashayi"],
+    "ధ్యాన": ["meditation", "meditating", "dhyana"],
+    "లక్ష్మీ": ["lakshmi", "narayana"],
+    "లక్ష్మీదేవి": ["lakshmi", "narayana", "lotus"],
+    "వైకుంఠ": ["vaikuntha", "throne"],
+    "కమలం": ["lotus", "padma", "padmasana", "pink lotus"],
+    "కమల": ["lotus", "padma", "padmasana"],
+    "తామర": ["lotus", "padma", "padmasana"],
+    "పద్మం": ["lotus", "padma", "padmasana"],
+    "పద్మాసన": ["padmasana", "lotus", "seated", "meditation"],
+    "దీపారాధన": ["diya", "lamp", "deepam", "puja", "worship", "arati"],
+    "దీపం": ["diya", "lamp", "deepam"],
+    "కుంభం": ["kalasha", "kumbha", "pot"],
+    "ఐశ్వర్య": ["wealth", "coins", "gold", "prosperity", "blessing"],
+    "సౌభాగ్య": ["prosperity", "blessing", "auspicious"],
+    "శుక్రవారం": ["friday", "puja", "worship"],
 }
 
 
@@ -307,10 +329,29 @@ def is_matching_orientation(asset: dict[str, Any] | str, content_type: str) -> b
         if target_is_long:
             return w >= h
         else:
-            return h >= w
+            return h > w  # Strict portrait only for Shorts (height strictly greater than width; rejects square and landscape)
+
+    # If dimensions not in dict, inspect file on disk directly
+    path_val = str(asset.get("path") or asset.get("source_path") or asset.get("image_file") or "").strip()
+    if path_val and Path(path_val).exists():
+        try:
+            from PIL import Image
+            with Image.open(path_val) as img:
+                iw, ih = img.size
+                if target_is_long:
+                    return iw >= ih
+                else:
+                    return ih > iw
+        except Exception:
+            pass
 
     # 2. Explicit aspect_ratio metadata
     ar = str(asset.get("aspect_ratio") or "").lower().strip()
+    if not ar and path_val:
+        from src.assets.approval_registry import get_trusted_registry
+        rec = get_trusted_registry().get_approval_record(path_val)
+        if rec and rec.aspect_ratio:
+            ar = str(rec.aspect_ratio).lower().strip()
     if ar in ("16:9", "horizontal", "landscape"):
         return target_is_long
     if ar in ("9:16", "vertical", "portrait"):
@@ -334,8 +375,86 @@ def is_matching_orientation(asset: dict[str, Any] | str, content_type: str) -> b
     if "vertical" in path_str or "portrait" in path_str:
         return not target_is_long
 
+    # For mock dictionaries without dimensions or files on disk:
+    # Videos require explicit vertical confirmation (fail closed).
+    # Images are allowed for shorts unless explicitly marked horizontal, landscape, or square.
+    if not target_is_long:
+        asset_type = str(asset.get("type") or asset.get("asset_type") or "").lower()
+        if "video" in asset_type or path_str.endswith((".mp4", ".mov", ".webm", ".mkv")):
+            return False
+        return not any(h_cue in path_str for h_cue in ("horizontal", "landscape", "square", "16:9", "1:1"))
+
     # Fail closed on unverified/unknown orientation
     return False
+
+
+# Production excluded assets (e.g. watermarked or damaged assets discovered during audit)
+# Excludes assets without modifying historical human review audit records.
+PRODUCTION_EXCLUDED_ASSET_PATHS: set[str] = {
+    "assets/gods/ganesha/0f8a0b018493cd68cc55168ee1764e14.jpg",  # APPR-REV-GANESHA-0066 (contains APANKAAINEWS watermark)
+    "assets/gods/krishna/11432de81c817c233d5eeb20b75efa3e.jpg",  # APPR-REV-KRISHNA-0175 (contains faint watermark text)
+}
+
+# Explicit replacement mappings directing selection to clean approved assets
+PRODUCTION_REPLACEMENT_ASSETS: dict[str, str] = {
+    "assets/gods/ganesha/0f8a0b018493cd68cc55168ee1764e14.jpg": "assets/gods/ganesha/20837852b7fe042b03cf0421442a16fa.jpg",  # APPR-REV-GANESHA-0070 (clean approved replacement)
+    "assets/gods/krishna/11432de81c817c233d5eeb20b75efa3e.jpg": "assets/gods/krishna/387b33299efeb98cb39193685d98d414.jpg",  # APPR-REV-KRISHNA-0177 (clean approved replacement)
+}
+
+
+def is_asset_production_eligible(asset_path: str | Path) -> bool:
+    """Checks whether an asset is eligible for production selection (not excluded for watermarks/defects)."""
+    from src.assets.approval_registry import normalize_repo_path
+    norm = normalize_repo_path(asset_path)
+    if not norm or norm in PRODUCTION_EXCLUDED_ASSET_PATHS:
+        return False
+    return True
+
+
+def _filter_and_replace_production_assets(
+    assets: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Filters out excluded assets (e.g. watermarked) and inserts designated clean approved replacements."""
+    from src.assets.approval_registry import normalize_repo_path
+    result: list[dict[str, Any]] = []
+    seen_paths: set[str] = set()
+
+    for item in assets:
+        norm = normalize_repo_path(
+            item.get("path")
+            or item.get("source_path")
+            or item.get("image_file")
+            or item.get("video_file")
+            or ""
+        )
+        if norm in PRODUCTION_EXCLUDED_ASSET_PATHS:
+            replacement_path = PRODUCTION_REPLACEMENT_ASSETS.get(norm)
+            if replacement_path and replacement_path not in seen_paths:
+                # Find the replacement item in the full asset pool if present, or adapt item
+                repl_item = next(
+                    (x for x in assets if normalize_repo_path(x.get("path", "")) == replacement_path),
+                    None,
+                )
+                if repl_item:
+                    seen_paths.add(replacement_path)
+                    result.append(repl_item)
+                else:
+                    adapted = dict(item)
+                    adapted["path"] = replacement_path
+                    adapted["source_path"] = replacement_path
+                    adapted["image_file"] = replacement_path
+                    adapted["asset_id"] = Path(replacement_path).stem
+                    seen_paths.add(replacement_path)
+                    result.append(adapted)
+            continue
+
+        if norm and norm not in seen_paths:
+            seen_paths.add(norm)
+            result.append(item)
+        elif not norm:
+            result.append(item)
+
+    return result
 
 
 def _is_matching_avatar(av1: str | None, av2: str | None) -> bool:
@@ -355,15 +474,16 @@ def _is_matching_avatar(av1: str | None, av2: str | None) -> bool:
     return False
 
 
-def _is_item_verified_visual(item: dict[str, Any], deity_key: str, avatar: str | None = None) -> bool:
+def _is_item_verified_visual(
+    item: dict[str, Any],
+    deity_key: str,
+    avatar: str | None = None,
+    allow_dual_composite: bool = False,
+) -> bool:
     """
-    Validates whether an asset item has genuine visual verification.
-    Populates missing deity identity metadata (avatar, provenance, verification_status)
-    from scanner narrative catalog or curated repository classification if verified.
-    Strictly preserves deity and avatar isolation:
-      - Generic Vishnu images without explicit avatar are UNVERIFIED.
-      - Drafts containing 'chatgpt' or 'unverified' in filename are UNVERIFIED.
-      - Wrong-deity assets are UNVERIFIED.
+    Validates whether an asset item has genuine visual verification via explicit trusted approval record.
+    Fails closed if the asset path is not explicitly registered and approved for deity_key (and avatar if requested).
+    Caller-provided verification_status cannot bypass this check.
     """
     if not isinstance(item, dict):
         return False
@@ -375,91 +495,43 @@ def _is_item_verified_visual(item: dict[str, Any], deity_key: str, avatar: str |
         or item.get("video_file")
         or ""
     ).replace("\\", "/")
-    stem = Path(path_str).stem.lower() if path_str else ""
 
-    # 1. Unapproved drafts or generic unverified files are strictly rejected
-    if "chatgpt" in stem or "unverified" in stem:
+    if not path_str:
         item["verification_status"] = "unverified"
+        item["approval_status"] = "UNAPPROVED"
         return False
 
-    # Reject explicit deity mismatch or cross-deity directory in path
-    item_deity = (item.get("deity") or item.get("canonical_deity") or "").strip().lower()
-    if item_deity:
-        from src.thumbnail.asset_index import AVATAR_TO_PARENT_DEITY
-        valid_deities = {deity_key.lower()}
-        if deity_key.lower() == "lord_vishnu":
-            valid_deities.update({"ram", "rama", "krishna", "narasimha", "varaha", "kurma", "vamana", "trivikrama", "matsya", "kalki", "parashurama"})
-        parent = AVATAR_TO_PARENT_DEITY.get(item_deity)
-        if parent:
-            valid_deities.add(parent.lower())
-        if item_deity not in valid_deities and deity_key.lower() not in valid_deities:
-            return False
+    # Anti-Misclassification Guard: Lord Manikanta/Ayyappa can NEVER be used for Lord Rama
+    norm_lower = path_str.lower()
+    if (deity_key == "ram" or avatar == "ram") and ("manikanta" in norm_lower or "ayyappa" in norm_lower):
+        item["verification_status"] = "mismatched_identity"
+        item["approval_status"] = "UNAPPROVED"
+        return False
 
-    from src.thumbnail.asset_index import CANONICAL_DEITIES
-    for other_deity, aliases in CANONICAL_DEITIES.items():
-        if other_deity == deity_key.lower():
-            continue
-        if deity_key.lower() == "lord_vishnu" and other_deity in ("narasimha", "krishna", "ram"):
-            continue
-        if other_deity == "lord_vishnu" and deity_key.lower() in ("narasimha", "krishna", "ram"):
-            continue
-        for alias in [other_deity] + aliases:
-            if not alias or len(alias) < 4:
-                continue
-            if f"/{alias}/" in path_str.lower() or f"/{alias}_" in path_str.lower():
-                return False
+    from src.assets.approval_registry import get_trusted_registry, normalize_repo_path
+    norm_path = normalize_repo_path(path_str)
+    if norm_path in PRODUCTION_EXCLUDED_ASSET_PATHS:
+        item["verification_status"] = "excluded_watermark"
+        item["approval_status"] = "EXCLUDED"
+        return False
 
-    # 2. Check canonical narrative catalog first
-    from src.assets.scanner import KNOWN_NARRATIVE_METADATA, _enrich_asset_metadata
-    for pattern_key, entry in KNOWN_NARRATIVE_METADATA.items():
-        p_clean = pattern_key.lower().replace(" ", "_")
-        stem_clean = stem.replace(" ", "_")
-        if p_clean in stem_clean or pattern_key.lower() in stem:
-            cat_av = entry.get("avatar")
-            from src.thumbnail.asset_index import AVATAR_TO_PARENT_DEITY
-            cat_parent = AVATAR_TO_PARENT_DEITY.get(cat_av.lower()) if cat_av else None
-            valid_parents = {cat_parent.lower()} if cat_parent else set()
-            if cat_av and cat_av.lower() in ("matsya", "kurma", "varaha", "narasimha", "vamana", "vamana_trivikrama", "trivikrama", "parashurama", "buddha", "kalki", "krishna", "ram", "rama"):
-                valid_parents.add("lord_vishnu")
-            if deity_key.lower() not in valid_parents and cat_parent:
-                return False
-            if avatar and cat_av:
-                if not _is_matching_avatar(cat_av, avatar):
-                    return False
-            item["verification_status"] = "verified_visual"
-            item["avatar"] = cat_av or avatar or deity_key
-            item["provenance"] = entry.get("provenance") or "Divine Dharshanam Daily generation workflow; visually verified"
-            return True
+    registry = get_trusted_registry()
+    is_approved, reason, record = registry.is_asset_approved(
+        path_str, deity=deity_key, avatar=avatar, allow_dual_composite=allow_dual_composite
+    )
 
-    # 3. For Lord Vishnu, only vetted narrative assets or explicit avatars are verified
-    if deity_key.lower() == "lord_vishnu":
-        detected_av = None
-        for av in ("varaha", "kurma", "vamana", "trivikrama", "narasimha", "krishna", "rama", "matsya", "kalki"):
-            if av in stem:
-                detected_av = "vamana_trivikrama" if av in ("vamana", "trivikrama") else av
-                break
-        if not detected_av and not (item.get("avatar") and item.get("avatar") != "lord_vishnu"):
-            item["verification_status"] = "unverified"
-            return False
-        if avatar:
-            target_av = detected_av or item.get("avatar")
-            if not _is_matching_avatar(target_av, avatar):
-                return False
+    if not is_approved or not record:
+        item["verification_status"] = "unverified"
+        item["approval_status"] = "UNAPPROVED"
+        return False
 
-    # 4. If path indicates a repository deity asset matching deity_key
-    enriched = _enrich_asset_metadata(dict(item), stem, deity_key)
-    if enriched.get("verification_status") == "verified_visual":
-        target_av = enriched.get("avatar") or item.get("avatar")
-        if avatar and target_av and not _is_matching_avatar(target_av, avatar):
-            return False
-        item["verification_status"] = "verified_visual"
-        if not item.get("avatar") or item.get("avatar") == deity_key:
-            item["avatar"] = enriched.get("avatar", avatar or deity_key)
-        if not item.get("provenance") or "unverified" in str(item.get("provenance")).lower():
-            item["provenance"] = enriched.get("provenance") or "Repository collection; curated deity asset"
-        return True
-
-    return item.get("verification_status") == "verified_visual"
+    # Asset is verified and approved via explicit trusted approval record
+    item["verification_status"] = "verified_visual"
+    item["approval_status"] = "APPROVED"
+    item["avatar"] = record.avatar or avatar or deity_key
+    item["provenance"] = record.provenance
+    item["canonical_deity"] = record.canonical_deity
+    return True
 
 
 def build_deity_visual_timeline(
@@ -493,8 +565,8 @@ def build_deity_visual_timeline(
     deities = manifest.get("deities", {})
     target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
 
-    repo_images = target_deity_assets.get("images", [])
-    repo_videos = target_deity_assets.get("videos", [])
+    repo_images = _filter_and_replace_production_assets(list(target_deity_assets.get("images", [])))
+    repo_videos = _filter_and_replace_production_assets(list(target_deity_assets.get("videos", [])))
 
     if not repo_images and not repo_videos:
         raise ValueError(f"No visual assets found in repository for deity '{deity_key}'")
@@ -506,18 +578,22 @@ def build_deity_visual_timeline(
         preferred_images = [img for img in repo_images if is_matching_orientation(img, "long")]
         eligible_images = preferred_images if preferred_images else repo_images
     else:
-        eligible_images = repo_images
+        # STRICT PORTRAIT ONLY FOR SHORTS: Rejects square and landscape images
+        eligible_images = [img for img in repo_images if is_matching_orientation(img, "short")]
+
+    # Prefer verified visual assets when available; fall back to manifest candidates for unverified assessment
+    verified_videos = [v for v in deity_videos if _is_item_verified_visual(v, deity_key, avatar)]
+    if verified_videos:
+        deity_videos = verified_videos
+
+    verified_images = [img for img in eligible_images if _is_item_verified_visual(img, deity_key, avatar)]
+    if verified_images:
+        eligible_images = verified_images
 
     # Strict Avatar Isolation
     if avatar:
-        deity_videos = [
-            v for v in deity_videos
-            if _is_matching_avatar(v.get("avatar"), avatar) and _is_item_verified_visual(v, deity_key, avatar)
-        ]
-        eligible_images = [
-            img for img in eligible_images
-            if _is_matching_avatar(img.get("avatar"), avatar) and _is_item_verified_visual(img, deity_key, avatar)
-        ]
+        deity_videos = [v for v in deity_videos if _is_matching_avatar(v.get("avatar"), avatar)]
+        eligible_images = [img for img in eligible_images if _is_matching_avatar(img.get("avatar"), avatar)]
         if not deity_videos and not eligible_images:
             raise NoMatchingDeityAssetError(
                 f"No verified visual assets found for deity '{deity_key}' with avatar '{avatar}'. "
@@ -527,7 +603,7 @@ def build_deity_visual_timeline(
     # When genuine deity assets exist on disk (e.g. handling local sparse checkout),
     # cleanly prefer physically available assets on disk.
     disk_videos = [v for v in deity_videos if Path(v.get("path", "")).exists()]
-    disk_images = [img for img in repo_images if Path(img.get("path", "")).exists()]
+    disk_images = [img for img in eligible_images if Path(img.get("path", "")).exists()]
     if disk_videos:
         deity_videos = disk_videos
     elif disk_images and deity_videos:
@@ -634,8 +710,8 @@ def select_scene_assets(
     deities = manifest.get("deities", {})
     target_deity_assets = deities.get(deity_key, {"images": [], "videos": []})
 
-    repo_images = list(target_deity_assets.get("images", []))
-    repo_videos = list(target_deity_assets.get("videos", []))
+    repo_images = _filter_and_replace_production_assets(list(target_deity_assets.get("images", [])))
+    repo_videos = _filter_and_replace_production_assets(list(target_deity_assets.get("videos", [])))
 
     target_ct = "long" if content_type == "long" else "short"
     deity_videos = [v for v in repo_videos if is_matching_orientation(v, target_ct)]
@@ -644,18 +720,22 @@ def select_scene_assets(
         preferred_images = [img for img in repo_images if is_matching_orientation(img, "long")]
         eligible_images = preferred_images if preferred_images else repo_images
     else:
-        eligible_images = repo_images
+        # STRICT PORTRAIT ONLY FOR SHORTS: Rejects square and landscape images
+        eligible_images = [img for img in repo_images if is_matching_orientation(img, "short")]
+
+    # Prefer verified visual assets when available; fall back to manifest candidates for unverified assessment
+    verified_videos = [v for v in deity_videos if _is_item_verified_visual(v, deity_key, avatar)]
+    if verified_videos:
+        deity_videos = verified_videos
+
+    verified_images = [img for img in eligible_images if _is_item_verified_visual(img, deity_key, avatar)]
+    if verified_images:
+        eligible_images = verified_images
 
     # Strict Avatar Isolation
     if avatar:
-        deity_videos = [
-            v for v in deity_videos
-            if _is_matching_avatar(v.get("avatar"), avatar) and _is_item_verified_visual(v, deity_key, avatar)
-        ]
-        eligible_images = [
-            img for img in eligible_images
-            if _is_matching_avatar(img.get("avatar"), avatar) and _is_item_verified_visual(img, deity_key, avatar)
-        ]
+        deity_videos = [v for v in deity_videos if _is_matching_avatar(v.get("avatar"), avatar)]
+        eligible_images = [img for img in eligible_images if _is_matching_avatar(img.get("avatar"), avatar)]
         if not deity_videos and not eligible_images:
             raise NoMatchingDeityAssetError(
                 f"No verified visual assets found for deity '{deity_key}' with avatar '{avatar}'. "
@@ -665,7 +745,7 @@ def select_scene_assets(
     # When genuine deity assets exist on disk (e.g. handling local sparse checkout),
     # cleanly prefer physically available assets on disk.
     disk_videos = [v for v in deity_videos if Path(v.get("path", "")).exists()]
-    disk_images = [img for img in repo_images if Path(img.get("path", "")).exists()]
+    disk_images = [img for img in eligible_images if Path(img.get("path", "")).exists()]
     if disk_videos:
         deity_videos = disk_videos
     elif disk_images and deity_videos:

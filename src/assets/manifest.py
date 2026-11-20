@@ -112,7 +112,8 @@ def load_landscape_asset_manifest(
     Enriches loaded records in memory with visual verification and provenance metadata.
     """
     if str(gods_dir) != "assets/gods_landscape_long_video":
-        return generate_landscape_asset_manifest(gods_dir=gods_dir, output_manifest_path=None)
+        res = generate_landscape_asset_manifest(gods_dir=gods_dir, output_manifest_path=None)
+        return _enrich_manifest_dict(res)
 
     m_path = Path(manifest_path or LANDSCAPE_MANIFEST_PATH)
     manifest = None

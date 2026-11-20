@@ -371,12 +371,40 @@ def rotate_deity_for_day(
     return candidate
 
 
+class NoApprovedWeekdayDeityAssetsError(RuntimeError):
+    """
+    Raised when no scheduled deities for a weekday have approved assets in the active trusted library.
+    Ensures the pipeline fails closed rather than selecting an unapproved/quarantined asset
+    or substituting an unrelated deity.
+    """
+    def __init__(self, weekday_name: str, eligible_deities: list[str]):
+        super().__init__(
+            f"No approved assets found in active trusted library for scheduled deities "
+            f"{eligible_deities} on {weekday_name}. Generation must be skipped (fail-closed)."
+        )
+        self.weekday_name = weekday_name
+        self.eligible_deities = eligible_deities
+
+
 def select_weekday_deity(
     dt: Optional[datetime] = None,
     history: Optional[list[dict[str, Any]]] = None,
+    require_approved_assets: bool = True,
 ) -> dict[str, Any]:
     """
-    Deterministically selects the day's scheduled deity and devotional context.
+    Deterministically selects the day's scheduled deity and devotional context,
+    verifying active trusted library coverage.
+
+    Parameters
+    ----------
+    dt : Optional[datetime]
+        Target datetime (Asia/Kolkata). Defaults to current Kolkata time.
+    history : Optional[list]
+        Recent generation history to prevent immediate repeats.
+    require_approved_assets : bool
+        When True (default), filters eligible deities to only those with at least
+        one approved asset in TrustedAssetApprovalRegistry. Fails closed with
+        NoApprovedWeekdayDeityAssetsError if no scheduled deity has approved assets.
 
     Returns
     -------
@@ -387,7 +415,9 @@ def select_weekday_deity(
       - scheduled_deity: str (canonical deity key)
       - display_name: str
       - repository_folder: str (canonical asset folder)
-      - eligible_deities: list[str]
+      - eligible_deities: list[str] (authoritative weekday eligibility group)
+      - available_deities: list[str] (eligible deities backed by approved assets)
+      - unavailable_deities: list[str] (eligible deities lacking approved assets)
       - significance: list[str]
       - visual_and_offering_context: dict
       - kolkata_date: str (YYYY-MM-DD)
@@ -400,8 +430,24 @@ def select_weekday_deity(
         dt = dt.astimezone(KOLKATA_TZ)
 
     day_info = get_weekday_info(dt)
-    eligible = day_info["primary_deities"]
-    chosen_deity = rotate_deity_for_day(dt, eligible, history=history)
+    eligible = list(day_info["primary_deities"])
+
+    available_deities = list(eligible)
+    unavailable_deities: list[str] = []
+
+    if require_approved_assets:
+        from src.assets.approval_registry import get_trusted_registry
+        registry = get_trusted_registry()
+        available_deities = [d for d in eligible if registry.has_approved_assets_for_deity(d)]
+        unavailable_deities = [d for d in eligible if not registry.has_approved_assets_for_deity(d)]
+
+        if not available_deities:
+            raise NoApprovedWeekdayDeityAssetsError(
+                weekday_name=day_info["english_day"],
+                eligible_deities=eligible,
+            )
+
+    chosen_deity = rotate_deity_for_day(dt, available_deities, history=history)
 
     repo_folder = DEITY_REPOSITORY_ALIAS.get(chosen_deity, chosen_deity)
     display_name = day_info["display_names"].get(chosen_deity, chosen_deity.replace("_", " ").title())
@@ -414,6 +460,8 @@ def select_weekday_deity(
         "display_name": display_name,
         "repository_folder": repo_folder,
         "eligible_deities": list(eligible),
+        "available_deities": list(available_deities),
+        "unavailable_deities": list(unavailable_deities),
         "significance": list(day_info["significance"]),
         "visual_and_offering_context": dict(day_info["visual_and_offering_context"]),
         "kolkata_date": dt.strftime("%Y-%m-%d"),
@@ -431,7 +479,11 @@ def get_day_of_week_deity_bonus(deity_key: Optional[str], now_dt: Optional[datet
     if not deity_key:
         return 0.0
 
-    d_info = select_weekday_deity(now_dt)
+    try:
+        d_info = select_weekday_deity(now_dt, require_approved_assets=False)
+    except Exception:
+        return 0.0
+
     target = deity_key.strip().lower()
     canonical = DEITY_CANONICAL_ALIASES.get(target, target)
     scheduled = d_info["scheduled_deity"].lower()

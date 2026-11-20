@@ -46,7 +46,7 @@ def _find_latest_research_file() -> Path:
 
 def main():
     input_file  = None
-    min_score   = DEFAULT_MIN_SCORE
+    min_score   = int(os.environ.get("DECISION_MIN_SCORE", DEFAULT_MIN_SCORE))
     save_output = True
     format_type = "narrated"
     language_code = None

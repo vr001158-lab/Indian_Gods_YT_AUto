@@ -71,7 +71,11 @@ class MockVideoComposer(VideoComposer):
         return True
 
 
-def format_caption_text(text: str, max_chars_per_line: int = 35) -> str:
+def format_caption_text(
+    text: str,
+    max_chars_per_line: int = 35,
+    max_lines: int | None = None,
+) -> str:
     """Formats caption text into clean multi-line blocks that fit within mobile safe area."""
     if not text:
         return ""
@@ -90,6 +94,12 @@ def format_caption_text(text: str, max_chars_per_line: int = 35) -> str:
             current_len = len(w)
     if current_line:
         lines.append(" ".join(current_line))
+
+    if max_lines is not None and len(lines) > max_lines:
+        lines = lines[:max_lines]
+        if not lines[-1].endswith((".", "!", "?", "...")):
+            lines[-1] = lines[-1].rstrip(",;") + "..."
+
     return "\n".join(lines)
 
 
@@ -118,7 +128,7 @@ class FFmpegVideoComposer(VideoComposer):
                Used instead of linear bgm_volume for accurate loudness targeting.
         """
         width, height = _parse_resolution(resolution)
-        
+
         # Check if it's old format (all scenes have empty voice_text)
         is_old = all(not s.get("voice_text") for s in scenes)
         if is_old and bgm_db == -22.0:
@@ -155,7 +165,7 @@ class FFmpegVideoComposer(VideoComposer):
         # ── 2. Construct Filtergraph ──────────────────────────────────────────
         filter_parts = []
         motions = ["zoom_in", "zoom_out", "pan_left", "pan_right", "zoom_in"]
-        
+
         # Prepare caption text files directory
         caption_dir = output_file.parent / f"_captions_{output_file.stem}"
         caption_dir.mkdir(parents=True, exist_ok=True)
@@ -164,14 +174,16 @@ class FFmpegVideoComposer(VideoComposer):
         for i, s in enumerate(scenes):
             v_input_idx = 2 * i
             motion_type = motions[i % len(motions)]
-            
+
             caption_file_path = None
             voice_text = s.get("voice_text", "")
             if voice_text:
-                max_chars = 50 if width > height else 35
-                formatted_cap = format_caption_text(voice_text, max_chars_per_line=max_chars)
+                max_chars = 50 if width > height else 36
+                max_lines = None if width > height else 3
+                formatted_cap = format_caption_text(voice_text, max_chars_per_line=max_chars, max_lines=max_lines)
                 txt_path = caption_dir / f"caption_scene_{i+1}.txt"
-                txt_path.write_text(formatted_cap, encoding="utf-8")
+                clean_lf_text = formatted_cap.replace("\r\n", "\n").replace("\r", "\n")
+                txt_path.write_text(clean_lf_text, encoding="utf-8", newline="\n")
                 caption_file_path = str(txt_path.absolute())
 
             v_filter = get_video_filtergraph_for_scene(

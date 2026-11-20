@@ -80,6 +80,39 @@ class TestMultilingualVideoRendering(unittest.TestCase):
     def setUp(self):
         self.tmp_dir = tempfile.TemporaryDirectory()
         self.tmp_path = Path(self.tmp_dir.name)
+        shiva_assets = [
+            "assets/gods/lord_shiva/181199585004244858.jpg",
+            "assets/gods/lord_shiva/Arunachalam thirunamalai Shiva.jpg",
+            "assets/gods/lord_shiva/Divine Trident of Cosmic Power⚡️🔱 Powerful Shiva Trishul Wallpaper in Blue Cosmtic Energy.jpg",
+            "assets/gods/lord_shiva/Mahadev Blessings  _ Divine Lord Shiva Wallpaper.jpg",
+            "assets/gods/lord_shiva/Blessings of Shiv Parivar 🕉️✨.jpg",
+        ]
+        self.shared_asset_plan_path = self.tmp_path / "shared_asset_plan.json"
+        self.shared_asset_plan_path.write_text(json.dumps({
+            "topic": "Secrets of Shiva's Snake: The Mastery Over Ego and Poison",
+            "deity": "lord_shiva",
+            "approval_metadata": {
+                "approved_for_generation": True,
+                "selected_topic": "Why Lord Shiva Wears a Snake Around His Neck",
+                "score": 66,
+                "confidence": "high",
+                "data_source": "youtube_api",
+                "category": "Stories of deities"
+            },
+            "scenes": [
+                {
+                    "scene": i + 1,
+                    "asset_type": "image",
+                    "asset": asset,
+                    "asset_id": Path(asset).stem,
+                    "deity": "lord_shiva",
+                    "source": "repository",
+                    "reason_for_selection": f"Repository asset for scene #{i + 1}",
+                    "validation_result": "OK"
+                }
+                for i, asset in enumerate(shiva_assets)
+            ]
+        }), encoding="utf-8")
 
     def tearDown(self):
         self.tmp_dir.cleanup()
@@ -90,15 +123,13 @@ class TestMultilingualVideoRendering(unittest.TestCase):
 
     def test_shared_asset_plan_reused(self):
         """create_visual_map_from_asset_plan uses exact assets from shared asset plan."""
-        if not SHARED_ASSET_PLAN_PATH.exists():
-            self.skipTest("Shared asset plan not available in CI environment")
         amap_hi = _make_mock_audio_map("hi-IN", [10, 9, 9, 9, 10])
-        vmap_hi = create_visual_map_from_asset_plan(SHARED_ASSET_PLAN_PATH, amap_hi)
+        vmap_hi = create_visual_map_from_asset_plan(self.shared_asset_plan_path, amap_hi)
 
         self.assertEqual(vmap_hi["provider"], "repository")
         self.assertEqual(len(vmap_hi["visual_scenes"]), 5)
 
-        plan = json.loads(SHARED_ASSET_PLAN_PATH.read_text(encoding="utf-8"))
+        plan = json.loads(self.shared_asset_plan_path.read_text(encoding="utf-8"))
         for i, sc in enumerate(vmap_hi["visual_scenes"]):
             expected_asset = plan["scenes"][i]["asset"]
             self.assertTrue(sc["image_file"].endswith(expected_asset.replace("\\", "/")))
@@ -106,10 +137,8 @@ class TestMultilingualVideoRendering(unittest.TestCase):
 
     def test_no_online_fallback_in_visual_map(self):
         """All visual scenes must come from repository source, never online."""
-        if not SHARED_ASSET_PLAN_PATH.exists():
-            self.skipTest("Shared asset plan not available in CI environment")
         amap_te = _make_mock_audio_map("te-IN", [8, 8, 9, 6, 10])
-        vmap_te = create_visual_map_from_asset_plan(SHARED_ASSET_PLAN_PATH, amap_te)
+        vmap_te = create_visual_map_from_asset_plan(self.shared_asset_plan_path, amap_te)
 
         for sc in vmap_te["visual_scenes"]:
             self.assertEqual(sc["source"], "repository")
@@ -121,15 +150,13 @@ class TestMultilingualVideoRendering(unittest.TestCase):
 
     def test_language_timing_adaptation(self):
         """Scene durations in visual_map stretch/trim according to each language's narration audio."""
-        if not SHARED_ASSET_PLAN_PATH.exists():
-            self.skipTest("Shared asset plan not available in CI environment")
         amap_hi = _make_mock_audio_map("hi-IN", [10, 9, 9, 9, 10])
         amap_te = _make_mock_audio_map("te-IN", [8, 8, 9, 6, 10])
         amap_ta = _make_mock_audio_map("ta-IN", [9, 7, 8, 8, 10])
 
-        vmap_hi = create_visual_map_from_asset_plan(SHARED_ASSET_PLAN_PATH, amap_hi)
-        vmap_te = create_visual_map_from_asset_plan(SHARED_ASSET_PLAN_PATH, amap_te)
-        vmap_ta = create_visual_map_from_asset_plan(SHARED_ASSET_PLAN_PATH, amap_ta)
+        vmap_hi = create_visual_map_from_asset_plan(self.shared_asset_plan_path, amap_hi)
+        vmap_te = create_visual_map_from_asset_plan(self.shared_asset_plan_path, amap_te)
+        vmap_ta = create_visual_map_from_asset_plan(self.shared_asset_plan_path, amap_ta)
 
         self.assertEqual(
             vmap_hi["visual_scenes"][0]["image_file"],
@@ -219,7 +246,7 @@ class TestMultilingualVideoRendering(unittest.TestCase):
         vmap = render_multilingual_video(
             language_code="hi-IN",
             audio_map_path=amap_file,
-            asset_plan_path=SHARED_ASSET_PLAN_PATH,
+            asset_plan_path=self.shared_asset_plan_path,
             output_video_path=out_video,
             composer_type="mock",
             resolution="1080x1920",
