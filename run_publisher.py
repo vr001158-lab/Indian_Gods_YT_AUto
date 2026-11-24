@@ -75,7 +75,10 @@ def main() -> int:
     _print_banner()
 
     # ── Step -1: Immediate Render-Only Fail-Closed Safety Gate ───────────────
-    if os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+    # ── Step -1: Dry-run is always safe, even if render-only is inherited ───
+    if args.dry_run:
+        pass
+    elif os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
         print("\n[BLOCKED] Publisher execution rejected: Pipeline is in RENDER_ONLY mode.", file=sys.stderr)
         print("  Live publishing and YouTube upload operations are strictly forbidden in render-only mode.", file=sys.stderr)
         print("APPROVED FOR PUBLISHING: NO", file=sys.stderr)
