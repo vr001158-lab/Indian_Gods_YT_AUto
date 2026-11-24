@@ -425,7 +425,9 @@ class PipelineRunner:
 
     def run_publisher(self) -> Path:
         """Executes the PUBLISHER stage (or dry-run)."""
-        if self.render_only or os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+        if self.dry_run:
+            PipelineLogger.info("Dry-run publisher validation enabled; live upload is disabled.")
+        elif self.render_only or os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
             err = "CRITICAL SAFETY VIOLATION: run_publisher() invoked in render-only mode! Upload and live publishing are strictly forbidden."
             PipelineLogger.error(err)
             raise RuntimeError(err)
