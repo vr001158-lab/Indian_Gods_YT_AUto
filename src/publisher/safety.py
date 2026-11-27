@@ -63,6 +63,8 @@ def validate_production_environment(
         return True, ""
 
     # 1. RENDER_ONLY check: RENDER_ONLY=true strictly forbids publishing
+
+
     if os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
         return False, "Production upload blocked: RENDER_ONLY mode is active. Live publishing is strictly forbidden."
 
