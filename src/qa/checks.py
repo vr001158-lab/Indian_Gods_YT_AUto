@@ -10,7 +10,9 @@
 from __future__ import annotations
 
 import json
+import math
 import subprocess
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +34,7 @@ PRODUCTION_SOURCES = {"youtube_api", "cached_youtube_api"}
 REJECTED_SOURCES   = {"mock", "offline"}
 # Kept for backwards-compat; callers that used ALLOWED_RESOLUTIONS directly still work.
 ALLOWED_RESOLUTIONS = ALL_ALLOWED_RESOLUTIONS
+AUDIO_DURATION_SHORTFALL_TOLERANCE_SECONDS = 0.25
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -335,6 +338,165 @@ def check_audio_map(audio_map: dict) -> tuple[bool, str]:
     return True, "OK"
 
 
+def _positive_duration(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        duration = float(value)
+    except (TypeError, ValueError):
+        return None
+    return duration if math.isfinite(duration) and duration > 0 else None
+
+
+def _stream_duration_seconds(stream: dict) -> float | None:
+    duration = _positive_duration(stream.get("duration"))
+    if duration is not None:
+        return duration
+
+    try:
+        duration_ts = float(stream["duration_ts"])
+        time_base = float(Fraction(str(stream["time_base"])))
+        duration = duration_ts * time_base
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        duration = None
+    if duration is not None and math.isfinite(duration) and duration > 0:
+        return duration
+
+    tags = stream.get("tags")
+    if isinstance(tags, dict):
+        for key in ("DURATION", "DURATION-eng", "duration"):
+            tag_val = tags.get(key)
+            if isinstance(tag_val, str) and ":" in tag_val:
+                parts = tag_val.split(":")
+                if len(parts) == 3:
+                    try:
+                        parsed = float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+                        if math.isfinite(parsed) and parsed > 0:
+                            return parsed
+                    except ValueError:
+                        pass
+    return None
+
+
+def _probe_scene_audio_duration(audio_file: Path) -> tuple[float | None, str | None]:
+    try:
+        if not audio_file.exists():
+            return None, f"audio file is missing: {audio_file}"
+        if not audio_file.is_file():
+            return None, f"audio path is not a file: {audio_file}"
+        if audio_file.stat().st_size == 0:
+            return None, f"audio file is empty: {audio_file}"
+    except (OSError, ValueError) as exc:
+        return None, f"audio file access error: {exc}"
+
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe", "-v", "error",
+                "-show_streams", "-show_format",
+                "-of", "json",
+                str(audio_file),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            encoding="utf-8",
+            errors="replace",
+        )
+    except FileNotFoundError:
+        return None, "ffprobe binary not found"
+    except Exception as exc:
+        return None, f"ffprobe error: {exc}"
+
+    if result.returncode != 0:
+        return None, f"ffprobe failed (exit {result.returncode}): {result.stderr[:200]}"
+
+    try:
+        probe = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        return None, f"ffprobe returned unparseable JSON: {exc}"
+    if not isinstance(probe, dict):
+        return None, "ffprobe returned malformed JSON (expected an object)"
+
+    streams = probe.get("streams")
+    if not isinstance(streams, list):
+        return None, "ffprobe returned malformed streams data"
+    audio_streams = [
+        stream for stream in streams
+        if isinstance(stream, dict) and stream.get("codec_type") == "audio"
+    ]
+    if not audio_streams:
+        return None, "ffprobe found no audio stream"
+
+    duration = _stream_duration_seconds(audio_streams[0])
+    if duration is None:
+        format_info = probe.get("format")
+        if isinstance(format_info, dict):
+            duration = _positive_duration(format_info.get("duration"))
+    if duration is None:
+        return None, "ffprobe did not report a positive audio duration"
+    return duration, None
+
+
+def check_audio_stream_duration(
+    video_validation: dict,
+    audio_map: dict,
+) -> tuple[bool, str]:
+    """
+    Ensure the rendered audio retains the duration of its per-scene audio inputs.
+
+    The concat filter can add silence to match scene slots, so longer output audio
+    is allowed. A shortfall greater than 0.25 seconds fails; this accommodates
+    AAC frame/MP4 timestamp rounding while still catching material truncation.
+    The standalone full-narration file is intentionally not used.
+    """
+    if not isinstance(video_validation, dict):
+        return False, "Rendered video validation data is missing or malformed"
+    actual_duration = _positive_duration(video_validation.get("audio_duration_seconds"))
+    if actual_duration is None:
+        return False, "Rendered video has no valid audio-stream duration"
+
+    if not isinstance(audio_map, dict):
+        return False, "Audio map is missing or malformed"
+    scenes = audio_map.get("audio_scenes")
+    if not isinstance(scenes, list) or not scenes:
+        return False, "audio_scenes is empty or malformed"
+
+    expected_duration = 0.0
+    for index, scene in enumerate(scenes, start=1):
+        if not isinstance(scene, dict):
+            return False, f"Scene {index} audio entry is malformed"
+        scene_id = scene.get("scene", index)
+        audio_path = scene.get("audio_file")
+        if audio_path is None:
+            return False, f"Scene {scene_id} is missing audio_file"
+        if not isinstance(audio_path, str):
+            return False, f"Scene {scene_id} has invalid audio path: expected string, got {type(audio_path).__name__}"
+        if not audio_path.strip():
+            return False, f"Scene {scene_id} is missing audio_file"
+        if "\x00" in audio_path:
+            return False, f"Scene {scene_id} has invalid audio path: embedded null byte"
+
+        try:
+            path_obj = Path(audio_path)
+        except (TypeError, ValueError) as exc:
+            return False, f"Scene {scene_id} has invalid audio path: {exc}"
+
+        duration, error = _probe_scene_audio_duration(path_obj)
+        if error is not None:
+            return False, f"Scene {scene_id} {error}"
+        expected_duration += duration
+
+    difference = actual_duration - expected_duration
+    detail = (
+        f"expected {expected_duration:.3f}s from {len(scenes)} scene audio files; "
+        f"actual {actual_duration:.3f}s; difference {difference:+.3f}s "
+        f"(shortfall tolerance {AUDIO_DURATION_SHORTFALL_TOLERANCE_SECONDS:.2f}s; "
+        "longer audio allowed for concat padding)"
+    )
+    return difference >= -AUDIO_DURATION_SHORTFALL_TOLERANCE_SECONDS, detail
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. Visual QA
 # ─────────────────────────────────────────────────────────────────────────────
@@ -489,6 +651,7 @@ def check_video_with_ffprobe(
         "height": 0,
         "audio_codec": "",
         "audio_channels": 0,
+        "audio_duration_seconds": 0.0,
         "ffprobe_passed": False,
         "ffmpeg_decode_passed": False
     }
@@ -550,10 +713,16 @@ def check_video_with_ffprobe(
     except Exception as exc:
         return False, f"ffprobe error: {exc}", vval
 
+    if not isinstance(probe, dict):
+        return False, "ffprobe returned malformed JSON (expected an object)", vval
     fmt = probe.get("format", {})
+    if not isinstance(fmt, dict):
+        return False, "ffprobe returned malformed format data", vval
     vval["container"] = fmt.get("format_name", "")
 
     streams = probe.get("streams", [])
+    if not isinstance(streams, list):
+        return False, "ffprobe returned malformed streams data", vval
     video_streams = [s for s in streams if s.get("codec_type") == "video"]
     audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
 
@@ -576,6 +745,10 @@ def check_video_with_ffprobe(
     as_info = audio_streams[0]
     vval["audio_codec"] = as_info.get("codec_name", "")
     vval["audio_channels"] = as_info.get("channels", 0)
+    audio_duration = _stream_duration_seconds(as_info)
+    if audio_duration is None:
+        return False, "Audio stream duration is missing or invalid in ffprobe output", vval
+    vval["audio_duration_seconds"] = audio_duration
 
     if codec != "h264":
         return False, f"Invalid video codec: expected h264, got '{codec}'", vval
@@ -588,11 +761,11 @@ def check_video_with_ffprobe(
     if not ok_res:
         return False, res_err, vval
 
-    duration = float(fmt.get("duration", 0) or 0)
-    if duration <= 0:
-        duration = float(vs.get("duration", 0) or 0)
-    if duration <= 0:
-        return False, f"Video duration is not positive: {duration}", vval
+    duration = _positive_duration(fmt.get("duration"))
+    if duration is None:
+        duration = _stream_duration_seconds(vs)
+    if duration is None:
+        return False, "Video duration is missing or invalid in ffprobe output", vval
 
     ok_dur, dur_err = validate_duration_for_content_type(duration, content_type)
     if not ok_dur:

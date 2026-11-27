@@ -91,7 +91,10 @@ class PipelineRunner:
             files = [p for p in files if p.stat().st_mtime >= min_mtime]
         if not files:
             raise FileNotFoundError(f"No files matching {pattern} created since stage start found in {directory}")
-        return files[-1]
+        path = Path(files[-1])
+        if not path.is_file():
+            raise ValueError(f"Expected a valid file, got: {path}")
+        return path
 
     def run_research(self) -> Path:
         """Executes the RESEARCH stage."""
@@ -121,7 +124,7 @@ class PipelineRunner:
         self.state.save()
 
         research_file = self.state.get_output("research_output")
-        if not research_file or not Path(research_file).exists():
+        if not research_file or not Path(research_file).is_file():
             raise ValueError(f"Missing or invalid research input file: {research_file}")
 
         start_time = time.time()
@@ -156,7 +159,7 @@ class PipelineRunner:
         self.state.save()
 
         decision_file = self.state.get_output("decision_output")
-        if not decision_file or not Path(decision_file).exists():
+        if not decision_file or not Path(decision_file).is_file():
             raise ValueError(f"Missing or invalid decision input file: {decision_file}")
 
         start_time = time.time()
@@ -182,7 +185,7 @@ class PipelineRunner:
         self.state.save()
 
         brief_file = self.state.get_output("content_brief_output")
-        if not brief_file or not Path(brief_file).exists():
+        if not brief_file or not Path(brief_file).is_file():
             raise ValueError(f"Missing or invalid brief input file: {brief_file}")
 
         start_time = time.time()
@@ -208,7 +211,7 @@ class PipelineRunner:
         self.state.save()
 
         script_file = self.state.get_output("script_output")
-        if not script_file or not Path(script_file).exists():
+        if not script_file or not Path(script_file).is_file():
             raise ValueError(f"Missing or invalid script input file: {script_file}")
 
         # ── Pre-Voice QA Verification Gate ────────────────────────────────────
@@ -263,7 +266,7 @@ class PipelineRunner:
         self.state.save()
 
         script_file = self.state.get_output("script_output")
-        if not script_file or not Path(script_file).exists():
+        if not script_file or not Path(script_file).is_file():
             raise ValueError(f"Missing or invalid script input file: {script_file}")
 
         start_time = time.time()
@@ -293,9 +296,9 @@ class PipelineRunner:
 
         audio_file = self.state.get_output("audio_map_output")
         visual_file = self.state.get_output("visual_map_output")
-        if not audio_file or not Path(audio_file).exists():
+        if not audio_file or not Path(audio_file).is_file():
             raise ValueError(f"Missing or invalid audio map input file: {audio_file}")
-        if not visual_file or not Path(visual_file).exists():
+        if not visual_file or not Path(visual_file).is_file():
             raise ValueError(f"Missing or invalid visual map input file: {visual_file}")
 
         start_time = time.time()
@@ -335,7 +338,7 @@ class PipelineRunner:
         self.state.save()
 
         decision_file = self.state.get_output("decision_output")
-        if not decision_file or not Path(decision_file).exists():
+        if not decision_file or not Path(decision_file).is_file():
             raise ValueError(f"Missing or invalid decision input file: {decision_file}")
 
         start_time = time.time()
@@ -443,7 +446,7 @@ class PipelineRunner:
         self.state.save()
 
         qa_file = self.state.get_output("qa_output")
-        if not qa_file or not Path(qa_file).exists():
+        if not qa_file or not Path(qa_file).is_file():
             raise ValueError(f"Missing QA input file: {qa_file}")
 
         cmd = [sys.executable, "run_publisher.py", "--qa", str(qa_file)]
@@ -485,6 +488,8 @@ class PipelineRunner:
             if value is None or not str(value).strip():
                 return None
             source = Path(value)
+            if source == Path(".") or str(source).strip() in (".", "./", ".\\"):
+                return None
             return source if source.is_file() else None
 
         # Source paths from pipeline state
@@ -618,7 +623,10 @@ class PipelineRunner:
             self.state.save()
             raise ValueError(err_msg)
 
+        output_dir = render_dir
+        output_path = Path(output_dir) / "publishing_package.zip"
         self.state.set_output("render_only_dir", render_dir)
+        self.state.set_output("render_only_package", output_path)
         self.state.set_output("render_only_summary", summary_file)
         self.state.update_stage(stage, "COMPLETED")
         self.state.save()

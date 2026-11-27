@@ -537,6 +537,9 @@ class TestPublisherMetadata(unittest.TestCase):
                 + os.pathsep
                 + str(Path(__file__).parent.parent)
             )
+            env["RENDER_ONLY"] = "true"
+            env["YOUTUBE_PUBLISH"] = "false"
+            env["YOUTUBE_PUBLISH_AUTHORIZED"] = "false"
             proc = subprocess.run(
                 [
                     sys.executable, str(cli),
@@ -555,6 +558,8 @@ class TestPublisherMetadata(unittest.TestCase):
             self.assertIn("YOUTUBE PUBLISHER", output)
             self.assertIn("DRY RUN", output)
             self.assertEqual(proc.returncode, 0, msg=output)
+            manifests = list((tmp / "publishing").glob("publish_*.json"))
+            self.assertEqual(len(manifests), 0)
 
 
 if __name__ == "__main__":

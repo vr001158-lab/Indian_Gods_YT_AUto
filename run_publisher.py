@@ -74,22 +74,6 @@ def main() -> int:
 
     _print_banner()
 
-    # ── Step -1: Immediate Render-Only Fail-Closed Safety Gate ───────────────
-    if not args.dry_run and os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
-        print("\n[BLOCKED] Publisher execution rejected: Pipeline is in RENDER_ONLY mode.", file=sys.stderr)
-        print("  Live publishing and YouTube upload operations are strictly forbidden in render-only mode.", file=sys.stderr)
-        print("APPROVED FOR PUBLISHING: NO", file=sys.stderr)
-        return 1
-
-    # ── Step 0: Validate Production Environment & Authorization ─────────────
-    is_env_ok, env_err = validate_production_environment(allow_dry_run=args.dry_run)
-    if not is_env_ok:
-        print(f"\n[BLOCKED] Publisher production safety gate rejected:", file=sys.stderr)
-        print(f"  {env_err}", file=sys.stderr)
-        print(file=sys.stderr)
-        print("APPROVED FOR PUBLISHING: NO", file=sys.stderr)
-        return 1
-
     # ── Step 1: Load and validate QA result ──────────────────────────────────
     print(f"QA file  : {args.qa}")
     try:
@@ -142,6 +126,22 @@ def main() -> int:
         print("All inputs validated successfully.")
         print("Remove --dry-run when authorized to upload.")
         return 0
+
+    # ── Step -1: Immediate Render-Only Fail-Closed Safety Gate ───────────────
+    if os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
+        print("\n[BLOCKED] Publisher execution rejected: Pipeline is in RENDER_ONLY mode.", file=sys.stderr)
+        print("  Live publishing and YouTube upload operations are strictly forbidden in render-only mode.", file=sys.stderr)
+        print("APPROVED FOR PUBLISHING: NO", file=sys.stderr)
+        return 1
+
+    # ── Step 0: Validate Production Environment & Authorization ─────────────
+    is_env_ok, env_err = validate_production_environment(allow_dry_run=False)
+    if not is_env_ok:
+        print(f"\n[BLOCKED] Publisher production safety gate rejected:", file=sys.stderr)
+        print(f"  {env_err}", file=sys.stderr)
+        print(file=sys.stderr)
+        print("APPROVED FOR PUBLISHING: NO", file=sys.stderr)
+        return 1
 
     # ── Step 3: Load credentials ──────────────────────────────────────────────
     # Credentials are loaded but NEVER printed, logged, or stored in manifests.

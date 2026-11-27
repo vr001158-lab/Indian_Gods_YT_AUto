@@ -19,6 +19,7 @@ from src.video.format_config import DEFAULT_CONTENT_TYPE, get_format_config, val
 from .artifacts import PipelineArtifacts, discover_artifacts
 from .checks import (
     check_audio_map,
+    check_audio_stream_duration,
     check_decision_approval,
     check_deity_identity_consistency,
     check_format_consistency,
@@ -270,6 +271,16 @@ class FinalQAGate:
         )
         result.record("video_ffprobe", ok, detail)
         result.video_validation = vval
+
+        if self._allow_mock and vval.get("container") == "mock":
+            result.record(
+                "audio_duration",
+                True,
+                "Skipped for mock video; audio-stream duration is checked in non-mock QA.",
+            )
+        else:
+            ok, detail = check_audio_stream_duration(vval, arts.audio_map)
+            result.record("audio_duration", ok, detail)
 
         # ── Step 9: Thumbnail QA ──────────────────────────────────────────
         ok, detail = check_thumbnail_meta(arts.thumbnail_meta, arts.thumbnail_file)
