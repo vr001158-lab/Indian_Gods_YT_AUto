@@ -38,15 +38,21 @@ on:
         default: true
         type: boolean
       execution_mode:
-        description: 'Execution Mode (render_only: real media render without publishing | dry_run: offline mock validation)'
-        required: false
+        description: 'Execution Mode (render_only: real media render without publishing | dry_run: offline mock validation | publish: live YouTube upload [requires confirmation])'
+        required: true
         default: 'render_only'
         type: choice
         options:
           - render_only
           - dry_run
+          - publish
+      publish_confirmation:
+        description: 'Publish Authorization Confirmation: Type "CONFIRM_PUBLISH" to authorize live YouTube upload when execution_mode is publish'
+        required: false
+        default: ''
+        type: string
       privacy_status:
-        description: 'YouTube Privacy Status (private by default)'
+        description: 'YouTube Privacy Status (private by default, strictly enforced)'
         required: true
         default: 'private'
         type: choice
@@ -157,6 +163,8 @@ jobs:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+          YOUTUBE_PUBLISH_OPT_IN_SECRET: ${{ secrets.YOUTUBE_PUBLISH_OPT_IN }}
+          PUBLISH_CONFIRMATION_INPUT: ${{ inputs.publish_confirmation }}
           LANGUAGE_CODE_INPUT: ${{ inputs.language_code }}
           CONTENT_TYPE_INPUT: ${{ inputs.content_type }}
           FORMAT_INPUT: ${{ inputs.format }}
@@ -173,7 +181,7 @@ jobs:
 
           if [ "${{ github.event_name }}" = "schedule" ]; then
             echo "⏰ [SCHEDULED RUN] Executing automated schedule strictly in RENDER-ONLY mode."
-            echo "🔒 Scheduled runs CANNOT authorize or execute YouTube publishing."
+            echo "🔒 Scheduled runs are permanently forbidden from authorizing or executing YouTube publishing."
             CT="short"
             case "$SCHEDULE_CRON" in
               "0 6 */3 * *") CT="long" ;;
@@ -189,6 +197,8 @@ jobs:
             CT="${CONTENT_TYPE_INPUT:-short}"
             FMT="narrated"
             LANG="te-IN"
+            PRIVACY="${PRIVACY_STATUS_INPUT:-private}"
+            export YOUTUBE_PRIVACY_STATUS="$PRIVACY"
 
             if [ "$EXEC_MODE" = "render_only" ]; then
               echo "🎬 [RENDER ONLY] Real media render mode selected. Enforcing strict publishing safety policy..."
@@ -197,7 +207,8 @@ jobs:
               export YOUTUBE_PUBLISH_AUTHORIZED="false"
               echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG --render-only"
               python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT" --render-only
-            else
+
+            elif [ "$EXEC_MODE" = "dry_run" ]; then
               # dry_run mode (mock/offline validation)
               echo "🔬 [DRY RUN] Offline mock validation mode selected. Live publishing disabled."
               export RENDER_ONLY="false"
@@ -205,6 +216,44 @@ jobs:
               export YOUTUBE_PUBLISH_AUTHORIZED="false"
               echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG --dry-run"
               python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT" --dry-run
+
+            elif [ "$EXEC_MODE" = "publish" ]; then
+              echo "🔒 [PUBLISH GATE EVALUATION] Validating dual authorization and secret opt-in..."
+
+              # Gate 1: Explicit confirmation string
+              if [ "$PUBLISH_CONFIRMATION_INPUT" != "CONFIRM_PUBLISH" ]; then
+                echo "❌ [BLOCKED] Publish mode requires publish_confirmation='CONFIRM_PUBLISH'. Received: '$PUBLISH_CONFIRMATION_INPUT'"
+                echo "🔒 Live publishing aborted: authorization string mismatch."
+                exit 1
+              fi
+
+              # Gate 2: dry_run must be explicitly false
+              if [ "$DRY_RUN_INPUT" != "false" ]; then
+                echo "❌ [BLOCKED] Publish mode requires dry_run=false. Received: '$DRY_RUN_INPUT'"
+                echo "🔒 Live publishing aborted: dry_run mode remains enabled."
+                exit 1
+              fi
+
+              # Gate 3: Secret opt-in check (repository secret YOUTUBE_PUBLISH_OPT_IN must be affirmative)
+              OPT_IN_LOWER=$(echo "$YOUTUBE_PUBLISH_OPT_IN_SECRET" | tr '[:upper:]' '[:lower:]' | xargs)
+              if [ "$OPT_IN_LOWER" != "true" ] && [ "$OPT_IN_LOWER" != "1" ] && [ "$OPT_IN_LOWER" != "yes" ]; then
+                echo "❌ [BLOCKED] Publish mode requires secret YOUTUBE_PUBLISH_OPT_IN to be configured and affirmative ('true')."
+                echo "🔒 Live publishing aborted: secret opt-in verification failed."
+                exit 1
+              fi
+
+              echo "🚀 [AUTHORIZED PUBLISH] Dual authorization verified (Manual dispatch + CONFIRM_PUBLISH + Secret Opt-In)."
+              export RENDER_ONLY="false"
+              export YOUTUBE_PUBLISH="true"
+              export YOUTUBE_PUBLISH_AUTHORIZED="true"
+              export YOUTUBE_PUBLISH_OPT_IN="true"
+              export REQUIRE_PUBLISH_OPT_IN="true"
+              echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG privacy=$PRIVACY"
+              python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT"
+
+            else
+              echo "❌ [UNKNOWN EXECUTION MODE] Invalid execution mode: '$EXEC_MODE'. Must be 'render_only', 'dry_run', or 'publish'."
+              exit 1
             fi
           fi
 
@@ -222,4 +271,12 @@ jobs:
         with:
           name: divine-dharshanam-render-only-${{ github.run_id }}
           path: data/render_only/
+          if-no-files-found: ignore
+
+      - name: Archive Publishing Manifest Artifacts
+        if: always() && inputs.execution_mode == 'publish'
+        uses: actions/upload-artifact@v4
+        with:
+          name: divine-dharshanam-publishing-manifest-${{ github.run_id }}
+          path: data/publishing/
           if-no-files-found: ignore
