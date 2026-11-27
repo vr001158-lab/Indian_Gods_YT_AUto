@@ -66,6 +66,8 @@ class PipelineRunner:
                 encoding="utf-8",
                 check=True
             )
+            if result.stdout and result.stdout.strip():
+                print(result.stdout.strip())
             return result.stdout
         except subprocess.CalledProcessError as e:
             err_output = []
