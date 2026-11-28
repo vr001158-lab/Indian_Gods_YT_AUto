@@ -561,6 +561,18 @@ class TestPublishingSecurityGates(unittest.TestCase):
         # Scheduled run uses --render-only
         self.assertIn("--render-only", text)
 
+    # ── Test 23: Workflow scheduled publishing configuration ─────────────────
+    def test_23_workflow_scheduled_publishing_configuration(self):
+        """Workflow supports safe optional scheduled publishing via ENABLE_SCHEDULED_PUBLISH."""
+        workflow_path = Path(".github/workflows/divine-dharshanam-daily.yml")
+        text = workflow_path.read_text(encoding="utf-8")
+
+        self.assertIn("ENABLE_SCHEDULED_PUBLISH_SECRET", text)
+        self.assertIn("ENABLE_SCHEDULED_PUBLISH_VAR", text)
+        self.assertIn("SCHEDULED_PRIVACY_STATUS_SECRET", text)
+        self.assertIn("Hands-free scheduled publishing ENABLED", text)
+        self.assertIn("Executing automated schedule safely in RENDER-ONLY mode", text)
+
 
 if __name__ == "__main__":
     unittest.main()

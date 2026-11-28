@@ -164,6 +164,10 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
           YOUTUBE_PUBLISH_OPT_IN_SECRET: ${{ secrets.YOUTUBE_PUBLISH_OPT_IN }}
+          ENABLE_SCHEDULED_PUBLISH_SECRET: ${{ secrets.ENABLE_SCHEDULED_PUBLISH }}
+          ENABLE_SCHEDULED_PUBLISH_VAR: ${{ vars.ENABLE_SCHEDULED_PUBLISH }}
+          SCHEDULED_PRIVACY_STATUS_SECRET: ${{ secrets.SCHEDULED_PRIVACY_STATUS }}
+          SCHEDULED_PRIVACY_STATUS_VAR: ${{ vars.SCHEDULED_PRIVACY_STATUS }}
           PUBLISH_CONFIRMATION_INPUT: ${{ inputs.publish_confirmation }}
           LANGUAGE_CODE_INPUT: ${{ inputs.language_code }}
           CONTENT_TYPE_INPUT: ${{ inputs.content_type }}
@@ -180,8 +184,6 @@ jobs:
           export YOUTUBE_PRIVACY_STATUS="private"
 
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "⏰ [SCHEDULED RUN] Executing automated schedule strictly in RENDER-ONLY mode."
-            echo "🔒 Scheduled runs are permanently forbidden from authorizing or executing YouTube publishing."
             CT="short"
             case "$SCHEDULE_CRON" in
               "0 6 */3 * *") CT="long" ;;
@@ -189,8 +191,31 @@ jobs:
             esac
             FMT="narrated"
             LANG="te-IN"
-            echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG --render-only"
-            python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT" --render-only
+
+            # Evaluate hands-free scheduled publishing authorization
+            SCHEDULED_PUB="${ENABLE_SCHEDULED_PUBLISH_SECRET:-${ENABLE_SCHEDULED_PUBLISH_VAR:-false}}"
+            SCHEDULED_PUB_LOWER=$(echo "$SCHEDULED_PUB" | tr '[:upper:]' '[:lower:]' | xargs)
+            OPT_IN_LOWER=$(echo "$YOUTUBE_PUBLISH_OPT_IN_SECRET" | tr '[:upper:]' '[:lower:]' | xargs)
+
+            if { [ "$SCHEDULED_PUB_LOWER" = "true" ] || [ "$SCHEDULED_PUB_LOWER" = "1" ] || [ "$SCHEDULED_PUB_LOWER" = "yes" ]; } && \
+               { [ "$OPT_IN_LOWER" = "true" ] || [ "$OPT_IN_LOWER" = "1" ] || [ "$OPT_IN_LOWER" = "yes" ]; }; then
+              PRIVACY="${SCHEDULED_PRIVACY_STATUS_SECRET:-${SCHEDULED_PRIVACY_STATUS_VAR:-public}}"
+              echo "⏰ [SCHEDULED RUN] Hands-free scheduled publishing ENABLED."
+              echo "🚀 Authorized schedule run: ENABLE_SCHEDULED_PUBLISH=true & YOUTUBE_PUBLISH_OPT_IN=true (Privacy: $PRIVACY)"
+              export RENDER_ONLY="false"
+              export YOUTUBE_PUBLISH="true"
+              export YOUTUBE_PUBLISH_AUTHORIZED="true"
+              export YOUTUBE_PUBLISH_OPT_IN="true"
+              export REQUIRE_PUBLISH_OPT_IN="true"
+              export YOUTUBE_PRIVACY_STATUS="$PRIVACY"
+              echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG privacy=$PRIVACY"
+              python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT"
+            else
+              echo "⏰ [SCHEDULED RUN] Executing automated schedule safely in RENDER-ONLY mode."
+              echo "ℹ️  To enable automatic scheduled publishing without manual review, set repository secret or variable ENABLE_SCHEDULED_PUBLISH='true'."
+              echo "🚀 Executing Telugu pipeline with content-type=$CT format=$FMT language=$LANG --render-only"
+              python run_pipeline.py --language "$LANG" --content-type "$CT" --format "$FMT" --render-only
+            fi
           else
             # workflow_dispatch execution
             EXEC_MODE="${EXECUTION_MODE_INPUT:-render_only}"
