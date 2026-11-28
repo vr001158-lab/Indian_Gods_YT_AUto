@@ -46,10 +46,10 @@ def validate_production_environment(
 
     Fail-closed rules:
     1. If allow_dry_run is True, dry-run mode is fully authorized (never uploads).
-    2. In production mode (allow_dry_run=False), explicit production authorization
-       is mandatory via YOUTUBE_PUBLISH_AUTHORIZED, YOUTUBE_PUBLISH, or
-       PRODUCTION_PUBLISH_AUTHORIZED set to a truthy value ('true', '1', 'yes').
-       Missing, empty, or other values fail closed.
+    2. Production mode requires RENDER_ONLY to be false and both
+       YOUTUBE_PUBLISH and YOUTUBE_PUBLISH_AUTHORIZED to be explicitly
+       affirmative ('true', '1', or 'yes'). Legacy authorization aliases are
+       not accepted.
     3. Production mode requires non-empty OAuth credentials:
        Either TOKEN_JSON environment variable containing valid JSON,
        or an existing non-empty token.json file containing valid JSON.
@@ -59,14 +59,14 @@ def validate_production_environment(
         (is_valid: bool, error_message: str)
     """
     import os
+    if allow_dry_run:
+        return True, ""
+
     # 1. RENDER_ONLY check: RENDER_ONLY=true strictly forbids publishing
 
 
     if os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
         return False, "Production upload blocked: RENDER_ONLY mode is active. Live publishing is strictly forbidden."
-
-    if allow_dry_run:
-        return True, ""
 
     # 2. YOUTUBE_PUBLISH check: must be explicitly affirmative ('true', '1', 'yes')
     yt_pub = os.environ.get("YOUTUBE_PUBLISH", "").strip().lower()
@@ -96,6 +96,24 @@ def validate_production_environment(
             f"Production upload blocked: Production authorization is disabled or invalid ('{auth_val}'). "
             "Must be explicitly 'true', '1', or 'yes'."
         )
+
+    # 4. YOUTUBE_PUBLISH_OPT_IN check:
+    # If REQUIRE_PUBLISH_OPT_IN is affirmative, secret opt-in (YOUTUBE_PUBLISH_OPT_IN) is strictly required.
+    # When present, YOUTUBE_PUBLISH_OPT_IN must be explicitly affirmative ('true', '1', or 'yes').
+    require_opt_in = os.environ.get("REQUIRE_PUBLISH_OPT_IN", "").strip().lower() in ("true", "1", "yes")
+    opt_in = os.environ.get("YOUTUBE_PUBLISH_OPT_IN")
+    if require_opt_in and not opt_in:
+        return False, (
+            "Production upload blocked: Secret opt-in (YOUTUBE_PUBLISH_OPT_IN) is required but missing or empty. "
+            "Set repository secret YOUTUBE_PUBLISH_OPT_IN='true' to authorize publishing."
+        )
+    if opt_in is not None:
+        opt_in_val = opt_in.strip().lower()
+        if opt_in_val not in ("true", "1", "yes"):
+            return False, (
+                f"Production upload blocked: Secret opt-in (YOUTUBE_PUBLISH_OPT_IN) is disabled or invalid ('{opt_in_val}'). "
+                "Must be explicitly 'true', '1', or 'yes'."
+            )
 
     # Validate presence and basic structure of credentials
     token_env = os.environ.get("TOKEN_JSON", "").strip()

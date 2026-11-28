@@ -3,7 +3,7 @@
 #
 # Validates:
 #   - Metadata completeness (title, description, hashtags, tags, category, language)
-#   - Public publishing enforcement (REQUIRED_PRIVACY == "public")
+#   - Private-by-default publishing enforcement (REQUIRED_PRIVACY == "private")
 #   - Safety gate validation of video QA & provenance
 #   - Non-fatal thumbnail handling & 403 handling rationale
 #   - Credentials safety & no leak in manifests
@@ -62,9 +62,9 @@ class TestPhase7PublishingReadiness(unittest.TestCase):
         self.assertIn("#IndianMythology", meta["description"])
         self.assertEqual(meta["category_id"], "27")
 
-    # 2. Public publishing enforced
-    def test_02_public_publishing_enforced(self):
-        self.assertEqual(REQUIRED_PRIVACY, "public")
+    # 2. Private publishing is the production default
+    def test_02_private_publishing_default(self):
+        self.assertEqual(REQUIRED_PRIVACY, "private")
 
     # 3. No CLI override of privacy setting
     def test_03_no_privacy_override_cli(self):

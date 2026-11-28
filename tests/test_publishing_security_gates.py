@@ -307,14 +307,17 @@ class TestPublishingSecurityGates(unittest.TestCase):
                 self.assertNotIn("YOUTUBE_PUBLISH_AUTHORIZED='true'", line)
 
     # ── Test 10: Manual workflow dispatch with dry_run=false cannot publish ───
-    def test_10_manual_dispatch_with_dry_run_false_cannot_publish(self):
-        """Workflow dispatch must NOT synthesize YOUTUBE_PUBLISH_AUTHORIZED=true merely on dry_run=false."""
+    def test_10_manual_dispatch_with_dry_run_false_alone_cannot_publish(self):
+        """Workflow dispatch must NOT synthesize authorization merely on dry_run=false."""
         workflow_path = Path(".github/workflows/divine-dharshanam-daily.yml")
         workflow_text = workflow_path.read_text(encoding="utf-8")
 
-        # Must not contain the vulnerable snippet: [ "$DRY_RUN_INPUT" = "false" ] -> export YOUTUBE_PUBLISH_AUTHORIZED="true"
-        self.assertNotIn('export YOUTUBE_PUBLISH_AUTHORIZED="true"', workflow_text)
-        self.assertNotIn("export YOUTUBE_PUBLISH_AUTHORIZED='true'", workflow_text)
+        # Must not contain unguarded dry_run=false authorization
+        self.assertNotIn('[ "$DRY_RUN_INPUT" = "false" ] && export YOUTUBE_PUBLISH_AUTHORIZED', workflow_text)
+        self.assertNotIn('if [ "$DRY_RUN_INPUT" = "false" ]; then\n              export YOUTUBE_PUBLISH_AUTHORIZED="true"', workflow_text)
+        # Must require CONFIRM_PUBLISH and secret opt-in
+        self.assertIn('CONFIRM_PUBLISH', workflow_text)
+        self.assertIn('YOUTUBE_PUBLISH_OPT_IN', workflow_text)
 
     # ── Test 11: No workflow contains unattended upload path ──────────────────
     def test_11_no_workflow_contains_unattended_upload_path(self):
@@ -451,6 +454,112 @@ class TestPublishingSecurityGates(unittest.TestCase):
 
                             mock_build.assert_not_called()
                             mock_youtube.thumbnails.return_value.set.assert_not_called()
+
+    def test_19_publish_video_denied_without_all_production_safeguards(self):
+        """Direct publishing rejects missing, false, or invalid authorization before upload."""
+        unauthorized_environments = [
+            {},
+            {"RENDER_ONLY": "false", "YOUTUBE_PUBLISH": "true"},
+            {"RENDER_ONLY": "false", "YOUTUBE_PUBLISH": "false", "YOUTUBE_PUBLISH_AUTHORIZED": "true"},
+            {"RENDER_ONLY": "false", "YOUTUBE_PUBLISH": "true", "YOUTUBE_PUBLISH_AUTHORIZED": "false"},
+            {"RENDER_ONLY": "false", "YOUTUBE_PUBLISH": "arbitrary", "YOUTUBE_PUBLISH_AUTHORIZED": "true"},
+            {"RENDER_ONLY": "true", "YOUTUBE_PUBLISH": "true", "YOUTUBE_PUBLISH_AUTHORIZED": "true"},
+        ]
+        from src.publisher.uploader import publish_video
+
+        for env_case in unauthorized_environments:
+            with self.subTest(env=env_case), \
+                 patch.dict(os.environ, env_case, clear=True), \
+                 patch("youtube_uploader.upload_to_youtube") as mock_upload:
+                with self.assertRaises(PublishError):
+                    publish_video(
+                        creds=MagicMock(),
+                        video_file=Path("missing.mp4"),
+                        title="Test",
+                        description="Test",
+                        tags=[],
+                        category_id="22",
+                        thumbnail_file=None,
+                        qa={},
+                    )
+                mock_upload.assert_not_called()
+
+    # ── Test 20: Secret opt-in required when configured ─────────────────────
+    def test_20_secret_opt_in_required_when_configured(self):
+        """When REQUIRE_PUBLISH_OPT_IN is true, missing or false opt-in blocks publishing."""
+        valid_token = json.dumps({
+            "token": "tok",
+            "refresh_token": "rt",
+            "client_id": "cid",
+            "client_secret": "sec",
+            "scopes": ["https://www.googleapis.com/auth/youtube.upload"],
+        })
+        # Case A: Missing opt-in when required
+        with patch.dict(os.environ, {
+            "RENDER_ONLY": "false",
+            "YOUTUBE_PUBLISH": "true",
+            "YOUTUBE_PUBLISH_AUTHORIZED": "true",
+            "REQUIRE_PUBLISH_OPT_IN": "true",
+            "TOKEN_JSON": valid_token,
+        }, clear=True):
+            is_ok, err = validate_production_environment(allow_dry_run=False)
+            self.assertFalse(is_ok)
+            self.assertIn("Secret opt-in (YOUTUBE_PUBLISH_OPT_IN) is required", err)
+
+        # Case B: False opt-in value
+        with patch.dict(os.environ, {
+            "RENDER_ONLY": "false",
+            "YOUTUBE_PUBLISH": "true",
+            "YOUTUBE_PUBLISH_AUTHORIZED": "true",
+            "YOUTUBE_PUBLISH_OPT_IN": "false",
+            "TOKEN_JSON": valid_token,
+        }, clear=True):
+            is_ok, err = validate_production_environment(allow_dry_run=False)
+            self.assertFalse(is_ok)
+            self.assertIn("Secret opt-in (YOUTUBE_PUBLISH_OPT_IN) is disabled or invalid", err)
+
+    # ── Test 21: Secret opt-in allows publishing when affirmative ───────────
+    def test_21_secret_opt_in_allows_publishing_when_affirmative(self):
+        """When YOUTUBE_PUBLISH_OPT_IN is 'true', publishing passes validation."""
+        valid_token = json.dumps({
+            "token": "tok",
+            "refresh_token": "rt",
+            "client_id": "cid",
+            "client_secret": "sec",
+            "scopes": ["https://www.googleapis.com/auth/youtube.upload"],
+        })
+        with patch.dict(os.environ, {
+            "RENDER_ONLY": "false",
+            "YOUTUBE_PUBLISH": "true",
+            "YOUTUBE_PUBLISH_AUTHORIZED": "true",
+            "REQUIRE_PUBLISH_OPT_IN": "true",
+            "YOUTUBE_PUBLISH_OPT_IN": "true",
+            "TOKEN_JSON": valid_token,
+        }, clear=True):
+            is_ok, err = validate_production_environment(allow_dry_run=False)
+            self.assertTrue(is_ok, msg=err)
+            self.assertEqual(err, "")
+
+    # ── Test 22: Workflow publish mode security invariants ──────────────────
+    def test_22_workflow_publish_mode_invariants(self):
+        """Workflow dispatch defaults to render_only, private privacy, and requires dual authorization."""
+        workflow_path = Path(".github/workflows/divine-dharshanam-daily.yml")
+        text = workflow_path.read_text(encoding="utf-8")
+
+        # Default execution_mode is render_only
+        self.assertIn("default: 'render_only'", text)
+        # Default privacy_status is private
+        self.assertIn("default: 'private'", text)
+        # Default dry_run is true
+        self.assertIn("default: true", text)
+        # publish option exists
+        self.assertIn("- publish", text)
+        # Requires CONFIRM_PUBLISH confirmation
+        self.assertIn("CONFIRM_PUBLISH", text)
+        # Secret opt-in check exists
+        self.assertIn("YOUTUBE_PUBLISH_OPT_IN_SECRET", text)
+        # Scheduled run uses --render-only
+        self.assertIn("--render-only", text)
 
 
 if __name__ == "__main__":

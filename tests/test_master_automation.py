@@ -513,7 +513,7 @@ class TestMasterAutomationSuite(unittest.TestCase):
         self.assertEqual(msg_dry, "")
 
         # In render-only mode without authorization, live publishing is strictly forbidden
-        with patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "false", "RENDER_ONLY": "true"}):
+        with patch.dict(os.environ, {"YOUTUBE_PUBLISH_AUTHORIZED": "false", "YOUTUBE_PUBLISH": "false", "RENDER_ONLY": "true"}):
             ok_prod, msg_prod = validate_production_environment(allow_dry_run=False)
             self.assertFalse(ok_prod)
             self.assertIn("strictly forbidden", msg_prod)

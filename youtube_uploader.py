@@ -15,7 +15,7 @@ def upload_to_youtube(
     title: str,
     description: str,
     tags: list,
-    privacy_status: str = "public",
+    privacy_status: str = "private",
     category_id: str = "22",  # "22" represents "People & Blogs"
     default_language: str | None = None,
     default_audio_language: str | None = None,
@@ -32,6 +32,13 @@ def upload_to_youtube(
         raise PermissionError("CRITICAL SAFETY BLOCK: YouTube API upload is blocked. YOUTUBE_PUBLISH must be explicitly 'true', '1', or 'yes'.")
     if os.environ.get("YOUTUBE_PUBLISH_AUTHORIZED", "").strip().lower() not in ("true", "1", "yes"):
         raise PermissionError("CRITICAL SAFETY BLOCK: YouTube API upload is blocked. YOUTUBE_PUBLISH_AUTHORIZED is not 'true'.")
+
+    require_opt_in = os.environ.get("REQUIRE_PUBLISH_OPT_IN", "").strip().lower() in ("true", "1", "yes")
+    opt_in = os.environ.get("YOUTUBE_PUBLISH_OPT_IN")
+    if require_opt_in and not opt_in:
+        raise PermissionError("CRITICAL SAFETY BLOCK: YouTube API upload is blocked. Secret opt-in (YOUTUBE_PUBLISH_OPT_IN) is required.")
+    if opt_in is not None and opt_in.strip().lower() not in ("true", "1", "yes"):
+        raise PermissionError("CRITICAL SAFETY BLOCK: YouTube API upload is blocked. Secret opt-in (YOUTUBE_PUBLISH_OPT_IN) is disabled or invalid.")
 
     if not video_path.exists():
         raise FileNotFoundError(f"❌ Video file not found: {video_path}")

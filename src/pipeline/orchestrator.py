@@ -32,7 +32,11 @@ class PipelineRunner:
             or getattr(state, "language_code", None)
             or os.environ.get("LANGUAGE_CODE", "te-IN")
         )
-        self.render_only = render_only or getattr(state, "render_only", False) or (os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"))
+        self.render_only = not dry_run and (
+            render_only
+            or getattr(state, "render_only", False)
+            or os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes")
+        )
         self.state = state or PipelineState(
             format=self.format,
             experiment_tag=self.experiment_tag,
@@ -62,6 +66,8 @@ class PipelineRunner:
                 encoding="utf-8",
                 check=True
             )
+            if result.stdout and result.stdout.strip():
+                print(result.stdout.strip())
             return result.stdout
         except subprocess.CalledProcessError as e:
             err_output = []
@@ -87,7 +93,10 @@ class PipelineRunner:
             files = [p for p in files if p.stat().st_mtime >= min_mtime]
         if not files:
             raise FileNotFoundError(f"No files matching {pattern} created since stage start found in {directory}")
-        return files[-1]
+        path = Path(files[-1])
+        if not path.is_file():
+            raise ValueError(f"Expected a valid file, got: {path}")
+        return path
 
     def run_research(self) -> Path:
         """Executes the RESEARCH stage."""
@@ -117,7 +126,7 @@ class PipelineRunner:
         self.state.save()
 
         research_file = self.state.get_output("research_output")
-        if not research_file or not Path(research_file).exists():
+        if not research_file or not Path(research_file).is_file():
             raise ValueError(f"Missing or invalid research input file: {research_file}")
 
         start_time = time.time()
@@ -152,7 +161,7 @@ class PipelineRunner:
         self.state.save()
 
         decision_file = self.state.get_output("decision_output")
-        if not decision_file or not Path(decision_file).exists():
+        if not decision_file or not Path(decision_file).is_file():
             raise ValueError(f"Missing or invalid decision input file: {decision_file}")
 
         start_time = time.time()
@@ -178,7 +187,7 @@ class PipelineRunner:
         self.state.save()
 
         brief_file = self.state.get_output("content_brief_output")
-        if not brief_file or not Path(brief_file).exists():
+        if not brief_file or not Path(brief_file).is_file():
             raise ValueError(f"Missing or invalid brief input file: {brief_file}")
 
         start_time = time.time()
@@ -204,7 +213,7 @@ class PipelineRunner:
         self.state.save()
 
         script_file = self.state.get_output("script_output")
-        if not script_file or not Path(script_file).exists():
+        if not script_file or not Path(script_file).is_file():
             raise ValueError(f"Missing or invalid script input file: {script_file}")
 
         # ── Pre-Voice QA Verification Gate ────────────────────────────────────
@@ -259,7 +268,7 @@ class PipelineRunner:
         self.state.save()
 
         script_file = self.state.get_output("script_output")
-        if not script_file or not Path(script_file).exists():
+        if not script_file or not Path(script_file).is_file():
             raise ValueError(f"Missing or invalid script input file: {script_file}")
 
         start_time = time.time()
@@ -289,9 +298,9 @@ class PipelineRunner:
 
         audio_file = self.state.get_output("audio_map_output")
         visual_file = self.state.get_output("visual_map_output")
-        if not audio_file or not Path(audio_file).exists():
+        if not audio_file or not Path(audio_file).is_file():
             raise ValueError(f"Missing or invalid audio map input file: {audio_file}")
-        if not visual_file or not Path(visual_file).exists():
+        if not visual_file or not Path(visual_file).is_file():
             raise ValueError(f"Missing or invalid visual map input file: {visual_file}")
 
         start_time = time.time()
@@ -331,7 +340,7 @@ class PipelineRunner:
         self.state.save()
 
         decision_file = self.state.get_output("decision_output")
-        if not decision_file or not Path(decision_file).exists():
+        if not decision_file or not Path(decision_file).is_file():
             raise ValueError(f"Missing or invalid decision input file: {decision_file}")
 
         start_time = time.time()
@@ -427,7 +436,7 @@ class PipelineRunner:
         """Executes the PUBLISHER stage (or dry-run)."""
         if self.dry_run:
             PipelineLogger.info("Dry-run publisher validation enabled; live upload is disabled.")
-        elif self.render_only or os.environ.get("RENDER_ONLY", "").lower() in ("true", "1", "yes"):
+        elif self.render_only or os.environ.get("RENDER_ONLY", "").strip().lower() in ("true", "1", "yes"):
             err = "CRITICAL SAFETY VIOLATION: run_publisher() invoked in render-only mode! Upload and live publishing are strictly forbidden."
             PipelineLogger.error(err)
             raise RuntimeError(err)
@@ -438,7 +447,7 @@ class PipelineRunner:
         self.state.save()
 
         qa_file = self.state.get_output("qa_output")
-        if not qa_file or not Path(qa_file).exists():
+        if not qa_file or not Path(qa_file).is_file():
             raise ValueError(f"Missing QA input file: {qa_file}")
 
         cmd = [sys.executable, "run_publisher.py", "--qa", str(qa_file)]
@@ -476,14 +485,22 @@ class PipelineRunner:
         audio_dest_dir.mkdir(parents=True, exist_ok=True)
         visuals_dest_dir.mkdir(parents=True, exist_ok=True)
 
+        def existing_file(value):
+            if value is None or not str(value).strip():
+                return None
+            source = Path(value)
+            if source == Path(".") or str(source).strip() in (".", "./", ".\\"):
+                return None
+            return source if source.is_file() else None
+
         # Source paths from pipeline state
-        cb_src = Path(self.state.get_output("content_brief_output") or "")
-        sc_src = Path(self.state.get_output("script_output") or "")
-        am_src = Path(self.state.get_output("audio_map_output") or "")
-        vm_src = Path(self.state.get_output("visual_map_output") or "")
-        vid_src = Path(self.state.get_output("video_output") or "")
-        thm_src = Path(self.state.get_output("thumbnail_output") or "")
-        qa_src = Path(self.state.get_output("qa_output") or "")
+        cb_src = existing_file(self.state.get_output("content_brief_output"))
+        sc_src = existing_file(self.state.get_output("script_output"))
+        am_src = existing_file(self.state.get_output("audio_map_output"))
+        vm_src = existing_file(self.state.get_output("visual_map_output"))
+        vid_src = existing_file(self.state.get_output("video_output"))
+        thm_src = existing_file(self.state.get_output("thumbnail_output"))
+        qa_src = existing_file(self.state.get_output("qa_output"))
 
         # Packaged destinations
         cb_dst = render_dir / "content_brief.json"
@@ -494,37 +511,37 @@ class PipelineRunner:
         thm_dst = render_dir / "thumbnail.png"
         qa_dst = render_dir / "final_qa.json"
 
-        if cb_src.exists():
+        if cb_src:
             shutil.copy2(cb_src, cb_dst)
-        if sc_src.exists():
+        if sc_src:
             shutil.copy2(sc_src, sc_dst)
-        if am_src.exists():
+        if am_src:
             shutil.copy2(am_src, am_dst)
-        if vm_src.exists():
+        if vm_src:
             shutil.copy2(vm_src, vm_dst)
-        if vid_src.exists():
+        if vid_src:
             shutil.copy2(vid_src, vid_dst)
             if vid_src.name != vid_dst.name:
                 shutil.copy2(vid_src, render_dir / vid_src.name)
-        if thm_src.exists():
+        if thm_src:
             shutil.copy2(thm_src, thm_dst)
-        if qa_src.exists():
+        if qa_src:
             shutil.copy2(qa_src, qa_dst)
 
         # Copy audio files
         audio_files_packaged = []
-        if am_src.exists():
+        if am_src:
             try:
                 am_data = json.loads(am_src.read_text(encoding="utf-8"))
-                full_narration = am_data.get("full_narration_audio_file")
-                if full_narration and Path(full_narration).exists():
-                    fn_dst = audio_dest_dir / Path(full_narration).name
+                full_narration = existing_file(am_data.get("full_narration_audio_file"))
+                if full_narration:
+                    fn_dst = audio_dest_dir / full_narration.name
                     shutil.copy2(full_narration, fn_dst)
                     audio_files_packaged.append(str(fn_dst))
                 for s in am_data.get("audio_scenes", []):
-                    af = s.get("audio_file")
-                    if af and Path(af).exists():
-                        af_dst = audio_dest_dir / Path(af).name
+                    af = existing_file(s.get("audio_file"))
+                    if af:
+                        af_dst = audio_dest_dir / af.name
                         shutil.copy2(af, af_dst)
                         audio_files_packaged.append(str(af_dst))
             except Exception as e:
@@ -532,14 +549,14 @@ class PipelineRunner:
 
         # Copy visual files
         visual_files_packaged = []
-        if vm_src.exists():
+        if vm_src:
             try:
                 vm_data = json.loads(vm_src.read_text(encoding="utf-8"))
                 for vs in vm_data.get("visual_scenes", []):
                     for k in ("image_file", "video_file"):
-                        vf = vs.get(k)
-                        if vf and Path(vf).exists():
-                            vf_dst = visuals_dest_dir / Path(vf).name
+                        vf = existing_file(vs.get(k))
+                        if vf:
+                            vf_dst = visuals_dest_dir / vf.name
                             shutil.copy2(vf, vf_dst)
                             visual_files_packaged.append(str(vf_dst))
             except Exception as e:
@@ -547,11 +564,11 @@ class PipelineRunner:
 
         # Validation
         artifacts_for_validation = {
-            "video": vid_dst if vid_dst.exists() else vid_src,
-            "audio": Path(audio_files_packaged[0]) if audio_files_packaged else (am_src),
-            "thumbnail": thm_dst if thm_dst.exists() else thm_src,
-            "script": sc_dst if sc_dst.exists() else sc_src,
-            "visual_map": vm_dst if vm_dst.exists() else vm_src,
+            "video": vid_dst,
+            "audio": Path(audio_files_packaged[0]) if audio_files_packaged else audio_dest_dir / "missing_audio_file",
+            "thumbnail": thm_dst,
+            "script": sc_dst,
+            "visual_map": vm_dst,
         }
 
         is_valid, details, errors = validate_render_only_output(
@@ -607,7 +624,10 @@ class PipelineRunner:
             self.state.save()
             raise ValueError(err_msg)
 
+        output_dir = render_dir
+        output_path = Path(output_dir) / "publishing_package.zip"
         self.state.set_output("render_only_dir", render_dir)
+        self.state.set_output("render_only_package", output_path)
         self.state.set_output("render_only_summary", summary_file)
         self.state.update_stage(stage, "COMPLETED")
         self.state.save()

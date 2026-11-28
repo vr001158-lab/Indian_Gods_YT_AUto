@@ -107,6 +107,18 @@ class TestPipelineState(unittest.TestCase):
 class TestPipelineOrchestrator(unittest.TestCase):
     """Tests PipelineRunner actions, dry run, fail-safes, and mock end-to-end runs (Tests 13-21)."""
 
+    def setUp(self):
+        self.env_patcher = patch.dict(os.environ, {
+            "YOUTUBE_PUBLISH": "false",
+            "YOUTUBE_PUBLISH_AUTHORIZED": "false",
+            "DRY_RUN": "true",
+            "RENDER_ONLY": "true",
+        })
+        self.env_patcher.start()
+
+    def tearDown(self):
+        self.env_patcher.stop()
+
     def test_13_runner_stores_dry_run(self):
         runner = PipelineRunner(dry_run=True)
         self.assertTrue(runner.dry_run)
@@ -122,6 +134,14 @@ class TestPipelineOrchestrator(unittest.TestCase):
     def test_15_non_existent_input_file_rejections(self):
         state = PipelineState()
         state.set_output("research_output", "non_existent_file_path.json")
+        runner = PipelineRunner(state)
+        
+        with self.assertRaises(ValueError):
+            runner.run_decision()
+
+    def test_15b_directory_as_input_rejections(self):
+        state = PipelineState()
+        state.set_output("research_output", ".")
         runner = PipelineRunner(state)
         
         with self.assertRaises(ValueError):
@@ -168,7 +188,9 @@ class TestPipelineOrchestrator(unittest.TestCase):
                 "reason": "Overall opportunity score is below threshold"
             }), encoding="utf-8")
             
-            state.set_output("research_output", tmp_path / "research.json") # dummy
+            research_dummy = tmp_path / "research.json"
+            research_dummy.write_text("{}", encoding="utf-8")
+            state.set_output("research_output", research_dummy)
             state.set_output("decision_output", decision_file)
             
             # Patch find_latest_file to return our unapproved decision JSON
@@ -183,30 +205,37 @@ class TestPipelineOrchestrator(unittest.TestCase):
         runner = PipelineRunner(state, dry_run=True)
         self.assertTrue(runner.dry_run)
 
+    @patch.dict(os.environ, {"RENDER_ONLY": "true", "YOUTUBE_PUBLISH": "false", "YOUTUBE_PUBLISH_AUTHORIZED": "false"})
     def test_20_resume_loading_skips(self):
-        state = PipelineState("resume_skip_run")
-        state.completed_stages = ["RESEARCH", "DECISION"]
-        state.current_stage = "CONTENT"
-        
-        # Verify execution starts from CONTENT stage
-        with patch.object(PipelineRunner, "run_content") as mock_content:
-            with patch.object(PipelineRunner, "run_script") as mock_script:
-                with patch.object(PipelineRunner, "run_voice") as mock_voice:
-                    with patch.object(PipelineRunner, "run_visual") as mock_visual:
-                        with patch.object(PipelineRunner, "run_video") as mock_video:
-                            with patch.object(PipelineRunner, "run_thumbnail") as mock_thumbnail:
-                                with patch.object(PipelineRunner, "run_qa") as mock_qa:
-                                    with patch.object(PipelineRunner, "run_publisher") as mock_pub:
-                                        runner = PipelineRunner(state, dry_run=True)
-                                        runner.execute_pipeline()
-                                        
-                                        # Content and subsequent should be called, but not research/decision
-                                        mock_content.assert_called_once()
-                                        mock_script.assert_called_once()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            qa_file = tmp_path / "qa.json"
+            qa_file.write_text("{}", encoding="utf-8")
 
+            state = PipelineState("resume_skip_run")
+            state.completed_stages = ["RESEARCH", "DECISION"]
+            state.current_stage = "CONTENT"
+            state.set_output("qa_output", qa_file)
+
+            # Verify execution starts from CONTENT stage
+            with patch.object(PipelineRunner, "run_content") as mock_content:
+                with patch.object(PipelineRunner, "run_script") as mock_script:
+                    with patch.object(PipelineRunner, "run_voice") as mock_voice:
+                        with patch.object(PipelineRunner, "run_visual") as mock_visual:
+                            with patch.object(PipelineRunner, "run_video") as mock_video:
+                                with patch.object(PipelineRunner, "run_thumbnail") as mock_thumbnail:
+                                    with patch.object(PipelineRunner, "run_qa") as mock_qa:
+                                        with patch.object(PipelineRunner, "run_publisher", return_value=qa_file) as mock_pub:
+                                            runner = PipelineRunner(state, dry_run=True)
+                                            runner.execute_pipeline()
+                                            
+                                            # Content and subsequent should be called, but not research/decision
+                                            mock_content.assert_called_once()
+                                            mock_script.assert_called_once()
+
+    @patch.dict(os.environ, {"RENDER_ONLY": "true", "YOUTUBE_PUBLISH": "false", "YOUTUBE_PUBLISH_AUTHORIZED": "false"})
     def test_21_successful_full_pipeline_mock_execution(self):
         state = PipelineState("full_mock_run")
-
         
         # Setup files on disk to prevent path validation failures
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -218,7 +247,8 @@ class TestPipelineOrchestrator(unittest.TestCase):
             script_f = tmp_path / "script.json"
             audio_f = tmp_path / "audio.json"
             visual_f = tmp_path / "visual.json"
-            video_f = tmp_path / "video.json"
+            video_map_f = tmp_path / "video_map.json"
+            mp4_f = tmp_path / "video.mp4"
             thumb_f = tmp_path / "thumb.json"
             qa_f = tmp_path / "qa.json"
             pub_f = tmp_path / "publish.json"
@@ -229,10 +259,23 @@ class TestPipelineOrchestrator(unittest.TestCase):
             script_f.write_text("{}", encoding="utf-8")
             audio_f.write_text("{}", encoding="utf-8")
             visual_f.write_text("{}", encoding="utf-8")
-            video_f.write_text(json.dumps({"video_file": "video.mp4"}), encoding="utf-8")
+            mp4_f.write_bytes(b"\x00\x00\x00\x20ftypisom" + b"\x00" * 100)
+            video_map_f.write_text(json.dumps({"video_file": str(mp4_f)}), encoding="utf-8")
             thumb_f.write_text("{}", encoding="utf-8")
             qa_f.write_text("{}", encoding="utf-8")
             pub_f.write_text("{}", encoding="utf-8")
+            
+            state.set_output("research_output", research_f)
+            state.set_output("decision_output", decision_f)
+            state.set_output("content_brief_output", brief_f)
+            state.set_output("script_output", script_f)
+            state.set_output("audio_map_output", audio_f)
+            state.set_output("visual_map_output", visual_f)
+            state.set_output("video_map_output", video_map_f)
+            state.set_output("video_output", mp4_f)
+            state.set_output("thumbnail_output", thumb_f)
+            state.set_output("qa_output", qa_f)
+            state.set_output("publishing_output", pub_f)
             
             # Setup stage return values
             with patch.object(PipelineRunner, "run_research", return_value=research_f) as m_res:
@@ -241,7 +284,7 @@ class TestPipelineOrchestrator(unittest.TestCase):
                         with patch.object(PipelineRunner, "run_script", return_value=script_f) as m_scr:
                             with patch.object(PipelineRunner, "run_voice", return_value=audio_f) as m_voi:
                                 with patch.object(PipelineRunner, "run_visual", return_value=visual_f) as m_vis:
-                                    with patch.object(PipelineRunner, "run_video", return_value=video_f) as m_vid:
+                                    with patch.object(PipelineRunner, "run_video", return_value=video_map_f) as m_vid:
                                         with patch.object(PipelineRunner, "run_thumbnail", return_value=thumb_f) as m_thu:
                                             with patch.object(PipelineRunner, "run_qa", return_value=qa_f) as m_qa:
                                                 with patch.object(PipelineRunner, "run_publisher", return_value=pub_f) as m_pub:
